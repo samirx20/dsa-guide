@@ -11,9 +11,11 @@ const EDGE_CURRICULUM = [
         title: "JavaScript & Browser Basics",
         items: [
           { id: "p1t1c1", type: "concept", text: "The DOM & Events — how the browser renders HTML and handles clicks/inputs" },
-          { id: "p1t1c2", type: "concept", text: "Asynchronous JS — Callbacks, Promises, and Async/Await (fetching data without freezing the UI)" },
-          { id: "p1t1c3", type: "concept", text: "Local Storage & Session Storage — persisting simple data in the browser" },
-          { id: "p1t1c4", type: "concept", text: "The Fetch API — making GET/POST requests to external APIs" },
+          { id: "p1t1c2", type: "concept", text: "CSS & Styling Basics — Flexbox, Grid, Box Model, and responsive design" },
+          { id: "p1t1c3", type: "concept", text: "Tailwind CSS Intro — utility-first styling for rapid development" },
+          { id: "p1t1c4", type: "concept", text: "Asynchronous JS — Callbacks, Promises, and Async/Await (fetching data without freezing the UI)" },
+          { id: "p1t1c5", type: "concept", text: "Local Storage & Session Storage — persisting simple data in the browser" },
+          { id: "p1t1c6", type: "concept", text: "The Fetch API — making GET/POST requests to external APIs" },
           { id: "p1t1p1", type: "project", num: 1, slug: "weather-dashboard", title: "Build a Weather Dashboard using Fetch and LocalStorage", difficulty: "Easy" }
         ]
       },
@@ -52,7 +54,8 @@ const EDGE_CURRICULUM = [
         items: [
           { id: "p2t2c1", type: "concept", text: "Server vs Client Components — when to render on the server vs the browser" },
           { id: "p2t2c2", type: "concept", text: "Routing & Layouts — file-based routing and nested layouts" },
-          { id: "p2t2c3", type: "concept", text: "Server Actions — mutating data without building a separate API route" },
+          { id: "p2t2c3", type: "concept", text: "Data Fetching & Caching — revalidation, static vs dynamic rendering in Next.js" },
+          { id: "p2t2c4", type: "concept", text: "Server Actions — mutating data without building a separate API route" },
           { id: "p2t2p1", type: "project", num: 2, slug: "saas-dashboard", title: "Build a multi-tenant SaaS dashboard with Next.js App Router", difficulty: "Medium" }
         ]
       }
@@ -157,8 +160,9 @@ const EDGE_CURRICULUM = [
         title: "SDK Design & Distribution",
         items: [
           { id: "p6t1c1", type: "concept", text: "Vite Library Mode — bundling TypeScript code for NPM distribution" },
-          { id: "p6t1c2", type: "concept", text: "The Beacon API — sending analytics data even if the user closes the tab" },
-          { id: "p6t1c3", type: "concept", text: "Batching & Queuing — grouping network requests to save battery and bandwidth" },
+          { id: "p6t1c2", type: "concept", text: "Testing — Unit Testing with Vitest and Mocking API Requests" },
+          { id: "p6t1c3", type: "concept", text: "The Beacon API — sending analytics data even if the user closes the tab" },
+          { id: "p6t1c4", type: "concept", text: "Batching & Queuing — grouping network requests to save battery and bandwidth" },
           { id: "p6t1p1", type: "project", num: 1, slug: "tracker-sdk", title: "Build, bundle, and publish the Open Source Edge Tracker SDK to NPM", difficulty: "Expert" },
           { id: "p6t1p2", type: "project", num: 2, slug: "ingestion-engine", title: "Build the high-scale Hono + Drizzle backend to ingest millions of tracker events", difficulty: "Expert" }
         ]

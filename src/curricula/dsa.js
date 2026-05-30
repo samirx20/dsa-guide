@@ -293,6 +293,7 @@ const DSA_CURRICULUM = [
         {id:"p11t1c3",type:"concept",text:"BFS — level-by-level via queue; finds shortest path in unweighted graphs"},
         {id:"p11t1c4",type:"concept",text:"DFS — depth-first via recursion/stack; cycle detection, connected components"},
         {id:"p11t1c5",type:"concept",text:"visited set or boolean array — essential to avoid revisiting nodes"},
+        {id:"p11t1c6",type:"concept",text:"Bipartite Graphs — coloring graphs using BFS/DFS to check for two sets"},
         {id:"p11t1p1",type:"problem",num:733, slug:"flood-fill",                   title:"Flood Fill",                          difficulty:"Easy"},
         {id:"p11t1p2",type:"problem",num:200, slug:"number-of-islands",            title:"Number of Islands",                   difficulty:"Medium"},
         {id:"p11t1p3",type:"problem",num:695, slug:"max-area-of-island",           title:"Max Area of Island",                  difficulty:"Medium"},
@@ -300,7 +301,8 @@ const DSA_CURRICULUM = [
         {id:"p11t1p5",type:"problem",num:994, slug:"rotting-oranges",              title:"Rotting Oranges (multi-source BFS)",  difficulty:"Medium"},
         {id:"p11t1p6",type:"problem",num:417, slug:"pacific-atlantic-water-flow",  title:"Pacific Atlantic Water Flow",         difficulty:"Medium"},
         {id:"p11t1p7",type:"problem",num:130, slug:"surrounded-regions",           title:"Surrounded Regions",                  difficulty:"Medium"},
-        {id:"p11t1p8",type:"problem",num:127, slug:"word-ladder",                  title:"Word Ladder",                         difficulty:"Hard"},
+        {id:"p11t1p8",type:"problem",num:785, slug:"is-graph-bipartite",           title:"Is Graph Bipartite?",                 difficulty:"Medium"},
+        {id:"p11t1p9",type:"problem",num:127, slug:"word-ladder",                  title:"Word Ladder",                         difficulty:"Hard"},
       ]},
       { id:"p11t2", title:"Topological Sort & Cycle Detection", items:[
         {id:"p11t2c1",type:"concept",text:"DAG — Directed Acyclic Graph; only DAGs have valid topological orderings"},
@@ -341,6 +343,7 @@ const DSA_CURRICULUM = [
         {id:"p12t0c4",type:"concept",text:"State definition — what does dp[i] or dp[i][j] mean? Write it in English first"},
         {id:"p12t0c5",type:"concept",text:"Transition relation — how to compute dp[i] from dp[i-1] or smaller states"},
         {id:"p12t0c6",type:"concept",text:"Space optimization — rolling array or 1D reduction from 2D tables"},
+        {id:"p12t0c7",type:"concept",text:"0/1 Knapsack Pattern — pick or don't pick to maximize value within capacity"},
       ]},
       { id:"p12t1", title:"1D Dynamic Programming", items:[
         {id:"p12t1p1",type:"problem",num:70,  slug:"climbing-stairs",                               title:"Climbing Stairs",                             difficulty:"Easy"},
