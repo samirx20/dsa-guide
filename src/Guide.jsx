@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useLocalStorage } from "./hooks/useLocalStorage";
+import styles from "./Guide.module.css";
 
 const DIFF_STYLE = {
   Easy:   { bg:"var(--color-background-success)", color:"var(--color-text-success)" },
@@ -12,10 +14,10 @@ function PhaseProgress({ phase, checked }) {
   const total = items.length;
   const pct = total ? Math.round((done/total)*100) : 0;
   return (
-    <div style={{display:"flex",alignItems:"center",gap:8,marginLeft:"auto"}}>
-      <span style={{fontSize:12,color:"var(--color-text-secondary)",whiteSpace:"nowrap"}}>{done}/{total}</span>
-      <div style={{width:60,height:4,borderRadius:2,background:"var(--color-border-tertiary)",overflow:"hidden"}}>
-        <div style={{width:`${pct}%`,height:"100%",background:phase.accent,borderRadius:2,transition:"width 0.3s"}}/>
+    <div className={styles.progressWrapper}>
+      <span className={styles.progressTextSmall}>{done}/{total}</span>
+      <div className={styles.progressTrack}>
+        <div className={styles.progressFill} style={{ width: `${pct}%`, background: phase.accent }} />
       </div>
     </div>
   );
@@ -25,48 +27,37 @@ function Item({ item, done, onToggle }) {
   const isLink = item.type === "problem" || item.type === "task";
   const url = item.type === "problem" ? `https://leetcode.com/problems/${item.slug}/` : null;
   return (
-    <div style={{
-      display:"flex",alignItems:"flex-start",gap:10,
-      padding:"7px 16px",cursor:"pointer",
-      background: done ? "var(--color-background-secondary)" : "transparent",
-      transition:"background 0.15s",
-    }}
+    <div 
+      className={`${styles.itemContainer} ${done ? styles.done : ''}`}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(item.id); }}}
       onClick={() => onToggle(item.id)}
       role="checkbox"
       aria-checked={done}
       tabIndex={0}
     >
-      <div style={{
-        width:16,height:16,borderRadius:3,flexShrink:0,marginTop:2,
-        border:`1.5px solid ${done ? "var(--color-border-primary)" : "var(--color-border-secondary)"}`,
-        background: done ? "var(--color-text-secondary)" : "transparent",
-        display:"flex",alignItems:"center",justifyContent:"center",
-        transition:"all 0.15s",
-      }}>
+      <div className={`${styles.checkbox} ${done ? styles.done : styles.todo}`}>
         {done && <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
           <path d="M1 4L3.5 6.5L9 1" stroke="var(--color-background-primary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>}
       </div>
       {isLink ? (
-        <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"wrap",flex:1,opacity:done?0.5:1}}>
-          <span style={{fontSize:11,fontFamily:"var(--font-mono)",color:"var(--color-text-tertiary)",flexShrink:0}}>#{item.num}</span>
-          <span style={{fontSize:13,color:"var(--color-text-primary)",fontWeight:400}}>{item.title}</span>
-          <span style={{
-            fontSize:10,fontWeight:500,padding:"1px 6px",borderRadius:3,flexShrink:0,
-            background:DIFF_STYLE[item.difficulty].bg,
-            color:DIFF_STYLE[item.difficulty].color,
+        <div className={`${styles.linkContent} ${done ? styles.done : ''}`}>
+          <span className={styles.itemNum}>#{item.num}</span>
+          <span className={styles.itemTitle}>{item.title}</span>
+          <span className={styles.itemDiff} style={{
+            background: DIFF_STYLE[item.difficulty].bg,
+            color: DIFF_STYLE[item.difficulty].color,
           }}>{item.difficulty}</span>
           {url && (
             <a href={url} target="_blank" rel="noreferrer"
               onClick={e => e.stopPropagation()}
-              style={{fontSize:11,color:"var(--color-text-info)",textDecoration:"none",flexShrink:0,display:"flex",alignItems:"center",gap:2}}>
+              className={styles.itemUrl}>
               <i className="ti ti-external-link" style={{fontSize:11}} aria-hidden="true"/>
             </a>
           )}
         </div>
       ) : (
-        <span style={{fontSize:13,color:done?"var(--color-text-tertiary)":"var(--color-text-primary)",lineHeight:1.5,flex:1,opacity:done?0.5:1}}>
+        <span className={`${styles.textContent} ${done ? styles.done : styles.todo}`}>
           {item.text}
         </span>
       )}
@@ -81,24 +72,14 @@ function Topic({ topic, checked, expanded, onToggle, onToggleItem }) {
   const isOpen = !!expanded[topic.id];
 
   return (
-    <div style={{borderTop:"0.5px solid var(--color-border-tertiary)"}}>
+    <div className={styles.topicContainer}>
       <div
         onClick={() => onToggle(topic.id)}
-        style={{
-          display:"flex",alignItems:"center",gap:8,
-          padding:"8px 16px",cursor:"pointer",
-          background: isOpen ? "var(--color-background-secondary)" : "transparent",
-        }}
+        className={`${styles.topicHeader} ${isOpen ? styles.open : ''}`}
       >
-        <i className="ti ti-chevron-down" aria-hidden="true" style={{
-          fontSize:13,color:"var(--color-text-tertiary)",
-          transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
-          transition:"transform 0.2s",
-        }}/>
-        <span style={{fontSize:13,fontWeight:500,color:"var(--color-text-primary)"}}>{topic.title}</span>
-        <span style={{fontSize:11,color:"var(--color-text-tertiary)",marginLeft:"auto"}}>
-          {done}/{total}
-        </span>
+        <i className={`ti ti-chevron-down ${styles.chevron} ${isOpen ? styles.open : styles.closed}`} aria-hidden="true"/>
+        <span className={styles.topicTitle}>{topic.title}</span>
+        <span className={styles.topicProgress}>{done}/{total}</span>
       </div>
       {isOpen && (
         <div>
@@ -114,41 +95,25 @@ function Topic({ topic, checked, expanded, onToggle, onToggleItem }) {
 function Phase({ phase, checked, expandedPhases, expandedTopics, onTogglePhase, onToggleTopic, onToggleItem }) {
   const isOpen = !!expandedPhases[phase.id];
   return (
-    <div style={{
-      borderRadius:"var(--border-radius-lg)",
-      border:"0.5px solid var(--color-border-tertiary)",
-      overflow:"hidden",
-      marginBottom:8,
-    }}>
+    <div className={styles.phaseContainer}>
       <div
         onClick={() => onTogglePhase(phase.id)}
-        style={{
-          display:"flex",alignItems:"center",gap:10,
-          padding:"12px 16px",cursor:"pointer",
-          background:"var(--color-background-secondary)",
-          borderLeft:`3px solid ${phase.accent}`,
-        }}
+        className={styles.phaseHeader}
+        style={{ borderLeft: `3px solid ${phase.accent}` }}
       >
-        <span style={{
-          fontSize:11,fontWeight:500,padding:"2px 7px",borderRadius:3,
+        <span className={styles.phaseBadge} style={{
           background: phase.accent + "22",
           color: phase.accent,
-          flexShrink:0,
-          fontFamily:"var(--font-mono)",
         }}>P{phase.phase}</span>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:14,fontWeight:500,color:"var(--color-text-primary)"}}>{phase.title}</div>
-          {isOpen && <div style={{fontSize:11,color:"var(--color-text-secondary)",marginTop:1}}>{phase.subtitle}</div>}
+        <div className={styles.phaseTitleContainer}>
+          <div className={styles.phaseTitle}>{phase.title}</div>
+          {isOpen && <div className={styles.phaseSubtitle}>{phase.subtitle}</div>}
         </div>
         <PhaseProgress phase={phase} checked={checked}/>
-        <i className="ti ti-chevron-down" aria-hidden="true" style={{
-          fontSize:14,color:"var(--color-text-tertiary)",flexShrink:0,
-          transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
-          transition:"transform 0.2s",
-        }}/>
+        <i className={`ti ti-chevron-down ${styles.chevron} ${isOpen ? styles.open : styles.closed}`} aria-hidden="true"/>
       </div>
       {isOpen && (
-        <div style={{background:"var(--color-background-primary)"}}>
+        <div className={styles.phaseContent}>
           {phase.topics.map(topic => (
             <Topic
               key={topic.id} topic={topic} checked={checked}
@@ -163,47 +128,38 @@ function Phase({ phase, checked, expandedPhases, expandedTopics, onTogglePhase, 
   );
 }
 
-export default function Guide({
-  curriculum, storageKey, title, subtitle,
-  taskLabel, taskColor,
-  showLeetCodeLegend, showDiffLegend,
-}) {
-  const [checked, setChecked]           = useState(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey))?.c || {}; } catch { return {}; }
-  });
-  const [expandedPhases, setEP]         = useState(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey))?.ep || {[curriculum[0].id]: true}; } catch { return {[curriculum[0].id]: true}; }
-  });
-  const [expandedTopics, setET]         = useState(() => {
-    const first = curriculum[0].topics;
-    const defaults = {};
-    first.forEach(t => { defaults[t.id] = true; });
-    try { return JSON.parse(localStorage.getItem(storageKey))?.et || defaults; } catch { return defaults; }
-  });
-  const [filter, setFilter]             = useState("all");
-  const [showReset, setShowReset]       = useState(false);
+export default function Guide({ config }) {
+  const {
+    curriculum, storageKey, title, subtitle,
+    taskLabel, taskColor,
+    showLeetCodeLegend, showDiffLegend,
+  } = config;
 
-  const persist = (c, ep, et) => {
-    try { localStorage.setItem(storageKey, JSON.stringify({ c, ep, et })); } catch { /* quota exceeded */ }
-  };
+  const [storedData, setStoredData] = useLocalStorage(storageKey, {
+    c: {},
+    ep: { [curriculum[0].id]: true },
+    et: curriculum[0].topics.reduce((acc, t) => ({ ...acc, [t.id]: true }), {})
+  });
+
+  const checked = storedData.c || {};
+  const expandedPhases = storedData.ep || {};
+  const expandedTopics = storedData.et || {};
+
+  const [filter, setFilter] = useState("all");
+  const [showReset, setShowReset] = useState(false);
+
+  const persist = (c, ep, et) => setStoredData({ c, ep, et });
 
   const handleToggleItem = (id) => {
-    const nc = { ...checked, [id]: !checked[id] };
-    setChecked(nc);
-    persist(nc, expandedPhases, expandedTopics);
+    persist({ ...checked, [id]: !checked[id] }, expandedPhases, expandedTopics);
   };
   const handleTogglePhase = (id) => {
-    const nep = { ...expandedPhases, [id]: !expandedPhases[id] };
-    setEP(nep);
-    persist(checked, nep, expandedTopics);
+    persist(checked, { ...expandedPhases, [id]: !expandedPhases[id] }, expandedTopics);
   };
   const handleToggleTopic = (id) => {
-    const net = { ...expandedTopics, [id]: !expandedTopics[id] };
-    setET(net);
-    persist(checked, expandedPhases, net);
+    persist(checked, expandedPhases, { ...expandedTopics, [id]: !expandedTopics[id] });
   };
   const handleReset = () => {
-    setChecked({});
     persist({}, expandedPhases, expandedTopics);
     setShowReset(false);
   };
@@ -228,106 +184,75 @@ export default function Guide({
   })).filter(p => p.topics.length > 0);
 
   return (
-    <div style={{padding:"1rem 0",maxWidth:720,margin:"0 auto"}}>
+    <div className={styles.container}>
       <h2 className="sr-only">{title}</h2>
 
-      <div style={{marginBottom:"1.5rem",padding:"0 4px"}}>
-        <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:4}}>
+      <div className={styles.header}>
+        <div className={styles.titleRow}>
           <div>
-            <span style={{fontSize:20,fontWeight:500,color:"var(--color-text-primary)"}}>{title}</span>
-            <span style={{fontSize:13,color:"var(--color-text-secondary)",marginLeft:10}}>{subtitle}</span>
+            <span className={styles.title}>{title}</span>
+            <span className={styles.subtitle}>{subtitle}</span>
           </div>
-          <span style={{fontSize:13,color:"var(--color-text-secondary)"}}>{pct}% complete</span>
+          <span className={styles.progressText}>{pct}% complete</span>
         </div>
 
-        <div style={{height:6,borderRadius:3,background:"var(--color-border-tertiary)",overflow:"hidden",marginBottom:12}}>
-          <div style={{
-            width:`${pct}%`,height:"100%",borderRadius:3,
-            background:"linear-gradient(90deg,#0F6E56,#185FA5)",
-            transition:"width 0.4s ease",
-          }}/>
+        <div className={styles.progressBarContainer}>
+          <div className={styles.progressBar} style={{ width: `${pct}%`, background: "linear-gradient(90deg,#0F6E56,#185FA5)" }}/>
         </div>
 
-        <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:16}}>
+        <div className={styles.statsRow}>
           {[
             {label:"Total",     val:`${done}/${total}`,      color:"var(--color-text-primary)"},
             {label:taskLabel,   val:`${taskDone}/${taskItems.length}`,   color:taskColor},
             {label:"Concepts",  val:`${concDone}/${concepts.length}`,color:"var(--color-text-info)"},
           ].map(s => (
-            <div key={s.label} style={{
-              background:"var(--color-background-secondary)",
-              borderRadius:"var(--border-radius-md)",
-              border:"0.5px solid var(--color-border-tertiary)",
-              padding:"6px 14px",display:"flex",gap:6,alignItems:"baseline",
-            }}>
-              <span style={{fontSize:11,color:"var(--color-text-secondary)"}}>{s.label}</span>
-              <span style={{fontSize:14,fontWeight:500,color:s.color,fontFamily:"var(--font-mono)"}}>{s.val}</span>
+            <div key={s.label} className={styles.statCard}>
+              <span className={styles.statLabel}>{s.label}</span>
+              <span className={styles.statValue} style={{ color: s.color }}>{s.val}</span>
             </div>
           ))}
-          <button onClick={() => setShowReset(!showReset)} style={{
-            marginLeft:"auto",fontSize:11,color:"var(--color-text-tertiary)",
-            background:"transparent",border:"none",cursor:"pointer",padding:"6px 8px",
-          }} aria-label="Reset progress">
+          <button onClick={() => setShowReset(!showReset)} className={styles.resetButton} aria-label="Reset progress">
             <i className="ti ti-refresh" aria-hidden="true" style={{fontSize:13}}/>
           </button>
         </div>
 
         {showReset && (
-          <div style={{
-            padding:12,borderRadius:"var(--border-radius-md)",
-            background:"var(--color-background-danger)",
-            border:"0.5px solid var(--color-border-danger)",
-            display:"flex",alignItems:"center",gap:12,marginBottom:12,
-          }}>
-            <span style={{fontSize:13,color:"var(--color-text-danger)",flex:1}}>Reset all progress? This cannot be undone.</span>
-            <button onClick={handleReset} style={{
-              fontSize:12,padding:"4px 12px",borderRadius:4,
-              background:"var(--color-background-danger)",
-              color:"var(--color-text-danger)",
-              border:"0.5px solid var(--color-border-danger)",cursor:"pointer",fontWeight:500,
-            }}>Reset</button>
-            <button onClick={()=>setShowReset(false)} style={{
-              fontSize:12,padding:"4px 12px",borderRadius:4,
-              background:"var(--color-background-secondary)",
-              color:"var(--color-text-secondary)",
-              border:"0.5px solid var(--color-border-tertiary)",cursor:"pointer",
-            }}>Cancel</button>
+          <div className={styles.resetAlert}>
+            <span className={styles.resetText}>Reset all progress? This cannot be undone.</span>
+            <button onClick={handleReset} className={styles.resetConfirmBtn}>Reset</button>
+            <button onClick={()=>setShowReset(false)} className={styles.resetCancelBtn}>Cancel</button>
           </div>
         )}
 
-        <div style={{display:"flex",gap:6}}>
+        <div className={styles.filterRow}>
           {[
             {key:"all",   label:"All"},
             {key:"todo",  label:"To Do"},
             {key:"done",  label:"Completed"},
           ].map(f => (
-            <button key={f.key} onClick={() => setFilter(f.key)} style={{
-              fontSize:12,padding:"5px 14px",borderRadius:"var(--border-radius-md)",cursor:"pointer",
-              border: filter===f.key ? "0.5px solid var(--color-border-primary)" : "0.5px solid var(--color-border-tertiary)",
-              background: filter===f.key ? "var(--color-background-primary)" : "transparent",
-              color: filter===f.key ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-              fontWeight: filter===f.key ? 500 : 400,
-            }}>{f.label}</button>
+            <button key={f.key} onClick={() => setFilter(f.key)} 
+              className={`${styles.filterBtn} ${filter === f.key ? styles.active : ''}`}>
+              {f.label}
+            </button>
           ))}
         </div>
       </div>
 
-      <div style={{display:"flex",gap:16,marginBottom:12,padding:"0 4px"}}>
+      <div className={styles.legendRow}>
         {[
           {icon:"ti-book",    label:"Concept to learn", color:"var(--color-text-secondary)"},
           {icon:"ti-code",    label: showLeetCodeLegend ? "LeetCode problem" : "Task to build",  color:"var(--color-text-secondary)"},
         ].map(l => (
-          <div key={l.label} style={{display:"flex",alignItems:"center",gap:4}}>
-            <i className={`ti ${l.icon}`} style={{fontSize:12,color:l.color}} aria-hidden="true"/>
-            <span style={{fontSize:11,color:"var(--color-text-tertiary)"}}>{l.label}</span>
+          <div key={l.label} className={styles.legendItem}>
+            <i className={`ti ${l.icon} ${styles.legendIcon}`} style={{color:l.color}} aria-hidden="true"/>
+            <span className={styles.legendText}>{l.label}</span>
           </div>
         ))}
         {showDiffLegend && (
-          <div style={{display:"flex",gap:8,marginLeft:"auto"}}>
+          <div className={styles.diffLegend}>
             {["Easy","Medium","Hard"].map(d => (
-              <span key={d} style={{
-                fontSize:10,padding:"1px 6px",borderRadius:3,
-                background:DIFF_STYLE[d].bg,color:DIFF_STYLE[d].color,fontWeight:500,
+              <span key={d} className={styles.diffBadge} style={{
+                background: DIFF_STYLE[d].bg, color: DIFF_STYLE[d].color
               }}>{d}</span>
             ))}
           </div>
@@ -336,7 +261,7 @@ export default function Guide({
 
       <div>
         {visibleCurriculum.length === 0 ? (
-          <div style={{textAlign:"center",padding:"2rem",color:"var(--color-text-secondary)",fontSize:14}}>
+          <div className={styles.emptyState}>
             {filter==="done" ? "Nothing completed yet — keep going!" : "All done! 🎉"}
           </div>
         ) : visibleCurriculum.map(phase => (
@@ -353,7 +278,7 @@ export default function Guide({
         ))}
       </div>
 
-      <div style={{marginTop:16,textAlign:"center",fontSize:11,color:"var(--color-text-tertiary)"}}>
+      <div className={styles.footer}>
         Progress is saved automatically · Click any item to mark it done
       </div>
     </div>

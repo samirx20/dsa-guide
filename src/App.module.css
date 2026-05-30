@@ -1,0 +1,24 @@
+.tabContainer {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  padding: 1rem 0 0;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+
+.tab {
+  font-size: 14px;
+  font-weight: 400;
+  padding: 8px 24px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.tab.active {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}

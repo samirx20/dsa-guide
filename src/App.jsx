@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useLocalStorage } from "./hooks/useLocalStorage";
 import Guide from "./Guide.jsx";
 import DSA_CURRICULUM from "./curricula/dsa.js";
 import EDGE_CURRICULUM from "./curricula/edge.js";
+import styles from "./App.module.css";
 
 const TABS = [
   {
@@ -31,48 +32,25 @@ const TABS = [
 ];
 
 export default function App() {
-  const [tab, setTab] = useState(() => {
-    try { return localStorage.getItem("guide-active-tab") || "dsa"; } catch { return "dsa"; }
-  });
-
-  const handleTabChange = (id) => {
-    setTab(id);
-    try { localStorage.setItem("guide-active-tab", id); } catch { /* quota exceeded */ }
-  };
-
-  const active = TABS.find(t => t.id === tab);
+  const [tab, setTab] = useLocalStorage("guide-active-tab", "dsa");
+  const active = TABS.find(t => t.id === tab) || TABS[0];
 
   return (
     <div>
-      <div style={{
-        display: "flex", justifyContent: "center", gap: 0, padding: "1rem 0 0",
-        borderBottom: "0.5px solid var(--color-border-tertiary)",
-      }}>
+      <div className={styles.tabContainer}>
         {TABS.map(t => (
-          <button key={t.id} onClick={() => handleTabChange(t.id)} style={{
-            fontSize: 14, fontWeight: tab === t.id ? 500 : 400,
-            padding: "8px 24px", cursor: "pointer",
-            background: "transparent", border: "none",
-            color: tab === t.id ? "var(--color-text-primary)" : "var(--color-text-tertiary)",
-            borderBottom: tab === t.id ? `2px solid ${t.curriculum[0].accent}` : "2px solid transparent",
-            transition: "all 0.15s",
-          }}>
+          <button 
+            key={t.id} 
+            onClick={() => setTab(t.id)} 
+            className={`${styles.tab} ${tab === t.id ? styles.active : ''}`}
+            style={{ borderBottomColor: tab === t.id ? t.curriculum[0].accent : 'transparent' }}
+          >
             {t.label}
           </button>
         ))}
       </div>
 
-      <Guide
-        key={active.id}
-        curriculum={active.curriculum}
-        storageKey={active.storageKey}
-        title={active.title}
-        subtitle={active.subtitle}
-        taskLabel={active.taskLabel}
-        taskColor={active.taskColor}
-        showLeetCodeLegend={active.showLeetCodeLegend}
-        showDiffLegend={active.showDiffLegend}
-      />
+      <Guide key={active.id} config={active} />
     </div>
   );
 }
