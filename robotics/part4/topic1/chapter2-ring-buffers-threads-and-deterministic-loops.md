@@ -430,6 +430,201 @@ int main() {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Trace a capacity-3 ring buffer.** Using the chapter's `push_overwrite` / `pop_oldest` logic on a `RealTimeRingBuffer<int, 3>`, fill in slots, `head_`, `tail_`, `count_` and the return value after each operation: `push(1)`, `push(2)`, `push(3)`, `push(4)`, `push(5)`, `pop()`, `push(6)`, `pop()`, `pop()`. How many items were overwritten?
+
+**Q2. Power-of-two masks.** For $N = 8$, what is `(13 + 1) & (N - 1)`? Why is the bitwise trick invalid for $N = 6$? Compute `(5 + 1) & (6 - 1)` and compare it with `(5 + 1) % 6`.
+
+**Q3. Drift arithmetic.** A $200\text{ Hz}$ loop ($T_s = 5\text{ ms}$) uses `sleep_for(5ms)`. Its body takes $0.8\text{ ms}$ and the scheduler adds $0.2\text{ ms}$ of wake-up latency. What are the actual period and rate, and how far behind schedule is it after 200 ticks? What is the accumulated error with `sleep_until`?
+
+**Q4. Producer outruns a stalled consumer.** In the chapter's `main()` (400 Hz producer, `RealTimeRingBuffer<ImuSample, 8>`), the controller has just drained everything up to `seq=#20`. Then the controller is delayed so that $40\text{ ms}$ pass before its next drain. How many samples are produced, which sequence numbers does the drain return, how many does `overwritten_count()` increase by, and what is `latest.sequence_id`?
+
+**Q5. Which line is the bug?** A teammate "simplifies" `push_overwrite`:
+
+```cpp
+void push_overwrite(const T& item) noexcept {
+    std::lock_guard<std::mutex> lock(mtx_);
+    buffer_[head_] = item;
+    head_ = (head_ + 1) % Capacity;
+    if (count_ < Capacity) ++count_;   // tail_ is never advanced
+}
+```
+
+On a capacity-4 buffer, after `push(10)`, …, `push(50)`, what do four successive `pop_oldest()` calls return? Compare with the chapter's dry-run table.
+
+### Coding Exercises
+
+**E1 (Easy). `peek_latest()`.** Write a single-threaded `RingBuffer<T, Capacity>` with the chapter's `push_overwrite` and `pop_oldest`, plus `std::optional<T> peek_latest() const` that returns the newest element **without removing it** (`std::nullopt` if empty).
+- Capacity 3, push `1..5`: `peek_latest()` → `5`, `size()` → `3`. Then `pop_oldest()` → `3`.
+
+**E2 (Easy–Medium). O(1) moving average.** A gyro bias estimator wants the mean of the last $N$ samples on every push. Write `template <std::size_t N> class RunningMeanRing` with `push(double)` and `mean()` that keeps a running sum, subtracting the value being overwritten, so each push is $O(1)$ and allocation-free.
+- $N = 3$: push `1, 2, 3` → `mean() == 2`. Push `10` → `5`. Push `20` → `11`.
+
+**E3 (Medium). Simulate `sleep_until` with the catch-up guard.** Without threads, model the phase-locked loop deterministically. Write `simulate_sleep_until(exec_ms, period_ms, catch_up_guard)` that returns each tick's wake time and the number of guard resets. Rules per tick: `next_tick += period`; if the guard is on and `now > next_tick + period`, increment `missed` and set `next_tick = now`; `wake = max(now, next_tick)`; then `now = wake + exec`. Start with `now = next_tick = 0`.
+- `exec = {1.2, 1.5, 25.0, 2.0, 1.0}`, period 10, guard on → wakes `10 20 30 55 65`, missed `1`
+- Same input, guard off → wakes `10 20 30 55 57` (tick 5 fires back-to-back: the "runaway burst")
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| Op | Returns | Slots `[0] [1] [2]` | `head_` | `tail_` | `count_` |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| `push(1)` | — | `1 — —` | 1 | 0 | 1 |
+| `push(2)` | — | `1 2 —` | 2 | 0 | 2 |
+| `push(3)` | — | `1 2 3` | 0 (wrapped) | 0 | 3 (full) |
+| `push(4)` | — | `4 2 3` | 1 | **1** | 3 |
+| `push(5)` | — | `4 5 3` | 2 | **2** | 3 |
+| `pop()` | **3** | `4 5 (3)` | 2 | 0 | 2 |
+| `push(6)` | — | `4 5 6` | 0 | 0 | 3 |
+| `pop()` | **4** | `(4) 5 6` | 0 | 1 | 2 |
+| `pop()` | **5** | `(4) (5) 6` | 0 | 2 | 1 |
+
+The pops return 3, 4, 5, oldest first. Two items (`1` and `2`) were overwritten. One item (`6`) is left.
+
+**Q2.** $14 = 1110_2$ and $7 = 0111_2$, so $14 \mathbin{\&} 7 = 0110_2 = \mathbf{6}$, the same as $14 \bmod 8$. For $N = 6$ the mask is $5 = 101_2$, and $6 \mathbin{\&} 5 = 110_2 \mathbin{\&} 101_2 = 100_2 = \mathbf{4}$, but $6 \bmod 6 = \mathbf{0}$. The identity only holds when $N - 1$ is all ones in binary, which means $N = 2^k$.
+
+**Q3.** Actual period $= 0.8 + 5.0 + 0.2 = \mathbf{6.0\text{ ms}}$, about $\mathbf{166.7\text{ Hz}}$. Each tick loses $1.0\text{ ms}$, so after 200 ticks the loop is **$200\text{ ms}$ behind** (and the gap keeps growing). With `sleep_until`, wake targets stay at $t_0 + k \cdot 5\text{ ms}$, so the accumulated error is **0**. Only the small per-tick wake-up jitter remains, and it does not add up.
+
+**Q4.** $40\text{ ms} / 2.5\text{ ms} = \mathbf{16}$ samples (`seq` 21–36). Only 8 fit, so `21`–`28` are overwritten: `overwritten_count()` rises by **8**. The drain loop returns **`#29` … `#36`** (8 samples, oldest first), and `latest.sequence_id` $= \mathbf{36}$. The controller acts on the freshest state, which is the point of overwrite-oldest.
+
+**Q5.** The bug is the last line: once full, `tail_` stays at slot 0, which now holds the **newest** item.
+
+| After pushes | Slots | `head_` | `tail_` | `count_` |
+| :--- | :---: | :---: | :---: | :---: |
+| `10..50` (buggy) | `50 20 30 40` | 1 | **0** | 4 |
+
+The pops return **50, 20, 30, 40**: the newest sample comes out first, then the old ones. The chapter's correct version advances `tail_` to 1 and pops 20, 30, 40, 50.
+
+**E1. Reference solution**
+
+```cpp
+#include <array>
+#include <cstddef>
+#include <iostream>
+#include <optional>
+
+template <typename T, std::size_t Capacity>
+class RingBuffer {
+    static_assert(Capacity > 0, "Capacity must be > 0");
+public:
+    void push_overwrite(const T& item) noexcept {
+        buffer_[head_] = item;
+        head_ = (head_ + 1) % Capacity;
+        if (count_ == Capacity) tail_ = (tail_ + 1) % Capacity;   // drop oldest
+        else ++count_;
+    }
+    std::optional<T> pop_oldest() noexcept {
+        if (count_ == 0) return std::nullopt;
+        T item = buffer_[tail_];
+        tail_ = (tail_ + 1) % Capacity;
+        --count_;
+        return item;
+    }
+    std::optional<T> peek_latest() const noexcept {
+        if (count_ == 0) return std::nullopt;
+        return buffer_[(head_ + Capacity - 1) % Capacity];        // slot just behind head_
+    }
+    std::size_t size() const noexcept { return count_; }
+private:
+    std::array<T, Capacity> buffer_{};
+    std::size_t head_{0}, tail_{0}, count_{0};
+};
+
+int main() {
+    RingBuffer<int, 3> rb;
+    for (int v : {1, 2, 3, 4, 5}) rb.push_overwrite(v);
+    std::cout << *rb.peek_latest() << "\n";   // 5
+    std::cout << rb.size() << "\n";           // 3 (peek removed nothing)
+    std::cout << *rb.pop_oldest() << "\n";    // 3
+}
+```
+
+$O(1)$. Adding `Capacity` before subtracting 1 avoids unsigned underflow when `head_ == 0`. In the threaded version, add the same `std::lock_guard` as the other methods.
+
+**E2. Reference solution**
+
+```cpp
+#include <array>
+#include <cstddef>
+#include <iostream>
+
+template <std::size_t N>
+class RunningMeanRing {
+    static_assert(N > 0, "N must be > 0");
+public:
+    void push(double x) noexcept {
+        if (count_ == N) sum_ -= buf_[head_];   // slot about to be overwritten = oldest
+        else ++count_;
+        buf_[head_] = x;
+        sum_ += x;
+        head_ = (head_ + 1) % N;
+    }
+    double mean() const noexcept { return count_ ? sum_ / static_cast<double>(count_) : 0.0; }
+private:
+    std::array<double, N> buf_{};
+    std::size_t head_{0}, count_{0};
+    double sum_{0.0};
+};
+
+int main() {
+    RunningMeanRing<3> m;
+    for (double x : {1.0, 2.0, 3.0}) m.push(x);
+    std::cout << m.mean() << "\n";  // 2
+    m.push(10.0);
+    std::cout << m.mean() << "\n";  // (2 + 3 + 10) / 3 = 5
+    m.push(20.0);
+    std::cout << m.mean() << "\n";  // (3 + 10 + 20) / 3 = 11
+}
+```
+
+When full, `head_ == tail_`, so `buf_[head_]` is exactly the oldest value. Subtract it before overwriting. This is $O(1)$ per push. Over millions of pushes, floating-point drift in `sum_` can be cleared by recomputing it occasionally outside the real-time path.
+
+**E3. Reference solution**
+
+```cpp
+#include <algorithm>
+#include <iostream>
+#include <vector>
+
+struct ScheduleResult { std::vector<double> wake_ms; int missed; };
+
+ScheduleResult simulate_sleep_until(const std::vector<double>& exec_ms, double period_ms,
+                                    bool catch_up_guard) {
+    ScheduleResult res{{}, 0};
+    res.wake_ms.reserve(exec_ms.size());        // offline tool: allocation is fine here
+    double now = 0.0, next_tick = 0.0;
+    for (double exec : exec_ms) {
+        next_tick += period_ms;                 // phase-locked target t0 + k*T
+        if (catch_up_guard && now > next_tick + period_ms) {
+            ++res.missed;                       // more than a full period late
+            next_tick = now;                    // re-anchor instead of bursting
+        }
+        double wake = std::max(now, next_tick); // sleep_until returns at once if late
+        res.wake_ms.push_back(wake);
+        now = wake + exec;
+    }
+    return res;
+}
+
+int main() {
+    for (bool guard : {true, false}) {
+        auto r = simulate_sleep_until({1.2, 1.5, 25.0, 2.0, 1.0}, 10.0, guard);
+        for (double w : r.wake_ms) std::cout << w << " ";
+        std::cout << "| missed=" << r.missed << "\n";
+    }
+    // 10 20 30 55 65 | missed=1
+    // 10 20 30 55 57 | missed=0
+}
+```
+
+Trace with the guard on: tick 3 runs 30→55. At tick 4, `next_tick = 40` and $55 > 40 + 10$, so the loop re-anchors to 55. Tick 5 then targets 65. With the guard off, tick 4 wakes at 55 (late), tick 5 targets 50 < 57, so it fires immediately at 57: two ticks only $2\text{ ms}$ apart. $O(n)$.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Name: `RingBufferAndLoopCadenceStudio`

@@ -482,6 +482,196 @@ if __name__ == "__main__":
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. World ↔ grid and log-odds.** A $10\text{ m} \times 10\text{ m}$ map has origin $(x_0, y_0) = (-5.0, -5.0)$ and $\Delta_{\text{res}} = 0.05\text{ m}$. (a) Which cell $(\text{row}, \text{col})$ contains the point $(1.23, -0.38)$, and what is that cell's centre in metres? (b) A cell starts at $L = 0$ ($p = 0.5$). It is hit twice ($+0.85$ each) and passed through once ($-0.4$). What are $L$ and $p$?
+
+**Q2. Inflation radius and footprint.** A robot of radius $R_{\text{robot}} = 0.25\text{ m}$ runs on a $\Delta_{\text{res}} = 0.10\text{ m}$ grid. What is $r_{\text{inflate}}$? Around a single isolated wall cell, how many cells (including the wall cell itself) does the chapter's `inflate_obstacles` loop mark with `dr*dr + dc*dc <= r*r`?
+
+**Q3. Heuristics and steering.** (a) On an empty 8-connected grid, what is the octile distance from $(0,0)$ to $(3,7)$? What does Manhattan distance give, and why does that break admissibility? (b) In RRT with $\delta_{\text{step}} = 0.8$, $q_{\text{near}} = (1, 1)$ and $q_{\text{rand}} = (4, 5)$, what is $q_{\text{new}}$?
+
+**Q4. A 4-connected A\* trace.** On the $4 \times 4$ grid below (`#` = wall at $(1,0), (1,1), (1,2)$), run 4-connected $A^*$ with Manhattan $h$ from $S = (0,0)$ to $G = (3,3)$. Give the popped node, $g$, $h$ and $f$ for each expansion, the final path and its cost, and anything left in the open set when the goal pops.
+
+```text
+        c0  c1  c2  c3
+  r0  [ S ][ . ][ . ][ . ]
+  r1  [ # ][ # ][ # ][ . ]
+  r2  [ . ][ . ][ . ][ . ]
+  r3  [ . ][ . ][ . ][ G ]
+```
+
+**Q5. Same grid, the chapter's 8-connected `plan_astar`.** What path and cost does the chapter's C++ planner (octile $h$, diagonal cost $1.41421356$) return on the Q4 grid? Is that path physically safe for a robot whose footprint is exactly one cell?
+
+### Coding Exercises
+
+**E1 (Easy). Bounds-checked coordinate conversion.** Write `std::optional<GridCell> world_to_grid(const MapInfo& m, double x, double y)` (return `std::nullopt` if off the map) and `void grid_to_world(const MapInfo& m, GridCell g, double& x, double& y)` (cell centre), where `struct MapInfo { double x0, y0, res; int rows, cols; };`.
+- `MapInfo{-5, -5, 0.05, 200, 200}`, `(1.23, -0.38)` → `{row 92, col 124}`, centre `(1.225, -0.375)`
+- `(5.2, 0.0)` → `std::nullopt`
+
+**E2 (Easy–Medium). Log-odds beam update.** Write `void apply_beam(std::vector<float>& L, const std::vector<int>& free_cells, int hit_cell)` using $l_{\text{free}} = -0.4$, $l_{\text{occ}} = +0.85$ and clamps $[-5, +5]$, plus `float occupancy_probability(float L)`.
+- 4 cells at $L = 0$, the same beam applied 3 times (free `{0,1,2}`, hit `3`) → `L[0] = -1.2` ($p \approx 0.231$), `L[3] = 2.55` ($p \approx 0.928$)
+- One cell hit 7 times → clamped `L = 5.0`, $p \approx 0.993$
+
+**E3 (Medium). No corner-cutting A\*.** Modify the chapter's `plan_astar` so a diagonal move is allowed only if **both** cardinal cells it squeezes between are free. Return the path and report its cost.
+- On the Q4 grid → `(0,0) (0,1) (0,2) (0,3) (1,3) (2,3) (3,3)`, 7 cells, cost `6`
+
+#### Dry-Run: Answers
+
+**Q1.** (a) $\text{col} = \lfloor (1.23 + 5)/0.05 \rfloor = \lfloor 124.6 \rfloor = \mathbf{124}$ and $\text{row} = \lfloor (-0.38 + 5)/0.05 \rfloor = \lfloor 92.4 \rfloor = \mathbf{92}$. The centre is $x = -5 + 124.5 \times 0.05 = \mathbf{1.225}$, $y = -5 + 92.5 \times 0.05 = \mathbf{-0.375}$. (b) $L = 0.85 + 0.85 - 0.4 = \mathbf{1.30}$, so $p = \frac{1}{1 + e^{-1.3}} \approx \mathbf{0.786}$. One "free" pass does not erase two hits.
+
+**Q2.** $r_{\text{inflate}} = \lceil 0.25/0.10 \rceil = \lceil 2.5 \rceil = \mathbf{3}$ cells. Count the offsets with $dr^2 + dc^2 \le 9$ row by row:
+
+| $dr$ | allowed $dc$ | count |
+| :---: | :--- | :---: |
+| 0 | $-3 \dots 3$ | 7 |
+| $\pm 1$ | $-2 \dots 2$ ($dc^2 \le 8$) | 5 each |
+| $\pm 2$ | $-2 \dots 2$ ($dc^2 \le 5$) | 5 each |
+| $\pm 3$ | $0$ only | 1 each |
+
+Total $= 7 + 2(5) + 2(5) + 2(1) = \mathbf{29}$ cells.
+
+**Q3.** (a) Octile $= \max(3, 7) + (\sqrt{2} - 1)\min(3, 7) = 7 + 0.4142 \times 3 \approx \mathbf{8.243}$, which is the true cost on an empty 8-grid (3 diagonals + 4 straights). Manhattan $= 3 + 7 = \mathbf{10} > 8.243$, so it overestimates $h^*$ and $A^*$ may return a suboptimal path. (b) $\|q_{\text{rand}} - q_{\text{near}}\| = \sqrt{3^2 + 4^2} = 5$, so $q_{\text{new}} = (1 + 0.8 \cdot \tfrac{3}{5},\ 1 + 0.8 \cdot \tfrac{4}{5}) = \mathbf{(1.48,\ 1.64)}$.
+
+**Q4.** Every pop has exactly one entry in the open set with the lowest $f$, so the order is forced:
+
+| Step | Popped | $g$ | $h$ | $f$ | Pushed |
+| :---: | :---: | :---: | :---: | :---: | :--- |
+| 1 | `(0,0)` | 0 | 6 | 6 | `(0,1)`: 1+5=6 (`(1,0)` is a wall) |
+| 2 | `(0,1)` | 1 | 5 | 6 | `(0,2)`: 2+4=6 |
+| 3 | `(0,2)` | 2 | 4 | 6 | `(0,3)`: 3+3=6 |
+| 4 | `(0,3)` | 3 | 3 | 6 | `(1,3)`: 4+2=6 |
+| 5 | `(1,3)` | 4 | 2 | 6 | `(2,3)`: 5+1=6 |
+| 6 | `(2,3)` | 5 | 1 | 6 | `(2,2)`: 6+2=8, `(3,3)`: 6+0=6 |
+| 7 | `(3,3)` | 6 | 0 | 6 | **Goal popped** |
+
+Path: `(0,0)→(0,1)→(0,2)→(0,3)→(1,3)→(2,3)→(3,3)`, **cost 6**, with **6 expansions** before the goal. `(2,2)` with $f = 8$ is left unexpanded in the open set. Because $h$ is exact along the corridor, every node on the path has $f = 6$, and $A^*$ never strays.
+
+**Q5.** The chapter's code checks only the destination cell of a diagonal move, so it cuts the corner from `(0,2)` to `(1,3)` between the wall at `(1,2)` and the free `(0,3)`: path `(0,0)→(0,1)→(0,2)→(1,3)→(2,3)→(3,3)`, cost $2 + 1.414 + 2 = \mathbf{5.414}$ (6 cells). It is **not safe** for a one-cell footprint: the robot clips the corner of wall cell `(1,2)` while moving diagonally. Either inflate generously or forbid corner cutting (E3).
+
+**E1. Reference solution**
+
+```cpp
+#include <cmath>
+#include <optional>
+
+struct GridCell { int r{0}; int c{0}; };
+struct MapInfo { double x0, y0, res; int rows, cols; };
+
+std::optional<GridCell> world_to_grid(const MapInfo& m, double x, double y) {
+    const int col = static_cast<int>(std::floor((x - m.x0) / m.res));  // floor, not truncate:
+    const int row = static_cast<int>(std::floor((y - m.y0) / m.res));  // handles x < x0 correctly
+    if (row < 0 || row >= m.rows || col < 0 || col >= m.cols) return std::nullopt;
+    return GridCell{row, col};
+}
+
+void grid_to_world(const MapInfo& m, GridCell g, double& x, double& y) {
+    x = m.x0 + (g.c + 0.5) * m.res;   // +0.5 -> centre of the square
+    y = m.y0 + (g.r + 0.5) * m.res;
+}
+// world_to_grid({-5,-5,0.05,200,200}, 1.23, -0.38) -> {92, 124}; centre (1.225, -0.375)
+```
+
+$O(1)$. `std::floor` matters: plain `static_cast<int>` truncates $-0.4 \to 0$ instead of $-1$, which silently maps off-map points onto row or column 0.
+
+**E2. Reference solution**
+
+```cpp
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+constexpr float L_FREE = -0.4f, L_OCC = 0.85f, L_MIN = -5.0f, L_MAX = 5.0f;
+
+void apply_beam(std::vector<float>& L, const std::vector<int>& free_cells, int hit_cell) {
+    for (int idx : free_cells) L[idx] = std::max(L_MIN, L[idx] + L_FREE);  // beam passed through
+    L[hit_cell] = std::min(L_MAX, L[hit_cell] + L_OCC);                     // beam reflected here
+}
+
+float occupancy_probability(float L) { return 1.0f / (1.0f + std::exp(-L)); }
+
+// 3x apply_beam(L, {0,1,2}, 3):  L[0] = -1.2 (p = 0.231),  L[3] = 2.55 (p = 0.928)
+// 7 hits on one cell: 5.95 clamps to 5.0 (p = 0.993)
+```
+
+Each beam costs $O(k)$ for the $k$ cells it crosses. Clamping at $\pm 5$ keeps a cell able to change its mind. A cell saturated at $L = +5$ (a chair that has since moved) drops below $p = 0.5$ after $\lceil 5/0.4 \rceil = 13$ free passes, not hundreds.
+
+**E3. Reference solution** (changes from the chapter are marked `NEW`)
+
+```cpp
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <queue>
+#include <vector>
+
+struct GridCell { int r{0}; int c{0};
+    bool operator==(const GridCell& o) const noexcept { return r == o.r && c == o.c; } };
+struct AStarNode { GridCell cell; double f_score{0.0};
+    bool operator>(const AStarNode& o) const noexcept { return f_score > o.f_score; } };
+
+inline double octile_heuristic(GridCell a, GridCell b) noexcept {
+    double dr = std::abs(a.r - b.r), dc = std::abs(a.c - b.c);
+    return std::max(dr, dc) + 0.41421356237 * std::min(dr, dc);
+}
+
+std::vector<GridCell> plan_astar_no_corner_cut(const std::vector<int>& grid, int rows, int cols,
+                                               GridCell start, GridCell goal, double& cost_out) {
+    const double INF = std::numeric_limits<double>::infinity();
+    std::vector<double> g_score(rows * cols, INF);
+    std::vector<int> parent(rows * cols, -1);
+    std::vector<uint8_t> closed(rows * cols, 0);
+    std::priority_queue<AStarNode, std::vector<AStarNode>, std::greater<AStarNode>> open_set;
+    auto blocked = [&](int r, int c) { return grid[r * cols + c] > 0; };       // NEW helper
+
+    const int start_idx = start.r * cols + start.c, goal_idx = goal.r * cols + goal.c;
+    g_score[start_idx] = 0.0;
+    open_set.push(AStarNode{start, octile_heuristic(start, goal)});
+    const int dr[8] = {-1, 1, 0, 0, -1, -1, 1, 1};
+    const int dc[8] = { 0, 0, -1, 1, -1, 1, -1, 1};
+    const double step_cost[8] = {1.0, 1.0, 1.0, 1.0, 1.41421356, 1.41421356, 1.41421356, 1.41421356};
+
+    while (!open_set.empty()) {
+        GridCell curr = open_set.top().cell;
+        open_set.pop();
+        const int curr_idx = curr.r * cols + curr.c;
+        if (curr == goal) {
+            cost_out = g_score[goal_idx];
+            std::vector<GridCell> path;
+            for (int at = goal_idx; at != -1; at = parent[at]) path.push_back(GridCell{at / cols, at % cols});
+            std::reverse(path.begin(), path.end());
+            return path;
+        }
+        if (closed[curr_idx]) continue;
+        closed[curr_idx] = 1;
+        for (int i = 0; i < 8; ++i) {
+            const int nr = curr.r + dr[i], nc = curr.c + dc[i];
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+            const int n_idx = nr * cols + nc;
+            if (blocked(nr, nc) || closed[n_idx]) continue;
+            if (i >= 4 && (blocked(curr.r + dr[i], curr.c) ||                   // NEW: both cardinal
+                           blocked(curr.r, curr.c + dc[i]))) continue;          // NEW: neighbours free
+            const double tentative_g = g_score[curr_idx] + step_cost[i];
+            if (tentative_g < g_score[n_idx]) {
+                g_score[n_idx] = tentative_g;
+                parent[n_idx] = curr_idx;
+                open_set.push(AStarNode{GridCell{nr, nc}, tentative_g + octile_heuristic(GridCell{nr, nc}, goal)});
+            }
+        }
+    }
+    cost_out = INF;
+    return {};
+}
+// Q4 grid (walls at indices 4, 5, 6): (0,0) (0,1) (0,2) (0,3) (1,3) (2,3) (3,3), cost = 6
+```
+
+The two side cells of a diagonal are always in bounds when the destination is, so no extra bounds check is needed. The octile heuristic stays admissible because removing edges can only increase true costs. Complexity is unchanged: $O(V \log V)$ with the binary heap.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Name: `MotionPlanningArena`

@@ -523,6 +523,248 @@ Let's trace the exact state of every pointer on the stack and the heap across th
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Struct padding.** On a typical 64-bit compiler (`double` aligned to 8, `int32_t` to 4), give `sizeof` and the byte offsets of every member for:
+
+```cpp
+struct PoseA { char frame; int32_t seq; double x; char valid; };
+struct PoseB { double x; int32_t seq; char frame; char valid; };
+struct alignas(32) PoseC { double x; int32_t seq; char frame; char valid; };
+```
+
+How many padding bytes does each one contain?
+
+**Q2. RAII on the normal exit path.** The chapter's `main()` calls `run_calibration_routine(82.0f)`. What is printed, line by line, if it calls `run_calibration_routine(70.0f)` instead? (`std::cout` prints the floats `0.0f`, `2.5f` and `5.0f` as `0`, `2.5` and `5`.)
+
+**Q3. `use_count` trace.** Using the chapter's `LidarScan`, what does this print, and on which line does `[LidarScan #7] Destroyed!` appear?
+
+```cpp
+std::shared_ptr<LidarScan> s = std::make_shared<LidarScan>(7, 1.0f);
+auto t = s;
+std::cout << "A " << s.use_count() << "\n";
+{
+    auto u = t;
+    auto v = std::move(t);
+    std::cout << "B " << s.use_count() << " " << (t ? "t valid" : "t null") << "\n";
+}
+std::cout << "C " << s.use_count() << "\n";
+s.reset();
+std::cout << "D end\n";
+```
+
+(Leave out the constructor's address line; it is not part of the question.)
+
+**Q4. Deadlines and cache lines.** (a) A $1\text{ kHz}$ loop stalls for $12.5\text{ ms}$. How many deadlines are missed? If the loop's crossover frequency is $\omega_c = 50\text{ rad/s}$, how much phase margin does a $10\text{ ms}$ delay cost (radians and degrees)? (b) With cold caches and $64\text{-byte}$ lines, how many cache lines must be fetched to scan `std::array<float, 1024>`? How many for 1024 contiguous `AlignedImuPacket`s ($32\text{ B}$ each)?
+
+**Q5. Spot the bug.** Which Common Mistake does each snippet commit, and what is the fix?
+
+```cpp
+// (a)
+auto next_owner = std::move(scan_ptr);
+std::cout << scan_ptr->sequence_id << "\n";
+
+// (b) called 1000 times per second
+void compute_normals(std::shared_ptr<const LidarScan> scan);
+
+// (c) inside the 1 kHz control loop
+history.push_back(sample);   // std::vector<ImuSample> history; no reserve()
+```
+
+### Coding Exercises
+
+**E1 (Easy). RAII arm flag.** Write a non-copyable class `ScopedArmFlag` that takes a `bool& armed`, sets it to `true` (printing `[ARM] motors armed`) in its constructor, and sets it back to `false` (printing `[DISARM] motors disarmed`) in a `noexcept` destructor. Show that an early `return` still disarms.
+- `run_move(armed, /*fault=*/true)` prints `[ARM] motors armed`, `inside: armed=true`, `[DISARM] motors disarmed`. Afterwards `armed == false`.
+
+**E2 (Easy–Medium). Zero-copy processing stage.** Write `std::unique_ptr<LidarScan> clamp_ranges(std::unique_ptr<LidarScan> scan, float max_range_m)` that takes ownership by value, clips every range to `max_range_m` in place, and returns ownership. A null input returns null.
+- Input `make_unique<LidarScan>(42, 8.5f)` with `max_range_m = 5.0f`: the caller's original pointer becomes `nullptr`, the returned pointer has the **same address**, and `ranges_m[0] == 5.0f`.
+
+**E3 (Medium). Fixed-capacity object pool with a `unique_ptr` deleter.** The WARNING box says to recycle buffers instead of freeing them in the real-time thread. Write `template <typename T, std::size_t N> class ObjectPool` that owns `std::array<T, N>` slots (no heap). `acquire()` returns `std::unique_ptr<T, Returner>`, where the custom deleter `Returner` puts the slot back on a free list instead of calling `delete`. It returns a null handle when the pool is exhausted. `available()` reports the free slots.
+- `ObjectPool<Frame, 2> pool;`: acquire `a`, `b`, `c`. `a` is valid, `c` is null, `available() == 0`.
+- After `a.reset()`, `available() == 1`. After all handles leave scope, `available() == 2`.
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| Struct | Layout (offsets) | `sizeof` | Padding |
+| :--- | :--- | :---: | :---: |
+| `PoseA` | `frame`@0, pad 1–3, `seq`@4–7, `x`@8–15, `valid`@16, tail pad 17–23 | **24** | 3 + 7 = **10 B** |
+| `PoseB` | `x`@0–7, `seq`@8–11, `frame`@12, `valid`@13, tail pad 14–15 | **16** | **2 B** |
+| `PoseC` | same members as `PoseB`, but `alignas(32)` rounds the size up to a multiple of 32 | **32** | **18 B** |
+
+Ordering from largest to smallest saves 8 bytes. `alignas(32)` trades 16 extra bytes for the guarantee that a packet never straddles a cache line (two per $64\text{ B}$ line).
+
+**Q2.** The temperature check fails ($70 \le 75$), so both torque commands run and the destructor fires at the closing brace:
+
+```text
+[HW] Opening CAN interface: can0 (fd=3)
+[HW] CAN fd=3 | Motor #1 -> Torque = 0 N*m
+[HW] CAN fd=3 | Motor #1 -> Torque = 2.5 N*m
+[HW] CAN fd=3 | Motor #1 -> Torque = 5 N*m
+[RAII] Scope exiting! Sending SAFE 0.0 N*m disarm...
+[HW] CAN fd=3 | Motor #1 -> Torque = 0 N*m
+[HW] Closing CAN fd=3
+```
+
+The only difference from the $82^\circ$C run is that `Torque = 5` appears and the `[ABORT]` line does not. The disarm-and-close tail is identical on both paths.
+
+**Q3.**
+
+```text
+A 2
+B 3 t null
+C 1
+[LidarScan #7] Destroyed!
+D end
+```
+
+| Point | Live owners | `use_count` |
+| :--- | :--- | :---: |
+| A | `s`, `t` | 2 |
+| After `u = t` | `s`, `t`, `u` | 3 |
+| After `v = std::move(t)` | `s`, `u`, `v` (`t` is now null, so no change) | **3** |
+| C (`u`, `v` destroyed) | `s` | 1 |
+| `s.reset()` | none | 0, and the destructor runs **before** `D end` |
+
+A move transfers ownership without touching the atomic count. Only copies increment it.
+
+**Q4.** (a) Deadlines at $1, 2, \dots, 12\text{ ms}$ pass during the stall, so **12 missed deadlines** (the chapter's $18\text{ ms}$ / $2\text{ ms}$ example gives 9 by the same logic). Phase loss $= \omega_c\tau_d = 50 \times 0.010 = \mathbf{0.5\text{ rad} \approx 28.6^\circ}$. (b) `std::array<float, 1024>` is $4096\text{ B}$, so $4096/64 = \mathbf{64}$ lines. 1024 `AlignedImuPacket`s are $32{,}768\text{ B}$, so $\mathbf{512}$ lines. Both scans are sequential, and the hardware prefetcher hides most of that cost. A pointer-chasing layout could take up to 1024 scattered misses.
+
+**Q5.** (a) **Use-after-move**: `scan_ptr` is `nullptr` after the move, so `->` dereferences address `0x0` (SIGSEGV). Use `next_owner->sequence_id`, or never touch `scan_ptr` again. (b) **`shared_ptr` by value** causes an atomic increment and decrement on every call, which means cache-coherency traffic 1000 times per second. Use `void compute_normals(const LidarScan& scan)` and call `compute_normals(*scan_ptr)`. (c) **`push_back` without capacity** occasionally reallocates and copies inside the hard real-time loop. Call `history.reserve(MAX)` during initialization, or use a fixed `std::array` ring buffer (next chapter).
+
+**E1. Reference solution**
+
+```cpp
+#include <iostream>
+
+class ScopedArmFlag {
+public:
+    explicit ScopedArmFlag(bool& armed) noexcept : armed_(armed) {
+        armed_ = true;
+        std::cout << "[ARM] motors armed\n";
+    }
+    ~ScopedArmFlag() noexcept {
+        armed_ = false;                       // runs on EVERY exit path
+        std::cout << "[DISARM] motors disarmed\n";
+    }
+    ScopedArmFlag(const ScopedArmFlag&) = delete;             // one guard per resource
+    ScopedArmFlag& operator=(const ScopedArmFlag&) = delete;
+private:
+    bool& armed_;
+};
+
+bool run_move(bool& armed, bool fault) {
+    ScopedArmFlag guard(armed);
+    std::cout << "inside: armed=" << std::boolalpha << armed << "\n";
+    if (fault) return false;                  // early return: destructor still runs
+    return true;
+}
+
+int main() {
+    bool armed = false;
+    bool ok = run_move(armed, true);
+    std::cout << "after: ok=" << std::boolalpha << ok << " armed=" << armed << "\n";
+    // after: ok=false armed=false
+}
+```
+
+$O(1)$, with no heap. Deleting the copy operations prevents two guards from disarming the same flag twice.
+
+**E2. Reference solution**
+
+```cpp
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <iostream>
+#include <memory>
+
+struct LidarScan {
+    uint64_t sequence_id;
+    std::array<float, 1024> ranges_m;
+    explicit LidarScan(uint64_t seq, float initial) : sequence_id(seq) { ranges_m.fill(initial); }
+};
+
+std::unique_ptr<LidarScan> clamp_ranges(std::unique_ptr<LidarScan> scan, float max_range_m) {
+    if (!scan) return scan;
+    for (float& r : scan->ranges_m) r = std::min(r, max_range_m);   // in place, no copy
+    return scan;                                                     // implicit move out
+}
+
+int main() {
+    auto scan = std::make_unique<LidarScan>(42, 8.5f);
+    LidarScan* before = scan.get();
+    auto clipped = clamp_ranges(std::move(scan), 5.0f);
+    std::cout << std::boolalpha << (scan == nullptr) << " "        // true
+              << (clipped.get() == before) << " "                  // true
+              << clipped->ranges_m[0] << "\n";                     // 5
+}
+```
+
+$O(N)$ for the clipping and $O(1)$ for both ownership hand-offs. The by-value `unique_ptr` parameter makes the transfer of ownership visible at the call site (`std::move` is required), and `return scan;` moves automatically.
+
+**E3. Reference solution**
+
+```cpp
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
+#include <memory>
+
+template <typename T, std::size_t N>
+class ObjectPool {
+public:
+    struct Returner {
+        ObjectPool* pool;
+        void operator()(T* p) const noexcept { pool->release(p); }   // recycle, never delete
+    };
+    using Handle = std::unique_ptr<T, Returner>;
+
+    ObjectPool() noexcept {
+        for (std::size_t i = 0; i < N; ++i) free_[i] = &slots_[i];
+        free_count_ = N;
+    }
+    ObjectPool(const ObjectPool&) = delete;              // handles store `this`
+    ObjectPool& operator=(const ObjectPool&) = delete;
+
+    Handle acquire() noexcept {
+        if (free_count_ == 0) return Handle(nullptr, Returner{this});
+        return Handle(free_[--free_count_], Returner{this});   // O(1) pop from free list
+    }
+    std::size_t available() const noexcept { return free_count_; }
+
+private:
+    void release(T* p) noexcept { free_[free_count_++] = p; } // O(1) push back
+    std::array<T, N> slots_{};
+    std::array<T*, N> free_{};
+    std::size_t free_count_ = 0;
+};
+
+struct Frame { uint32_t seq{0}; std::array<float, 256> data{}; };
+
+int main() {
+    ObjectPool<Frame, 2> pool;
+    {
+        auto a = pool.acquire();
+        auto b = pool.acquire();
+        auto c = pool.acquire();                         // exhausted -> null handle
+        std::cout << std::boolalpha << (a != nullptr) << " " << (c == nullptr)
+                  << " " << pool.available() << "\n";    // true true 0
+        a.reset();                                       // deleter returns slot
+        std::cout << pool.available() << "\n";           // 1
+    }                                                    // b returned (c is null: no call)
+    std::cout << pool.available() << "\n";               // 2
+}
+```
+
+`acquire` and `release` are $O(1)$, and all memory lives inside the pool, so the real-time thread never calls `new` or `delete`. `std::unique_ptr` never invokes its deleter on a null pointer, so the empty handle `c` is harmless. The pool must outlive every handle, which is why it is declared before the inner scope.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Name: `RealTimeMemoryAndSmartPointerLab`

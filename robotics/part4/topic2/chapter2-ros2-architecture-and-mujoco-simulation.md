@@ -436,6 +436,145 @@ if __name__ == "__main__":
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. QoS compatibility.** For each publisher → subscriber pair, does the connection form? (a) `BestEffort` → `Reliable`. (b) `Reliable` → `BestEffort`. (c) `Reliable` → `Reliable`. (d) Durability `TransientLocal` → `Volatile`. (e) Durability `Volatile` → `TransientLocal`. For any that fail, what does the subscriber's callback do?
+
+**Q2. Trace the safety filter.** `SafetyVelocityFilterNode` receives scans whose minimum ranges are, in order, `1.50, 0.80, 0.59, 0.60, 0.30`, followed by one scan with an **empty** `ranges` vector. Assume exactly one timer tick fires after each scan. What `(linear.x, angular.z)` is published on each of the six ticks?
+
+**Q3. Chain the TF tree by hand.** Ignore the LiDAR's $5^\circ$ pitch for this question (`rpy = 0`). ${}^{\text{base}}\mathbf{T}_{\text{lidar}}$ is a pure translation $(0.25, 0, 0.40)$. ${}^{\text{odom}}\mathbf{T}_{\text{base}}$ is translation $(3.0, 1.0, 0)$ with yaw $+90^\circ$. ${}^{\text{map}}\mathbf{T}_{\text{odom}}$ is translation $(0.5, -0.2, 0)$ with no rotation. Where is the pedestrian $\mathbf{p}_{\text{lidar}} = (2, 0, 0)$ in `base_link`, `odom` and `map`?
+
+**Q4. PD + gravity torque.** Using the MuJoCo script's gains ($K_p = [120, 80]$, $K_d = [22, 14]$, target $[0^\circ, -45^\circ]$) and actuator limits ($\pm 50$, $\pm 30\text{ N·m}$): (a) at $\mathbf{q} = [10^\circ, -40^\circ]$, $\dot{\mathbf{q}} = [0.2, -0.1]\text{ rad/s}$, `qfrc_bias` $= [-13.0, -1.4]$, what torques are commanded? (b) Check row 0 of the chapter's dry-run table: at $\mathbf{q} = [60^\circ, 30^\circ]$, $\dot{\mathbf{q}} = \mathbf{0}$, bias $[-4.91, 0.00]$, what are the raw torques, and what does MuJoCo apply after `ctrlrange` clamping?
+
+**Q5. Blocking a single-threaded executor.** In the C++ node, someone adds `std::this_thread::sleep_for(500ms)` inside the timer callback. `/scan` arrives at $20\text{ Hz}$ with `SensorDataQoS` (history `KeepLast(5)`). During one $500\text{ ms}$ block, how many scans arrive, how many can still be delivered afterwards, and what is the robot doing in the meantime?
+
+### Coding Exercises
+
+**E1 (Easy). QoS checker.** Write `qos_compatible(pub_reliability, sub_reliability, pub_durability="volatile", sub_durability="volatile") -> bool` with values `"reliable"` / `"best_effort"` and `"transient_local"` / `"volatile"`. A connection forms only if the publisher offers at least what the subscriber requests on **both** policies.
+- `("best_effort", "reliable")` → `False`. `("reliable", "best_effort")` → `True`.
+- `("reliable", "reliable", "volatile", "transient_local")` → `False`
+
+**E2 (Easy–Medium). URDF transform chain with NumPy.** Write `make_T(xyz, rpy) -> np.ndarray` (4×4) using the URDF convention $\mathbf{R} = \mathbf{R}_z(\text{yaw})\,\mathbf{R}_y(\text{pitch})\,\mathbf{R}_x(\text{roll})$, and `transform_point(T, p) -> np.ndarray`. Use them to redo Q3 **with** the chapter's real pitch `rpy="0.0 0.0873 0.0"`.
+- `transform_point(make_T([0.25, 0, 0.40], [0, 0.0873, 0]), [2, 0, 0])` → `[2.242, 0.0, 0.226]`
+- Full chain map ← odom ← base ← lidar → `[3.5, 3.042, 0.226]`
+
+**E3 (Medium). Feel gravity compensation without MuJoCo.** Simulate a single link (mass $2\text{ kg}$, length $0.5\text{ m}$, COM at $0.25\text{ m}$, $I = mL^2/3$, joint damping $0.2$) with semi-implicit Euler at $\Delta t = 0.002\text{ s}$. Use $\ddot{q} = (\tau - mgl_c\cos q - b\dot{q})/I$ with $q$ measured from horizontal, start at $q = 60^\circ$, target $0^\circ$, $K_p = 120$, $K_d = 22$, torque clamp $\pm 50$. Write `simulate(gravity_comp: bool, steps=1000) -> float` returning the final angle in degrees.
+- `simulate(True)` → about `0.00°`
+- `simulate(False)` → about `-2.34°` (permanent sag)
+
+#### Dry-Run: Answers
+
+**Q1.** (a) **No.** The subscriber requests more than the publisher offers. (b) **Yes.** (c) **Yes.** (d) **Yes**: a latched publisher can feed a subscriber that does not need history. (e) **No**: the subscriber demands late-join history that a volatile publisher never keeps. In the failing cases the callback **silently never fires**. `ros2 topic info <topic> --verbose` shows the mismatch.
+
+**Q2.** The test is `min_obstacle_dist_m_ < 0.60f`, which is strict:
+
+| Tick | Stored min (m) | `< 0.60`? | Published `(linear.x, angular.z)` |
+| :---: | :---: | :---: | :---: |
+| 1 | 1.50 | no | `(1.2, 0.0)` |
+| 2 | 0.80 | no | `(1.2, 0.0)` |
+| 3 | 0.59 | yes | `(0.0, 0.5)` |
+| 4 | 0.60 | **no** (equal is not less) | `(1.2, 0.0)` |
+| 5 | 0.30 | yes | `(0.0, 0.5)` |
+| 6 | 0.30 (empty scan ignored) | yes | `(0.0, 0.5)` |
+
+On tick 6 the `if (!msg->ranges.empty())` guard skips the update, so the stale $0.30$ keeps the robot braking. That is the safe default.
+
+**Q3.**
+- `base_link`: $(2 + 0.25,\ 0,\ 0 + 0.40) = \mathbf{(2.25, 0, 0.40)}$.
+- `odom`: a yaw of $+90^\circ$ maps $(x, y) \to (-y, x)$, so $(2.25, 0) \to (0, 2.25)$. Adding $(3.0, 1.0)$ gives $\mathbf{(3.00, 3.25, 0.40)}$.
+- `map`: add $(0.5, -0.2)$ to get $\mathbf{(3.50, 3.05, 0.40)}$.
+
+This is exactly $\mathbf{p}_{\text{map}} = {}^{\text{map}}\mathbf{T}_{\text{odom}}\,{}^{\text{odom}}\mathbf{T}_{\text{base}}\,{}^{\text{base}}\mathbf{T}_{\text{lidar}}\,\mathbf{p}_{\text{lidar}}$, applied right to left.
+
+**Q4.** (a) $q_{\text{err}} = [0 - 0.1745,\ -0.7854 + 0.6981] = [-0.1745,\ -0.0873]$ rad.
+- Shoulder: $120(-0.1745) - 22(0.2) - 13.0 = -20.94 - 4.40 - 13.00 = \mathbf{-38.34\text{ N·m}}$
+- Elbow: $80(-0.0873) - 14(-0.1) - 1.4 = -6.98 + 1.40 - 1.40 = \mathbf{-6.98\text{ N·m}}$
+
+Both are inside the limits, so nothing is clamped.
+
+(b) $q_{\text{err}} = [-60^\circ, -75^\circ] = [-1.0472, -1.3090]$ rad. Raw: $120(-1.0472) - 4.91 = \mathbf{-130.57}$ and $80(-1.3090) + 0 = \mathbf{-104.72}$. After `ctrlrange`: **$[-50, -30]$**, matching the "saturated" first row of the chapter's table.
+
+**Q5.** $0.5\text{ s} \times 20\text{ Hz} = \mathbf{10}$ scans arrive. `KeepLast(5)` keeps only the newest 5, so **at most 5** can be delivered after the block and at least 5 are dropped. Meanwhile the `SingleThreadedExecutor` runs nothing else: no scan callbacks and no new `/cmd_vel`. The robot keeps executing its **last** velocity command for half a second, blind to new obstacles. Never block in callbacks.
+
+**E1. Reference solution**
+
+```python
+RELIABILITY_RANK = {"best_effort": 0, "reliable": 1}
+DURABILITY_RANK = {"volatile": 0, "transient_local": 1}
+
+def qos_compatible(pub_reliability: str, sub_reliability: str,
+                   pub_durability: str = "volatile", sub_durability: str = "volatile") -> bool:
+    # Request-vs-offered: the publisher must offer at least what the subscriber asks for.
+    reliability_ok = RELIABILITY_RANK[pub_reliability] >= RELIABILITY_RANK[sub_reliability]
+    durability_ok = DURABILITY_RANK[pub_durability] >= DURABILITY_RANK[sub_durability]
+    return reliability_ok and durability_ok
+
+print(qos_compatible("best_effort", "reliable"))                            # False
+print(qos_compatible("reliable", "best_effort"))                            # True
+print(qos_compatible("reliable", "reliable", "volatile", "transient_local"))  # False
+```
+
+$O(1)$. Encoding each policy as an ordered rank turns the rule into a single `>=` per policy.
+
+**E2. Reference solution**
+
+```python
+import math
+import numpy as np
+
+def make_T(xyz, rpy) -> np.ndarray:
+    roll, pitch, yaw = rpy
+    cr, sr = math.cos(roll), math.sin(roll)
+    cp, sp = math.cos(pitch), math.sin(pitch)
+    cy, sy = math.cos(yaw), math.sin(yaw)
+    Rx = np.array([[1, 0, 0], [0, cr, -sr], [0, sr, cr]])
+    Ry = np.array([[cp, 0, sp], [0, 1, 0], [-sp, 0, cp]])
+    Rz = np.array([[cy, -sy, 0], [sy, cy, 0], [0, 0, 1]])
+    T = np.eye(4)
+    T[:3, :3] = Rz @ Ry @ Rx          # URDF: roll about X, then pitch about Y, then yaw about Z
+    T[:3, 3] = xyz
+    return T
+
+def transform_point(T: np.ndarray, p) -> np.ndarray:
+    return (T @ np.append(np.asarray(p, dtype=float), 1.0))[:3]
+
+T_base_lidar = make_T([0.25, 0.0, 0.40], [0.0, 0.0873, 0.0])
+T_odom_base = make_T([3.0, 1.0, 0.0], [0.0, 0.0, math.pi / 2])
+T_map_odom = make_T([0.5, -0.2, 0.0], [0.0, 0.0, 0.0])
+
+print(transform_point(T_base_lidar, [2, 0, 0]).round(3))                          # [2.242 0.    0.226]
+print(transform_point(T_map_odom @ T_odom_base @ T_base_lidar, [2, 0, 0]).round(3))  # [3.5   3.042 0.226]
+```
+
+A positive pitch about $+Y$ tilts the beam's $+X$ axis downward: $x = 0.25 + 2\cos(0.0873) = 2.242$ and $z = 0.40 - 2\sin(0.0873) = 0.226$. The pedestrian reading lands $17\text{ cm}$ lower than the no-pitch answer. $O(1)$ per point.
+
+**E3. Reference solution**
+
+```python
+import math
+
+def simulate(gravity_comp: bool, steps: int = 1000, dt: float = 0.002) -> float:
+    m, length, lc, g, b = 2.0, 0.5, 0.25, 9.81, 0.2
+    inertia = m * length ** 2 / 3.0             # rod pivoting about one end
+    q, qd = math.radians(60.0), 0.0
+    for _ in range(steps):
+        grav = m * g * lc * math.cos(q)           # torque needed to hold the link (like qfrc_bias)
+        tau = 120.0 * (0.0 - q) - 22.0 * qd + (grav if gravity_comp else 0.0)
+        tau = max(-50.0, min(50.0, tau))          # actuator ctrlrange
+        qdd = (tau - grav - b * qd) / inertia
+        qd += qdd * dt                            # semi-implicit Euler
+        q += qd * dt
+    return math.degrees(q)
+
+print(round(simulate(True), 2), round(simulate(False), 2))   # 0.0 -2.34
+```
+
+Without compensation, the steady state satisfies $K_p(-q) = mgl_c\cos q$, i.e. $q \approx -\frac{2 \cdot 9.81 \cdot 0.25}{120} = -0.0409\text{ rad} \approx -2.34^\circ$. This is the same droop law $e_{\text{ss}} = F_{\text{gravity}}/K_p$ from Part 3. Adding the bias term cancels gravity exactly, so $e_{\text{ss}} = 0$. $O(\text{steps})$.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Name: `Ros2GraphAndMujocoSimWorkbench`

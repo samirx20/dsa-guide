@@ -597,6 +597,178 @@ You will observe deterministic $100\text{ Hz}$ execution with sub-microsecond lo
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. The daemon's C-space.** In `main()`, the raw grid is $20 \times 20$ at $0.20\text{ m/cell}$ with a wall in column 10, rows 0–13, inflated for a $0.25\text{ m}$ robot. What is `rad_cells`? Which columns become blocked, and down to which row in each? How many cells are blocked in total? What is the lowest free row in column 10, and what world $y$ is the centre of that gap cell?
+
+**Q2. `pop_latest_and_clear()` trace.** On a `RealTimeRingBuffer<int, 4>`, push `1, 2, 3, 4, 5, 6`. Then call `pop_latest_and_clear()`, `pop_oldest()`, `push_overwrite(7)`, `pop_oldest()`. Give `head_`, `tail_` and `count_` along the way, every return value, and the final `overwritten_count_`.
+
+**Q3. Would the `static_assert`s still pass?** (a) A teammate moves `uint32_t sequence_id` to the **top** of `RobotStatePacket`, above the `double`. What is the new `sizeof`? (b) Someone appends `bool armed;` after `reserved_pad` in `TelemetryFrame`. What is the new `sizeof`?
+
+**Q4. One controller tick by hand.** Use the Thread 3 control law. (a) The state is $(0.30, 0.30, 0.0)$, `wp_idx = 1`, `world_xy_m[1] = (0.50, 0.50)`, and the goal (last waypoint) is grid $(18, 18)$. Compute the waypoint distance, whether `wp_idx` advances, `goal_dist`, `heading_err`, `cmd_v` and `cmd_w`. Compare with the expected-output line for tick #5. (b) On an earlier tick with the same state but `wp_idx = 0` (`world_xy_m[0] = (0.30, 0.30)`, the start cell), what `cmd_w` is produced, and why?
+
+**Q5. Thread bookkeeping for one 30-tick run.** (a) How many `TelemetryFrame`s are pushed, and can `telemetry_ring` (capacity 8) overflow if Thread 4 drains every $50\text{ ms}$? (b) About how many `RobotStatePacket`s does Thread 1 produce between two controller ticks, and how many does `pop_latest_and_clear()` discard each tick? (c) Why must the controller copy `active_path_ptr` under `path_mtx` instead of reading it without the lock?
+
+### Coding Exercises
+
+**E1 (Easy). Non-destructive `peek_latest()`.** Add `std::optional<T> peek_latest() const noexcept` to the project's `RealTimeRingBuffer`. It returns the newest sample without changing `head_`, `tail_` or `count_` (so Thread 4 could sample a pose without stealing it from Thread 3).
+- Capacity 4, push `1..6`: `peek_latest()` → `6`. A following `pop_latest_and_clear()` still returns `6`.
+
+**E2 (Easy–Medium). Path length helpers.** Write `double path_length_m(const WaypointPath& p)` (sum of segment lengths) and `double remaining_length_m(const WaypointPath& p, std::size_t wp_idx, double x, double y)` (distance from the robot to `world_xy_m[wp_idx]` plus the remaining segments, or $0$ if `wp_idx` is past the end).
+- Path `{(0.3,0.3), (0.5,0.5), (0.7,0.5)}` → `path_length_m` = `0.4828`
+- `remaining_length_m(path, 1, 0.4, 0.3)` → `0.4236`. `remaining_length_m(path, 3, 0, 0)` → `0`
+
+**E3 (Medium). Allocation-free jitter statistics.** Thread 3 measures `wakeup_jitter_us` but only reports the latest value. Write `class JitterStats` with `record(double us)` and accessors `count()`, `mean_us()` (running mean, no stored samples), `max_us()` and `histogram()` (a `std::array<uint32_t, 5>` for buckets `[0,50)`, `[50,100)`, `[100,500)`, `[500,1000)`, `[1000,∞)` µs). No heap allocation.
+- Record the six jitters from the expected output (`64.2, 51.1, 48.9, 55.4, 44.8, 52.3`) plus one GC-style spike `1250.0`: `count = 7`, `mean ≈ 223.81`, `max = 1250`, histogram `[2, 4, 0, 0, 1]`
+
+#### Dry-Run: Answers
+
+**Q1.** `rad_cells` $= \lceil 0.25/0.20 \rceil = \lceil 1.25 \rceil = \mathbf{2}$. A wall cell at $(r, 10)$ blocks offsets with $dr^2 + dc^2 \le 4$:
+
+| Column | Allowed $\lvert dr \rvert$ | Blocked rows | Cells |
+| :---: | :---: | :---: | :---: |
+| 10 | $\le 2$ | 0–15 | 16 |
+| 9, 11 | $\le 1$ ($dc^2 = 1$) | 0–14 | 15 each |
+| 8, 12 | $0$ ($dc^2 = 4$) | 0–13 | 14 each |
+
+Total $= 16 + 2(15) + 2(14) = \mathbf{74}$ cells. In column 10 the lowest free row is **16**, centred at $y = (16 + 0.5) \times 0.20 = \mathbf{3.30\text{ m}}$, so A\* must route the robot through the gap in rows 16–19. The start $(1,1)$ and goal $(18,18)$ are both free.
+
+**Q2.** The writes go `1@0, 2@1, 3@2, 4@3`, then `5@0` and `6@1` (two overwrites). After the pushes: slots `[5, 6, 3, 4]`, `head_ = 2`, `tail_ = 2`, `count_ = 4`.
+
+| Call | Returns | `head_` | `tail_` | `count_` |
+| :--- | :---: | :---: | :---: | :---: |
+| `pop_latest_and_clear()` | **6** (index $(2 + 4 - 1) \bmod 4 = 1$) | 2 | 2 | 0 |
+| `pop_oldest()` | **`std::nullopt`** | 2 | 2 | 0 |
+| `push_overwrite(7)` | — (written at index 2) | 3 | 2 | 1 |
+| `pop_oldest()` | **7** | 3 | 3 | 0 |
+
+`overwritten_count_` $= \mathbf{2}$. The clear step itself drops 3, 4 and 5 without counting them as overwrites.
+
+**Q3.** (a) `sequence_id`@0–3, then 4 bytes of padding (the `double` needs 8-alignment), `timestamp_sec`@8–15, five floats @16–35. That is $36\text{ B}$, rounded up to a multiple of `alignas(32)`: **`sizeof = 64`**, so `static_assert(... == 32)` **fails**. (b) $64 + 1 = 65$, rounded up to a multiple of 64: **`sizeof = 128`**, and its assert fails too. Both are the build-time protection the milestone describes.
+
+**Q4.** (a) $\Delta = (0.20, 0.20)$, so the distance is $0.283 \ge 0.25$ and **`wp_idx` stays at 1**. Goal centre $= (18.5 \times 0.2,\ 18.5 \times 0.2) = (3.70, 3.70)$, so `goal_dist` $= \sqrt{2} \times 3.40 \approx \mathbf{4.81\text{ m}} > 0.15$ and **`cmd_v = 0.80`**. `heading_err` $= \operatorname{atan2}(0.2, 0.2) - 0 = \mathbf{0.785\text{ rad}}$, so **`cmd_w`** $= 2.5 \times 0.785 \approx \mathbf{1.96\text{ rad/s}}$. This matches tick #5's `Cmd=(0.80m/s, 1.96rad/s)`.
+
+(b) `dx = dy = 0`, so the hypot test passes and `wp_idx` becomes 1. **But** `dx` and `dy` were already computed for waypoint 0, and `atan2(0, 0) = 0`, so `heading_err = 0` and **`cmd_w = 0`** on that tick. The new target only takes effect on the next tick. It is harmless here, but recomputing `dx, dy` after advancing `wp_idx` would remove the one-tick lag.
+
+**Q5.** (a) Ticks 5, 10, …, 30 give **6 frames**. Thread 4 drains roughly one frame per $50\text{ ms}$ window, far below the 8-slot capacity, so **no overflow** in normal operation. (b) $10\text{ ms} / 2.5\text{ ms} = $ about **4** packets per control tick. `pop_latest_and_clear()` returns the newest and **discards about 3**. (c) A `std::shared_ptr` is two words (object pointer plus control block), and copying it while Thread 2 assigns a new one is a data race. A torn read could pair the old pointer with the new reference count, which is undefined behaviour. The lock is held only for an $O(1)$ handle copy. (C++20's `std::atomic<std::shared_ptr<T>>` is the lock-free alternative.)
+
+**E1. Reference solution** (add inside `RealTimeRingBuffer`)
+
+```cpp
+    // Returns the freshest sample WITHOUT consuming anything: O(1), no allocation.
+    std::optional<T> peek_latest() const noexcept {
+        std::lock_guard<std::mutex> lock(mtx_);       // mtx_ is already `mutable`
+        if (count_ == 0) return std::nullopt;
+        return buffer_[(head_ + Capacity - 1) % Capacity];
+    }
+
+// Usage:
+//   RealTimeRingBuffer<int, 4> rb;
+//   for (int v = 1; v <= 6; ++v) rb.push_overwrite(v);
+//   *rb.peek_latest()          -> 6   (count_ still 4)
+//   *rb.pop_latest_and_clear() -> 6
+```
+
+It uses the same index arithmetic as `pop_latest_and_clear()` but leaves `tail_` and `count_` alone. It is `const` because it only reads, which is why `mtx_` must be `mutable`.
+
+**E2. Reference solution**
+
+```cpp
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
+#include <utility>
+#include <vector>
+
+struct WaypointPath {
+    uint64_t plan_sequence_id{0};
+    std::vector<std::pair<double, double>> world_xy_m;
+};
+
+double path_length_m(const WaypointPath& p) {
+    double total = 0.0;
+    for (std::size_t i = 1; i < p.world_xy_m.size(); ++i) {
+        const auto& a = p.world_xy_m[i - 1];
+        const auto& b = p.world_xy_m[i];
+        total += std::hypot(b.first - a.first, b.second - a.second);
+    }
+    return total;
+}
+
+double remaining_length_m(const WaypointPath& p, std::size_t wp_idx, double x, double y) {
+    if (wp_idx >= p.world_xy_m.size()) return 0.0;
+    const auto& target = p.world_xy_m[wp_idx];
+    double total = std::hypot(target.first - x, target.second - y);   // robot -> active waypoint
+    for (std::size_t i = wp_idx + 1; i < p.world_xy_m.size(); ++i) {  // then along the path
+        const auto& a = p.world_xy_m[i - 1];
+        const auto& b = p.world_xy_m[i];
+        total += std::hypot(b.first - a.first, b.second - a.second);
+    }
+    return total;
+}
+
+int main() {
+    WaypointPath path{1, {{0.3, 0.3}, {0.5, 0.5}, {0.7, 0.5}}};
+    std::cout << path_length_m(path) << "\n";                  // 0.482843
+    std::cout << remaining_length_m(path, 1, 0.4, 0.3) << "\n"; // 0.423607
+    std::cout << remaining_length_m(path, 3, 0.0, 0.0) << "\n"; // 0
+}
+```
+
+$0.2\sqrt{2} + 0.2 = 0.4828$. From $(0.4, 0.3)$: $\sqrt{0.1^2 + 0.2^2} + 0.2 = 0.2236 + 0.2 = 0.4236$. Both are $O(n)$ and read-only, so they are safe to call on a `shared_ptr<const WaypointPath>` from the controller.
+
+**E3. Reference solution**
+
+```cpp
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
+
+class JitterStats {
+public:
+    void record(double jitter_us) noexcept {
+        ++count_;
+        mean_us_ += (jitter_us - mean_us_) / static_cast<double>(count_);  // running mean
+        max_us_ = std::max(max_us_, jitter_us);
+        ++histogram_[bucket(jitter_us)];
+    }
+    std::uint32_t count() const noexcept { return count_; }
+    double mean_us() const noexcept { return mean_us_; }
+    double max_us() const noexcept { return max_us_; }
+    const std::array<std::uint32_t, 5>& histogram() const noexcept { return histogram_; }
+
+private:
+    static std::size_t bucket(double us) noexcept {
+        if (us < 50.0) return 0;
+        if (us < 100.0) return 1;
+        if (us < 500.0) return 2;
+        if (us < 1000.0) return 3;
+        return 4;
+    }
+    std::uint32_t count_{0};
+    double mean_us_{0.0};
+    double max_us_{0.0};
+    std::array<std::uint32_t, 5> histogram_{};
+};
+
+int main() {
+    JitterStats stats;
+    for (double j : {64.2, 51.1, 48.9, 55.4, 44.8, 52.3, 1250.0}) stats.record(j);
+    std::cout << stats.count() << " " << stats.mean_us() << " " << stats.max_us() << " |";
+    for (auto h : stats.histogram()) std::cout << " " << h;
+    std::cout << "\n";   // 7 223.814 1250 | 2 4 0 0 1
+}
+```
+
+`record` is $O(1)$ with fixed storage, so it is safe inside the $100\text{ Hz}$ loop. The incremental mean avoids storing samples, and its sum stays well-conditioned. Note how one $1.25\text{ ms}$ spike pulls the mean from about $52.8$ to $223.8\ \mu\text{s}$. That is why real-time systems report **max** and a histogram, not just the average.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Name: `AutonomousRobotDaemonMissionControl`
