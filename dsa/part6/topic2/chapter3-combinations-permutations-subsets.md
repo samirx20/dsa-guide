@@ -685,6 +685,171 @@ Swap Perm:     void bt(int start)
 
 ---
 
+## Practice & Self-Check
+
+Before tracing, classify each question using the Decision Guide: *does order matter?* *all lengths or fixed K?* *reuse allowed?* The answer tells you the loop start, the recursive argument, and the save condition.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Bit-mask subsets.** Using `subsetsBitMask` on `nums = [4, 5, 6, 7]`: (a) which subset does `mask = 11` produce? (b) which subset does `mask = 6` produce? (c) which `mask` produces `[5, 7]`?
+
+**Q2. Combinations order.** Run `combinationBacktrack` on `nums = [1, 2, 3, 4]`. (a) List all results for $K = 2$ in push order. (b) For $K = 3$, what is the **3rd** combination pushed, and how many are there in total?
+
+**Q3. Swap-based permutations are not lexicographic.** Run `permuteSwap(nums, 0, result)` on `nums = [1, 2, 3, 4]`. List the first **6** permutations pushed. At which position does the output first break lexicographic order?
+
+**Q4. Combinations with Target Sum.** Using the "Variation: Combinations with Target Sum" code on `nums = [1, 2, 3, 4, 5]`: what is pushed for (a) $k = 2$, `target = 6`, and (b) $k = 3$, `target = 9`?
+
+**Q5. A missing guard.** The "Common Variations → Combination Sum (reuse allowed)" snippet has only the base case `if (target == 0)`. What happens when you call it with `nums = [2, 3]` and `target = 1`? What one-line fix makes it terminate?
+
+### Coding Exercises
+
+**E1 (Easy). Combinations of 1..n with a tighter loop bound.** Return all $C(n, k)$ combinations of the numbers $1..n$. Instead of looping to `n`, stop at `n - (k - current.size()) + 1` — beyond that, there aren't enough numbers left to fill `k` slots.
+
+```cpp
+vector<vector<int>> combine(int n, int k);
+// combine(4, 2) -> [[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]]
+// combine(4, 3) -> [[1,2,3],[1,2,4],[1,3,4],[2,3,4]]
+```
+
+**E2 (Easy–Medium). Letter Combinations of a Phone Number (LC 17).** Each digit 2–9 maps to letters as on a phone keypad (`2 → "abc"`, `3 → "def"`, …, `7 → "pqrs"`, `9 → "wxyz"`). Position `i` of the output chooses one letter of `digits[i]`.
+
+```cpp
+vector<string> letterCombinations(const string& digits);
+// "23" -> ["ad","ae","af","bd","be","bf","cd","ce","cf"]
+// ""   -> []
+```
+
+**E3 (Medium). Palindrome Partitioning (LC 131).** Split `s` into pieces so that every piece is a palindrome; return all such splits. The "choice" at each level is *where the next piece ends*.
+
+```cpp
+vector<vector<string>> partition(const string& s);
+// "aab" -> [["a","a","b"], ["aa","b"]]
+// "aba" -> [["a","b","a"], ["aba"]]
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Bit $i$ selects `nums[i]`.
+
+| mask | binary (bit 3..0) | bits set | subset |
+|------|-------------------|----------|--------|
+| 11 | 1011 | 0, 1, 3 | **[4, 5, 7]** |
+| 6 | 0110 | 1, 2 | **[5, 6]** |
+| **10** | 1010 | 1, 3 | [5, 7] |
+
+So (c) is `mask = 10` ($2^1 + 2^3$).
+
+**Q2.** (a) `[1,2]`, `[1,3]`, `[1,4]`, `[2,3]`, `[2,4]`, `[3,4]` — $C(4,2) = 6$. (b) For $K = 3$ the order is `[1,2,3]`, `[1,2,4]`, `[1,3,4]`, `[2,3,4]`, so the 3rd is **`[1,3,4]`** and there are $C(4,3) =$ **4**.
+
+**Q3.** First six: `[1,2,3,4]`, `[1,2,4,3]`, `[1,3,2,4]`, `[1,3,4,2]`, **`[1,4,3,2]`**, **`[1,4,2,3]`**. Order breaks at positions 5–6: `[1,4,3,2]` comes before `[1,4,2,3]`.
+
+| start=0 | start=1 swap | array after swap | start=2 outputs |
+|---------|--------------|------------------|-----------------|
+| i=0 (no-op) | i=1 (no-op) | [1,2,3,4] | [1,2,3,4], [1,2,4,3] |
+| | i=2: swap(1,2) | [1,3,2,4] | [1,3,2,4], [1,3,4,2] |
+| | i=3: swap(1,3) | **[1,4,3,2]** | [1,4,3,2], [1,4,2,3] |
+
+Swapping index 1 with index 3 moves `4` forward but also moves `2` to the back, so the suffix `[3,2]` is not sorted. The `visited[]` version, by contrast, always yields lexicographic order for sorted input.
+
+**Q4.** (a) **`[1,5]`, `[2,4]`** — `[3,3]` is impossible because recursion passes `i + 1` (no reuse). (b) **`[1,3,5]`, `[2,3,4]`**. Check (b) exhaustively by first element: starting with 1 needs two distinct numbers from {2..5} summing to 8 → only `3 + 5`; starting with 2 needs 7 from {3..5} → only `3 + 4`; starting with 3 needs 6 from {4, 5} → impossible.
+
+**Q5.** **Infinite recursion → stack overflow.** `target` goes `1 → -1 → -3 → -5 → …` because the call passes `i` (so `2` is reused forever) and nothing ever returns for a negative target. Fix: add `if (target < 0) return;` right after the base case (or sort and `break` when `nums[i] > target`, as in Chapter 2).
+
+| Call | target | Next call |
+|------|--------|-----------|
+| 1 | 1 | i=0 → target − 2 |
+| 2 | −1 | i=0 → target − 2 |
+| 3 | −3 | i=0 → target − 2 |
+| … | … | never reaches 0 |
+
+**E1 — reference solution**
+
+```cpp
+void bt(int n, int k, int start, vector<int>& current, vector<vector<int>>& result) {
+    if ((int)current.size() == k) {                 // Save only at length K
+        result.push_back(current);
+        return;
+    }
+    int need = k - (int)current.size();             // Slots still to fill
+    for (int i = start; i <= n - need + 1; i++) {   // Pruned upper bound
+        current.push_back(i);
+        bt(n, k, i + 1, current, result);
+        current.pop_back();
+    }
+}
+
+vector<vector<int>> combine(int n, int k) {
+    vector<vector<int>> result;
+    vector<int> current;
+    bt(n, k, 1, current, result);
+    return result;
+}
+```
+
+$O(k \cdot C(n,k))$. For `combine(4, 2)` at the root, `need = 2`, so `i` runs only to 3: starting with `4` could never produce a pair, so that dead branch is never created.
+
+**E2 — reference solution**
+
+```cpp
+const string KEYS[10] = {"", "", "abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz"};
+
+void bt(const string& digits, int i, string& current, vector<string>& result) {
+    if (i == (int)digits.size()) {          // One letter chosen per digit
+        result.push_back(current);
+        return;
+    }
+    for (char c : KEYS[digits[i] - '0']) {  // Choices = letters on this key
+        current.push_back(c);               // CHOOSE
+        bt(digits, i + 1, current, result); // EXPLORE next digit
+        current.pop_back();                 // UNCHOOSE
+    }
+}
+
+vector<string> letterCombinations(const string& digits) {
+    vector<string> result;
+    if (digits.empty()) return result;      // Edge case: no digits → no combinations
+    string current;
+    bt(digits, 0, current, result);
+    return result;
+}
+```
+
+$O(N \cdot 4^N)$ for $N$ digits. Like permutations, *position* matters, but each level draws from its own choice set, so no `visited[]` and no `index` loop are needed.
+
+**E3 — reference solution**
+
+```cpp
+bool isPal(const string& s, int l, int r) {
+    while (l < r) if (s[l++] != s[r--]) return false;
+    return true;
+}
+
+void bt(const string& s, int start, vector<string>& current,
+        vector<vector<string>>& result) {
+    if (start == (int)s.size()) {                 // Whole string consumed
+        result.push_back(current);
+        return;
+    }
+    for (int end = start; end < (int)s.size(); end++) {
+        if (!isPal(s, start, end)) continue;      // PRUNE: piece must be a palindrome
+        current.push_back(s.substr(start, end - start + 1));   // CHOOSE piece
+        bt(s, end + 1, current, result);                         // EXPLORE the rest
+        current.pop_back();                                      // UNCHOOSE
+    }
+}
+
+vector<vector<string>> partition(const string& s) {
+    vector<vector<string>> result;
+    vector<string> current;
+    bt(s, 0, current, result);
+    return result;
+}
+```
+
+$O(N \cdot 2^N)$ worst case (all `'a'`s). Trace for `"aab"`: `"a"` → `"a"` → `"b"` ✓; `"a"` → `"ab"` ✗ pruned; `"aa"` → `"b"` ✓; `"aab"` ✗ pruned.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

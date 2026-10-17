@@ -337,6 +337,156 @@ For D&C recurrences of the form $T(N) = a \cdot T(N/b) + O(N^d)$:
 
 ---
 
+## Practice & Self-Check
+
+For every question, name the three phases explicitly — **Divide**, **Conquer**, **Combine** — before you start tracing.
+
+### Predict the Output / Trace by Hand
+
+**Q1. `findMaxDC` on an odd-length array.** Run the chapter's `findMaxDC(arr, 0, 4)` on `arr = [4, 9, 2, 7, 5]`. List every call `(left, right)` in the order it is made, the `mid` it computes (if any), and the value it returns. How many calls are made in total, and does that match the chapter's $2N - 1$ formula?
+
+**Q2. Merge Sort's last step.** Run the chapter's `mergeSort` on `[5, 1, 4, 2, 3]`. (a) What are the two sorted halves just before the final `merge(arr, 0, 2, 4)`? (b) How many times does the first `while (i <= mid && j <= right)` loop compare `arr[i] <= arr[j]` during that final merge?
+
+**Q3. Master Theorem drill.** Using the table from Section 6 ($T(N) = a\,T(N/b) + O(N^d)$), give the complexity of each recurrence:
+
+1. $T(N) = 2T(N/2) + O(1)$ (the chapter's `findMaxDC`)
+2. $T(N) = 4T(N/2) + O(N)$
+3. $T(N) = 2T(N/2) + O(N^2)$
+
+**Q4. How much overlap?** The chapter says that inside `fib(5)`, `fib(2)` is solved 3 times and `fib(3)` 2 times. Using the chapter's naive `fib`, how many times is `fib(2)` called inside `fib(6)`? How many times is `fib(3)` called?
+
+### Coding Exercises
+
+**E1 (Easy). Sum by Divide and Conquer.** Mirror `findMaxDC`, but combine with `+` instead of `max`.
+
+```cpp
+long long sumDC(const vector<int>& arr, int left, int right);
+// arr = [3, 1, 4, 1, 5], sumDC(arr, 0, 4) -> 14
+// arr = [7],             sumDC(arr, 0, 0) -> 7
+```
+
+**E2 (Easy–Medium). Min and max in one pass.** Return both the minimum and the maximum of `arr[left..right]` from a single D&C recursion (the combine step merges two pairs).
+
+```cpp
+pair<int,int> minMaxDC(const vector<int>& arr, int left, int right);  // {min, max}
+// arr = [4, 9, 2, 7, 5] -> {2, 9}
+// arr = [-3]            -> {-3, -3}
+```
+
+**E3 (Medium). Count inversions.** An inversion is a pair of indices $i < j$ with $arr[i] > arr[j]$. Count them in $O(N \log N)$ by piggy-backing on the chapter's `mergeSort`: during the merge, whenever an element from the right half is taken before the remaining left-half elements, it forms an inversion with each of them.
+
+```cpp
+long long countInversions(vector<int>& arr, int left, int right);
+// [2, 4, 1, 3, 5] -> 3    (pairs (2,1), (4,1), (4,3))
+// [5, 4, 3, 2, 1] -> 10
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **9** after **9 calls** — exactly $2 \cdot 5 - 1 = 9$, so the formula holds for odd $N$ too.
+
+| Order | Call `(left, right)` | mid | Returns |
+|-------|----------------------|-----|---------|
+| 1 | `(0, 4)` | 2 | max(9, 7) = **9** |
+| 2 | `(0, 2)` | 1 | max(9, 2) = 9 |
+| 3 | `(0, 1)` | 0 | max(4, 9) = 9 |
+| 4 | `(0, 0)` | – | 4 |
+| 5 | `(1, 1)` | – | 9 |
+| 6 | `(2, 2)` | – | 2 |
+| 7 | `(3, 4)` | 3 | max(7, 5) = 7 |
+| 8 | `(3, 3)` | – | 7 |
+| 9 | `(4, 4)` | – | 5 |
+
+(The "Returns" column of rows 1–3 and 7 is filled in after their children finish.)
+
+**Q2.** (a) Left half `[1, 4, 5]` (indices 0–2), right half `[2, 3]` (indices 3–4). (b) **3 comparisons**:
+
+| Compare | Taken | temp |
+|---------|-------|------|
+| 1 vs 2 | 1 (left) | [1] |
+| 4 vs 2 | 2 (right) | [1, 2] |
+| 4 vs 3 | 3 (right) | [1, 2, 3] |
+| right exhausted | copy 4, 5 | [1, 2, 3, 4, 5] |
+
+**Q3.**
+
+| Recurrence | a | b | d | $\log_b a$ | Case | Result |
+|------------|---|---|---|------------|------|--------|
+| $2T(N/2)+O(1)$ | 2 | 2 | 0 | 1 | $d < \log_b a$ | $O(N)$ |
+| $4T(N/2)+O(N)$ | 4 | 2 | 1 | 2 | $d < \log_b a$ | $O(N^2)$ |
+| $2T(N/2)+O(N^2)$ | 2 | 2 | 2 | 1 | $d > \log_b a$ | $O(N^2)$ |
+
+The first line confirms the chapter's claim that `findMaxDC` is $O(N)$, not $O(N \log N)$.
+
+**Q4.** `fib(2)` is called **5** times and `fib(3)` **3** times. Count calls of `fib(k)` inside `fib(n)` as $\text{cnt}(n) = \text{cnt}(n-1) + \text{cnt}(n-2)$ with $\text{cnt}(k) = 1$ and $\text{cnt}(k-1) = 0$:
+
+| target | in fib(k) | fib(k+1) | fib(k+2) | fib(k+3) | fib(k+4) |
+|--------|-----------|----------|----------|----------|----------|
+| `fib(2)` | 1 (fib 2) | 1 (fib 3) | 2 (fib 4) | 3 (fib 5) | **5** (fib 6) |
+| `fib(3)` | 1 (fib 3) | 1 (fib 4) | 2 (fib 5) | **3** (fib 6) | – |
+
+The counts are themselves Fibonacci numbers — the overlap grows exponentially, which is exactly why DP (not D&C) is the right tool.
+
+**E1 — reference solution**
+
+```cpp
+long long sumDC(const vector<int>& arr, int left, int right) {
+    if (left == right) return arr[left];               // Base: one element
+    int mid = left + (right - left) / 2;               // Divide
+    return sumDC(arr, left, mid) + sumDC(arr, mid + 1, right);  // Conquer + Combine
+}
+```
+
+$T(N) = 2T(N/2) + O(1) = O(N)$ time, $O(\log N)$ stack space.
+
+**E2 — reference solution**
+
+```cpp
+pair<int,int> minMaxDC(const vector<int>& arr, int left, int right) {
+    if (left == right) return {arr[left], arr[left]};  // Base: min = max = the element
+    int mid = left + (right - left) / 2;
+    pair<int,int> L = minMaxDC(arr, left, mid);
+    pair<int,int> R = minMaxDC(arr, mid + 1, right);
+    return {min(L.first, R.first), max(L.second, R.second)};  // Combine two pairs
+}
+```
+
+$O(N)$ time, $O(\log N)$ space. Same call tree as Q1, carrying two values per node.
+
+**E3 — reference solution**
+
+```cpp
+long long mergeCount(vector<int>& arr, int left, int mid, int right) {
+    vector<int> temp;
+    int i = left, j = mid + 1;
+    long long inv = 0;
+    while (i <= mid && j <= right) {
+        if (arr[i] <= arr[j]) {
+            temp.push_back(arr[i++]);
+        } else {
+            inv += (mid - i + 1);          // arr[j] is smaller than ALL of arr[i..mid]
+            temp.push_back(arr[j++]);
+        }
+    }
+    while (i <= mid) temp.push_back(arr[i++]);
+    while (j <= right) temp.push_back(arr[j++]);
+    for (int k = 0; k < (int)temp.size(); k++) arr[left + k] = temp[k];
+    return inv;
+}
+
+long long countInversions(vector<int>& arr, int left, int right) {
+    if (left >= right) return 0;
+    int mid = left + (right - left) / 2;
+    long long inv = countInversions(arr, left, mid)
+                  + countInversions(arr, mid + 1, right);
+    return inv + mergeCount(arr, left, mid, right);
+}
+```
+
+$O(N \log N)$ time, $O(N)$ extra space. Because both halves are sorted, when `arr[j] < arr[i]` it is also smaller than every remaining left element, so all `mid - i + 1` pairs are counted at once. For `[2, 4, 1, 3, 5]`: left `[2,4,1]` → `[1,2,4]` contributes 2 inversions (`(2,1)`, `(4,1)`), right `[3,5]` contributes 0, and the final merge counts 1 (`3` jumps ahead of `4`): total 3.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

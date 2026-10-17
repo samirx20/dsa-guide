@@ -475,6 +475,182 @@ if (currentSum + nums[i] > target) continue;
 
 ---
 
+## Practice & Self-Check
+
+For each question, ask two things: *is this pruning **safe*** (it never cuts a branch that contains a valid answer), and *does it rely on a precondition* (sorted input, positive numbers, no reuse)?
+
+### Predict the Output / Trace by Hand
+
+**Q1. Combination Sum on `[2, 3, 5]`, target = 8.** Run the "With Sum Pruning (Sorted + Break)" code. List every combination pushed into `result`, in order.
+
+**Q2. Combination Sum II.** Run the Section 3 Combination Sum II `backtrack` (sum `break` + duplicate `continue`, recursion on `i + 1`) on `candidates = [10, 1, 2, 7, 6, 1, 5]`, target = 8, after sorting. What is the sorted array, and what combinations are pushed, in order?
+
+**Q3. Forgetting to sort before Subsets II.** The Subsets II `backtrack` relies on equal values being adjacent. What does it record for `nums = [2, 1, 2]` *without* sorting first? Which entries are duplicates (as sets)?
+
+**Q4. `break` on unsorted input.** Someone keeps the `break` from the sorted Combination Sum code but forgets the `sort(...)` call. What does `combinationSum([2, 7, 3], 5)` return? What is the correct answer?
+
+**Q5. A pruning that is not safe here.** Section 5's "Remaining Elements Pruning" recurses with `i` (elements may be reused). What does it return for `nums = [2]`, target = 4? Is that correct? Under what condition is the `sum + remainingSum < target` check actually safe?
+
+### Coding Exercises
+
+**E1 (Easy). Combination Sum III.** Find all combinations of exactly `k` distinct numbers from 1–9 that sum to `n`. The numbers 1–9 are already sorted, so use `break` sum-pruning.
+
+```cpp
+vector<vector<int>> combinationSum3(int k, int n);
+// k = 3, n = 7 -> [[1, 2, 4]]
+// k = 3, n = 9 -> [[1, 2, 6], [1, 3, 5], [2, 3, 4]]
+```
+
+**E2 (Easy–Medium). Permutations with duplicates.** Return all *unique* permutations. Sort, then use a duplicate-pruning rule adapted for a `used[]` array (permutations loop from 0, so `i > index` no longer applies).
+
+```cpp
+vector<vector<int>> permuteUnique(vector<int>& nums);
+// [1, 1, 2] -> [[1, 1, 2], [1, 2, 1], [2, 1, 1]]
+// [3, 3]    -> [[3, 3]]
+```
+
+**E3 (Medium). Optimality pruning: fewest numbers to reach a target.** Each number may be reused. Return the minimum count of numbers whose sum equals `target`, or `-1`. Keep a global `best` and prune with `if (count + 1 >= best) return;` (the "Optimality Pruning" row of the Types table). Sorting descending finds good answers early, which makes the pruning stronger.
+
+```cpp
+int minCountSum(vector<int> nums, int target);
+// nums = [1, 3, 4], target = 6 -> 2   (3 + 3)
+// nums = [2],       target = 3 -> -1
+```
+
+#### Dry-Run: Answers
+
+**Q1.** `[2,2,2,2]`, `[2,3,3]`, `[3,5]`.
+
+| Path | Sum | What happens |
+|------|-----|--------------|
+| 2,2,2,2 | 8 | ✓ record |
+| 2,2,2 then +3 | 9 | break |
+| 2,2,3 | 7 | next +3 → 10, break |
+| 2,2 then +5 | 9 | break |
+| 2,3,3 | 8 | ✓ record |
+| 2,3 then +5 | 10 | break |
+| 2,5 | 7 | +5 → 12, break |
+| 3,3 | 6 | +3 → 9, break |
+| 3,5 | 8 | ✓ record |
+| 5 then +5 | 10 | break |
+
+**Q2.** Sorted: `[1, 1, 2, 5, 6, 7, 10]`. Pushed: **`[1,1,6]`, `[1,2,5]`, `[1,7]`, `[2,6]`**.
+
+| Depth-0 pick | Explored (key steps) | Recorded |
+|--------------|----------------------|----------|
+| `1` (i=0) | `1,1` → `1,1,2` (4) then +5=9 break; `1,1,5`=7 then +6 break; `1,1,6` = 8 ✓ | `[1,1,6]` |
+| | `1,2` → `1,2,5` = 8 ✓ | `[1,2,5]` |
+| | `1,5` (6) → +6=12 break; `1,6` (7) → +7 break; `1,7` = 8 ✓ | `[1,7]` |
+| `1` (i=1) | **skipped**: `i > index` and `nums[1] == nums[0]` | – |
+| `2` (i=2) | `2,5` (7) → +6 break; `2,6` = 8 ✓ | `[2,6]` |
+| `5` (i=3) | `5` + 6 = 11 → break | – |
+| `6`, `7` | `6`: +7 = 13 break; `7`: next is 10 → 17 break | – |
+| `10` | 0 + 10 > 8 → break the root loop | – |
+
+**Q3.** Records 8 entries: `[]`, `[2]`, `[2,1]`, `[2,1,2]`, `[2,2]`, `[1]`, `[1,2]`, `[2]`. The duplicate check never fires (`nums[1]=1 ≠ nums[0]=2`, `nums[2]=2 ≠ nums[1]=1`), so `[2]` appears twice and `[2,1]` / `[1,2]` are the same set. The correct answer has 6 subsets: `[]`, `[1]`, `[1,2]`, `[1,2,2]`, `[2]`, `[2,2]`.
+
+**Q4.** It returns **`[]`** (nothing), but the correct answer is **`[[2, 3]]`**.
+
+| Frame | Tries | Sum | Result |
+|-------|-------|-----|--------|
+| root | 2 | 2 | recurse |
+| `[2]` | 2 | 4 | recurse |
+| `[2,2]` | 2 | 6 > 5 | **break** (never tries 3) |
+| `[2]` | 7 | 9 > 5 | **break** — `3` is never tried, so `[2,3]` is lost |
+| root | 7 | 7 > 5 | **break** — `3` is never tried |
+
+`break` assumes "everything after `i` is at least as big". On unsorted input that is false, so the pruning is **unsafe**. Either sort first or use `continue`.
+
+**Q5.** It returns **`[]`**, which is **wrong** — `[2, 2]` sums to 4. At the root, `sum = 0`, `remainingSum = 2`, and `0 + 2 < 4` returns immediately. The check assumes each remaining element can be taken at most once; with reuse allowed (recursing on `i`), the remaining elements can contribute unboundedly. It is safe only when the recursion passes `i + 1` (each element used at most once, e.g. Combination Sum II) and all numbers are non-negative.
+
+**E1 — reference solution**
+
+```cpp
+void bt(int k, int n, int start, int sum,
+        vector<int>& current, vector<vector<int>>& result) {
+    if ((int)current.size() == k) {
+        if (sum == n) result.push_back(current);
+        return;
+    }
+    for (int x = start; x <= 9; x++) {
+        if (sum + x > n) break;            // 1..9 is sorted: all later x are bigger
+        current.push_back(x);              // CHOOSE
+        bt(k, n, x + 1, sum + x, current, result);   // EXPLORE (distinct: x + 1)
+        current.pop_back();                // UNCHOOSE
+    }
+}
+
+vector<vector<int>> combinationSum3(int k, int n) {
+    vector<vector<int>> result;
+    vector<int> current;
+    bt(k, n, 1, 0, current, result);
+    return result;
+}
+```
+
+At most $\binom{9}{k}$ leaves, so it is effectively constant-time; the `break` cuts most of them.
+
+**E2 — reference solution**
+
+```cpp
+void bt(vector<int>& nums, vector<bool>& used,
+        vector<int>& current, vector<vector<int>>& result) {
+    if (current.size() == nums.size()) {
+        result.push_back(current);
+        return;
+    }
+    for (int i = 0; i < (int)nums.size(); i++) {
+        if (used[i]) continue;
+        // Duplicate pruning: among equal values, only use them left-to-right.
+        if (i > 0 && nums[i] == nums[i - 1] && !used[i - 1]) continue;
+        used[i] = true;
+        current.push_back(nums[i]);
+        bt(nums, used, current, result);
+        current.pop_back();
+        used[i] = false;
+    }
+}
+
+vector<vector<int>> permuteUnique(vector<int>& nums) {
+    sort(nums.begin(), nums.end());              // Equal values become adjacent
+    vector<vector<int>> result;
+    vector<int> current;
+    vector<bool> used(nums.size(), false);
+    bt(nums, used, current, result);
+    return result;
+}
+```
+
+$O(N \cdot N!)$ worst case. The rule "skip `nums[i]` if its equal left neighbour is *unused*" forces equal values to be placed in index order, so each distinct arrangement is built exactly once.
+
+**E3 — reference solution**
+
+```cpp
+void bt(vector<int>& nums, int target, int index,
+        int sum, int count, int& best) {
+    if (sum == target) {                        // Found a valid combination
+        best = min(best, count);
+        return;
+    }
+    if (count + 1 >= best) return;              // OPTIMALITY PRUNING: can't beat best
+    for (int i = index; i < (int)nums.size(); i++) {
+        if (sum + nums[i] > target) continue;   // Descending order: later ones may still fit
+        bt(nums, target, i, sum + nums[i], count + 1, best);   // reuse allowed: i
+    }
+}
+
+int minCountSum(vector<int> nums, int target) {
+    sort(nums.rbegin(), nums.rend());           // Big numbers first → good 'best' early
+    int best = INT_MAX;
+    bt(nums, target, 0, 0, 0, best);
+    return best == INT_MAX ? -1 : best;
+}
+```
+
+Note the use of `continue`, not `break`: in **descending** order, a number that is too big says nothing about the smaller ones after it. For `[4, 3, 1]`, 6: path `4,1,1` sets `best = 3` first; later `3,3` improves it to `2`, and every deeper branch with `count + 1 >= 2` is cut. (For large inputs this problem is better solved with DP — see the Coin Change chapter later.)
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

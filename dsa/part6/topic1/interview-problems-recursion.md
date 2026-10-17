@@ -443,6 +443,155 @@ Output: "olleh"
 
 ---
 
+## Practice & Self-Check
+
+Each question below re-runs one of the six solutions above on a new input. Draw the recursion tree or fill the dry-run table yourself before peeking.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Climbing Stairs, n = 5.** Using the naive `climbStairs` from Problem 2 (base case `n <= 1` returns 1), what does `climbStairs(5)` return, and how many total calls does it make (including itself)?
+
+**Q2. Power of Two on 24 and 0.** Trace Problem 3's `isPowerOfTwo` on `n = 24`. List each call's `n`, `n % 2`, and the action. What is returned and how many calls are made? Then: what does `isPowerOfTwo(0)` return and on which line?
+
+**Q3. `myPow` dry-run.** Fill in Problem 4's dry-run table for `fastPow(3, 13)` (columns `n`, `n/2`, `half`, `n%2`, result). Then say what `myPow(2.0, -3)` returns and what the values of `x` and `N` are when it calls `fastPow`.
+
+**Q4. Generate Parentheses, n = 3.** Problem 5's `generate` always tries `(` before `)`. List the strings in `result` *in the exact order they are pushed*. How many are there?
+
+**Q5. The hidden cost of `substr`.** Problem 6's `reverseString` makes $N$ calls for a string of length $N$. Counting the characters copied by `s.substr(1)` and by the `+` concatenation, what is the real time complexity? How many characters does `s.substr(1)` copy in total for `"hello"`?
+
+### Coding Exercises
+
+**E1 (Easy). Power of Three.** Adapt Problem 3's base-case/recursive-step structure.
+
+```cpp
+bool isPowerOfThree(int n);
+// isPowerOfThree(27) -> true
+// isPowerOfThree(45) -> false   (45 -> 15 -> 5, and 5 % 3 != 0)
+```
+
+**E2 (Easy–Medium). Stairs with 1, 2 or 3 steps — memoized.** Count the distinct ways to climb `n` stairs taking 1, 2, or 3 steps at a time. Write it recursively, then add a memo table so it runs in $O(n)$ (the "Recursion + memoization" row of the comparison table).
+
+```cpp
+long long countWays(int n, vector<long long>& memo);   // memo sized n+1, filled with -1
+// n = 3 -> 4   (1+1+1, 1+2, 2+1, 3)
+// n = 4 -> 7
+```
+
+**E3 (Medium). Binary strings with no consecutive 1s.** Generate every binary string of length `n` that never contains `"11"`. Use the same shape as Generate Parentheses: two choices per position, each guarded by a validity condition. Try `'0'` before `'1'`.
+
+```cpp
+vector<string> noConsecutiveOnes(int n);
+// n = 2 -> ["00", "01", "10"]
+// n = 3 -> ["000", "001", "010", "100", "101"]
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **8**, after **15** calls. Values: $c(0)=1, c(1)=1, c(2)=2, c(3)=3, c(4)=5, c(5)=8$. Calls: $C(n) = 1 + C(n-1) + C(n-2)$ with $C(0)=C(1)=1$:
+
+| n | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| ways | 1 | 1 | 2 | 3 | 5 | 8 |
+| calls | 1 | 1 | 3 | 5 | 9 | 15 |
+
+Note `climbStairs(n)` equals `fib(n + 1)`, which is why it has the same tree shape as Problem 1's `fib(5)` (also 15 nodes).
+
+**Q2.** `isPowerOfTwo(24)` returns **false** after **4** calls:
+
+| Step | n | n % 2 | n == 1? | Action |
+|------|---|-------|---------|--------|
+| 1 | 24 | 0 | No | Call `isPowerOfTwo(12)` |
+| 2 | 12 | 0 | No | Call `isPowerOfTwo(6)` |
+| 3 | 6 | 0 | No | Call `isPowerOfTwo(3)` |
+| 4 | 3 | 1 | No | Odd → return `false` |
+
+`isPowerOfTwo(0)` returns **false** from the second line, `if (n <= 0 || n % 2 != 0) return false;` (the `n <= 0` check). Without it, `0 % 2 == 0` and `0 / 2 == 0` would recurse forever.
+
+**Q3.** `fastPow(3, 13)` = **1594323** ($3^{13}$):
+
+| Step | n | n/2 | half | n%2 | Result |
+|------|---|-----|------|-----|--------|
+| `fastPow(3,13)` | 13 | 6 | 729 | 1 | 729 × 729 × 3 = **1594323** |
+| `fastPow(3,6)` | 6 | 3 | 27 | 0 | 27 × 27 = 729 |
+| `fastPow(3,3)` | 3 | 1 | 3 | 1 | 3 × 3 × 3 = 27 |
+| `fastPow(3,1)` | 1 | 0 | 1 | 1 | 1 × 1 × 3 = 3 |
+| `fastPow(3,0)` | 0 | – | – | – | 1 |
+
+`myPow(2.0, -3)`: since `N = -3 < 0`, it sets `x = 1/2 = 0.5` and `N = 3`, then `fastPow(0.5, 3)` → `fastPow(0.5,1) = 0.5` → `0.5 × 0.5 × 0.5` = **0.125**.
+
+**Q4.** **5** strings (the 3rd Catalan number), pushed in this order:
+
+| Order | String | Path of choices |
+|-------|--------|-----------------|
+| 1 | `((()))` | ( ( ( ) ) ) |
+| 2 | `(()())` | ( ( ) ( ) ) |
+| 3 | `(())()` | ( ( ) ) ( ) |
+| 4 | `()(())` | ( ) ( ( ) ) |
+| 5 | `()()()` | ( ) ( ) ( ) |
+
+Because `(` is always tried first, the results come out in lexicographic order (`'(' < ')'` in ASCII).
+
+**Q5.** $O(N^2)$ time. Call $k$ copies a substring of length $N-k$ and concatenates a result of similar length, so the total work is about $(N-1) + (N-2) + \dots + 1 = \frac{N(N-1)}{2}$. For `"hello"`, `substr(1)` copies $4 + 3 + 2 + 1 = $ **10** characters (`"ello"`, `"llo"`, `"lo"`, `"o"`). Passing indices instead of substrings (like E2 in Chapter 1) removes this cost.
+
+**E1 — reference solution**
+
+```cpp
+bool isPowerOfThree(int n) {
+    if (n == 1) return true;                    // 3^0
+    if (n <= 0 || n % 3 != 0) return false;     // Not divisible: stop
+    return isPowerOfThree(n / 3);               // Recursive step
+}
+```
+
+$O(\log_3 n)$ time and stack space. `27 → 9 → 3 → 1` returns true; `45 → 15 → 5`, and `5 % 3 = 2` returns false.
+
+**E2 — reference solution**
+
+```cpp
+long long countWays(int n, vector<long long>& memo) {
+    if (n < 0) return 0;                 // Overshot the top: not a valid way
+    if (n == 0) return 1;                // Exactly at the top: one way
+    if (memo[n] != -1) return memo[n];   // Already solved
+    return memo[n] = countWays(n - 1, memo)
+                   + countWays(n - 2, memo)
+                   + countWays(n - 3, memo);
+}
+// Usage: vector<long long> memo(n + 1, -1); countWays(n, memo);
+```
+
+Each `n` is solved once → $O(n)$ time, $O(n)$ space. Values: $w(0)=1$, $w(1)=1$, $w(2)=w(1)+w(0)=2$, $w(3)=w(2)+w(1)+w(0)=4$, $w(4)=w(3)+w(2)+w(1)=4+2+1=7$.
+
+**E3 — reference solution**
+
+```cpp
+void build(int n, string& cur, vector<string>& result) {
+    if ((int)cur.size() == n) {           // Base case: full length
+        result.push_back(cur);
+        return;
+    }
+    cur.push_back('0');                   // '0' is always allowed
+    build(n, cur, result);
+    cur.pop_back();
+
+    if (cur.empty() || cur.back() != '1') {   // '1' only if previous char isn't '1'
+        cur.push_back('1');
+        build(n, cur, result);
+        cur.pop_back();
+    }
+}
+
+vector<string> noConsecutiveOnes(int n) {
+    vector<string> result;
+    string cur;
+    build(n, cur, result);
+    return result;
+}
+```
+
+The guard plays the role of `close < open` in Generate Parentheses: invalid branches are never entered. The count follows Fibonacci (2, 3, 5, 8, … for n = 1, 2, 3, 4), so time is $O(F_{n+2} \cdot n)$ and stack space $O(n)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

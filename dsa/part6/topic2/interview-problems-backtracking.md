@@ -470,6 +470,184 @@ This systematic approach ensures clear thinking in interviews.
 
 ---
 
+## Practice & Self-Check
+
+These questions re-run the six solutions above on fresh inputs. For each one, name the template first (subset / permutation / combination-with-reuse / 2D / constraint), then trace.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Combination Sum, `[2, 3]`, target = 6.** Run Problem 3's `backtrack` (reuse allowed, `if (sum > target) return;`). (a) Which combinations are pushed, in order? (b) How many times is `backtrack` called in total (including the root), and how many of those calls end at the `sum > target` prune?
+
+**Q2. Word Search on the classic board.** Use Problem 4's `dfs` (tries Down, Up, Right, Left in that order) on
+
+```
+A B C E
+S F C S
+A D E E
+```
+
+(a) Does `"ABCCED"` exist? Give the cells of the path that `dfs` finds starting at (0,0). (b) Does `"ABCB"` exist? Which line of the code stops the path `A → B → C → B` from reusing the `B` at (0,1)?
+
+**Q3. N-Queens bitmask.** In Problem 5's bitmask version with $n = 4$, suppose row 0 places its queen in column 1 (`col = 0b0010`). The call for row 1 receives `cols`, `diag1`, `diag2`. Compute those three masks and `available` in binary. Which column(s) can row 1 use?
+
+**Q4. Spot the error in a dry-run.** Problem 5's "Dry-Run for N=4" table claims that after queens at (0,0) and (1,2), the placement (2,3) is valid. Using the code's own `diag2[row - col + n - 1]` index, check that claim. Which existing queen attacks (2,3)? Is there *any* valid column for row 2?
+
+### Coding Exercises
+
+**E1 (Easy). Count Combination Sum results.** Same rules as Problem 3 (distinct candidates, unlimited reuse), but return only the *number* of combinations. Sort and use `break` instead of the `sum > target` return.
+
+```cpp
+int countCombos(vector<int> candidates, int target);
+// countCombos([2, 3, 6, 7], 7) -> 2    ([2,2,3], [7])
+// countCombos([2, 3, 5], 8)    -> 3    ([2,2,2,2], [2,3,3], [3,5])
+```
+
+**E2 (Easy–Medium). Count word paths.** Instead of returning `true` at the first match, count *every* distinct path of cells (4-directional, no cell reused within a path) that spells `word`. Reuse Problem 4's mark-with-`'#'` trick.
+
+```cpp
+int countWordPaths(vector<vector<char>> board, const string& word);
+// board = [[A,B],[B,A]], word = "AB"  -> 4
+// board = [[A,B],[B,A]], word = "ABA" -> 4
+// board = [[A,B],[B,A]], word = "AA"  -> 0
+```
+
+**E3 (Medium). Restore IP Addresses (LC 93).** Insert three dots into a digit string to form every valid IPv4 address. Each of the 4 parts is 0–255 with no leading zeros (`"0"` is fine, `"01"` is not). The choice at each level is the length of the next part (1, 2 or 3).
+
+```cpp
+vector<string> restoreIpAddresses(const string& s);
+// "25525511135" -> ["255.255.11.135", "255.255.111.35"]
+// "0000"        -> ["0.0.0.0"]
+```
+
+#### Dry-Run: Answers
+
+**Q1.** (a) `[2,2,2]`, then `[3,3]`. (b) **9** calls, **2** pruned.
+
+| Call | curr | sum | Outcome |
+|------|------|-----|---------|
+| 1 | [] | 0 | loop |
+| 2 | [2] | 2 | loop |
+| 3 | [2,2] | 4 | loop |
+| 4 | [2,2,2] | 6 | **found** |
+| 5 | [2,2,3] | 7 | prune (7 > 6) |
+| 6 | [2,3] | 5 | loop (only i = 1) |
+| 7 | [2,3,3] | 8 | prune (8 > 6) |
+| 8 | [3] | 3 | loop (only i = 1) |
+| 9 | [3,3] | 6 | **found** |
+
+`[3,2]` is never built because the loop starts at `index` — that is what removes order-duplicates.
+
+**Q2.** (a) **Yes**: (0,0) A → (0,1) B → (0,2) C → (1,2) C → (2,2) E → (2,1) D.
+
+| index | at cell | looking for | Down | Up | Right | Left |
+|-------|---------|-------------|------|----|-------|------|
+| 1 | (0,0) | B | (1,0) S ✗ | OOB ✗ | (0,1) B ✓ | – |
+| 2 | (0,1) | C | (1,1) F ✗ | OOB ✗ | (0,2) C ✓ | – |
+| 3 | (0,2) | C | (1,2) C ✓ | – | – | – |
+| 4 | (1,2) | E | (2,2) E ✓ | – | – | – |
+| 5 | (2,2) | D | OOB ✗ | (1,2) `#` ✗ | (2,3) E ✗ | (2,1) D ✓ |
+| 6 | – | – | `index == word.length()` → true | | | |
+
+(b) **No.** After `A(0,0) → B(0,1) → C(0,2)`, the only `B` adjacent to (0,2) is (0,1), which now holds `'#'` because of `board[r][c] = '#';  // CHOOSE`. The mismatch test `board[r][c] != word[index]` then returns false. No other start works either (the board has a single `B`).
+
+**Q3.**
+
+| Mask | Computation | Binary (bits 3..0) |
+|------|-------------|--------------------|
+| `cols` | `0 \| 0b0010` | `0010` |
+| `diag1` | `(0 \| 0b0010) << 1` | `0100` |
+| `diag2` | `(0 \| 0b0010) >> 1` | `0001` |
+| `available` | `1111 & ~(0010 \| 0100 \| 0001)` = `1111 & ~0111` | **`1000`** |
+
+Only **column 3** is available — matching the 4-Queens solution `.Q.. / ...Q / Q... / ..Q.`. Column 1 is blocked vertically, columns 0 and 2 diagonally.
+
+**Q4.** The claim is **wrong**. With $n = 4$: queen (1,2) has `diag2 = 1 - 2 + 3 = 2`, and (2,3) has `diag2 = 2 - 3 + 3 = 2` — the same "\" diagonal, so (1,2) attacks (2,3). Row 2 has **no** valid column:
+
+| (2,col) | Blocked by |
+|---------|-----------|
+| (2,0) | column of (0,0) |
+| (2,1) | `diag1`: (1,2) has `1+2 = 3`, (2,1) has `2+1 = 3` |
+| (2,2) | column of (1,2) |
+| (2,3) | `diag2` = 2, shared with (1,2) |
+
+So the code backtracks at row 2 (not row 3): it un-places (1,2), tries (1,3), and only then reaches a further row.
+
+**E1 — reference solution**
+
+```cpp
+int countFrom(vector<int>& c, int target, int index, int sum) {
+    if (sum == target) return 1;                  // One valid combination
+    int total = 0;
+    for (int i = index; i < (int)c.size(); i++) {
+        if (sum + c[i] > target) break;           // Sorted: everything after is too big
+        total += countFrom(c, target, i, sum + c[i]);   // i: reuse allowed
+    }
+    return total;
+}
+
+int countCombos(vector<int> candidates, int target) {
+    sort(candidates.begin(), candidates.end());
+    return countFrom(candidates, target, 0, 0);
+}
+```
+
+No `current` vector is needed because nothing is recorded — just counted. Same exponential worst case as Problem 3, but the `break` cuts more than the after-the-fact `sum > target` return.
+
+**E2 — reference solution**
+
+```cpp
+int dfsCount(vector<vector<char>>& b, const string& w, int r, int c, int idx) {
+    if (r < 0 || r >= (int)b.size() || c < 0 || c >= (int)b[0].size()
+        || b[r][c] != w[idx]) return 0;           // Out of bounds, used, or mismatch
+    if (idx == (int)w.size() - 1) return 1;       // Matched the last character here
+    char temp = b[r][c];
+    b[r][c] = '#';                                // CHOOSE
+    int total = dfsCount(b, w, r + 1, c, idx + 1) + dfsCount(b, w, r - 1, c, idx + 1)
+              + dfsCount(b, w, r, c + 1, idx + 1) + dfsCount(b, w, r, c - 1, idx + 1);
+    b[r][c] = temp;                               // UNCHOOSE
+    return total;                                 // Sum instead of ||: explore all paths
+}
+
+int countWordPaths(vector<vector<char>> board, const string& word) {
+    if (word.empty()) return 0;
+    int total = 0;
+    for (int r = 0; r < (int)board.size(); r++)
+        for (int c = 0; c < (int)board[0].size(); c++)
+            total += dfsCount(board, word, r, c, 0);
+    return total;
+}
+```
+
+$O(m \cdot n \cdot 4^L)$. The key change from Problem 4 is replacing the short-circuit `||` with `+`. For `"AB"` each of the two `A`s has two `B` neighbours → 4. For `"AA"` no `A` is adjacent to another `A` → 0.
+
+**E3 — reference solution**
+
+```cpp
+void bt(const string& s, int start, int parts, string current, vector<string>& result) {
+    if (parts == 4) {
+        if (start == (int)s.size())               // Used every digit exactly
+            result.push_back(current.substr(0, current.size() - 1));   // drop last '.'
+        return;
+    }
+    for (int len = 1; len <= 3 && start + len <= (int)s.size(); len++) {
+        string seg = s.substr(start, len);
+        if (seg.size() > 1 && seg[0] == '0') break;   // Leading zero: longer is also invalid
+        if (stoi(seg) > 255) break;                   // Longer would be even bigger
+        bt(s, start + len, parts + 1, current + seg + ".", result);
+    }
+}
+
+vector<string> restoreIpAddresses(const string& s) {
+    vector<string> result;
+    bt(s, 0, 0, "", result);
+    return result;
+}
+```
+
+At most $3^4 = 81$ leaves, so effectively $O(1)$. `current` is passed by value (strings are tiny), so no explicit unchoose is needed — the copy *is* the undo. For `"0000"`, every part is forced to be `"0"` because `"00"` breaks on the leading-zero check.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

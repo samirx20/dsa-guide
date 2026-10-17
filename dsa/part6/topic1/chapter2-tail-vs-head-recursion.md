@@ -310,6 +310,146 @@ void printAscendingIterative(int n) {
 
 ---
 
+## Practice & Self-Check
+
+The single most useful habit from this chapter: before predicting output, ask *"does the work happen before the call (on the way down) or after it (on the way up)?"*
+
+### Predict the Output / Trace by Hand
+
+**Q1. Work on both sides.** This function mixes the chapter's `printDescending` and `printAscending` into one body. What does `mystery(3)` print? Is it tail recursive?
+
+```cpp
+void mystery(int n) {
+    if (n == 0) return;
+    cout << n << " ";   // work BEFORE the call
+    mystery(n - 1);
+    cout << n << " ";   // work AFTER the call
+}
+```
+
+**Q2. Stack snapshot.** Call `printAscending(4)` from the chapter. (a) What is the maximum stack size reached? (b) At the exact moment the character `3` is printed, which frames are on the call stack?
+
+**Q3. Which are tail recursive?** For each function, say whether the recursive call is the *last action* (TCO-eligible) or not, and why.
+
+```cpp
+// (a)
+int fact(int n) { if (n <= 1) return 1; return n * fact(n - 1); }
+// (b)
+int factAcc(int n, int acc) { if (n <= 1) return acc; return factAcc(n - 1, acc * n); }
+// (c)
+int countDown(int n) { if (n == 0) return 0; return 1 + countDown(n - 1); }
+// (d)
+void printDescending(int n) { if (n == 0) return; cout << n << " "; printDescending(n - 1); }
+```
+
+**Q4. Traversals on a new tree.** Using the chapter's `preorder`, `inorder`, and `postorder` functions, write the output for this tree:
+
+```
+        5
+       / \
+      3   8
+     /   / \
+    1   7   9
+```
+
+### Coding Exercises
+
+**E1 (Easy). Tail-recursive factorial.** Write factorial so that the recursive call is the very last operation (carry the partial product in an accumulator, like `sumHelper` in Chapter 1).
+
+```cpp
+long long factTail(int n, long long acc = 1);
+// factTail(5) -> 120
+// factTail(0) -> 1
+```
+
+**E2 (Easy–Medium). Print an array backwards with head recursion.** Called with `i = 0`, print the elements from last to first. You may not index from the end — the reversal must come from doing the work *after* the call.
+
+```cpp
+void printReverse(const vector<int>& a, int i);
+// a = {10, 20, 30}, printReverse(a, 0) prints: 30 20 10
+// a = {},           printReverse(a, 0) prints nothing
+```
+
+**E3 (Medium). Decimal to binary string.** Return the binary representation of a non-negative integer. Repeated `n % 2` produces bits from least to most significant — use head recursion so the most significant bit naturally ends up first.
+
+```cpp
+string toBinary(int n);
+// toBinary(6)  -> "110"
+// toBinary(13) -> "1101"
+// toBinary(0)  -> "0"
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Prints **`3 2 1 1 2 3`**. It is **not** tail recursive — there is a `cout` after the recursive call, so each frame must wait.
+
+| Event | Output so far |
+|-------|---------------|
+| `mystery(3)` prints before call | `3` |
+| `mystery(2)` prints before call | `3 2` |
+| `mystery(1)` prints before call | `3 2 1` |
+| `mystery(0)` base case returns | `3 2 1` |
+| `mystery(1)` resumes, prints after | `3 2 1 1` |
+| `mystery(2)` resumes, prints after | `3 2 1 1 2` |
+| `mystery(3)` resumes, prints after | `3 2 1 1 2 3` |
+
+**Q2.** (a) **5** frames: `printA(4)`, `printA(3)`, `printA(2)`, `printA(1)`, `printA(0)`. (b) When `3` is printed, `printA(0)`, `printA(1)` and `printA(2)` have already returned (having printed `1 2`), so the stack holds **`printA(4)` (waiting) and `printA(3)` (printing)** — size 2.
+
+**Q3.**
+
+| Function | Tail recursive? | Reason |
+|----------|-----------------|--------|
+| (a) `fact` | No | Must multiply `n *` the result after the call returns |
+| (b) `factAcc` | Yes | The call's result is returned directly; nothing left to do |
+| (c) `countDown` | No | Must add `1 +` after the call returns |
+| (d) `printDescending` | Yes | `cout` happens before; the call is the last statement |
+
+**Q4.**
+
+| Traversal | Output |
+|-----------|--------|
+| Preorder (node first) | `5 3 1 8 7 9` |
+| Inorder (node in middle) | `1 3 5 7 8 9` |
+| Postorder (node last) | `1 3 7 9 8 5` |
+
+Inorder of this tree is sorted because it is a Binary Search Tree — a preview of the Trees phase.
+
+**E1 — reference solution**
+
+```cpp
+long long factTail(int n, long long acc = 1) {
+    if (n <= 1) return acc;              // Base case: nothing left to multiply
+    return factTail(n - 1, acc * n);     // Tail call: work already done in acc
+}
+```
+
+Time $O(n)$; space $O(1)$ with TCO, $O(n)$ without. Trace for 5: `(5,1) → (4,5) → (3,20) → (2,60) → (1,120)` → returns 120.
+
+**E2 — reference solution**
+
+```cpp
+void printReverse(const vector<int>& a, int i) {
+    if (i == (int)a.size()) return;   // Base case: past the end
+    printReverse(a, i + 1);           // Recurse FIRST (head recursion)
+    cout << a[i] << " ";              // Work on the way back up
+}
+```
+
+Time $O(n)$, space $O(n)$. The deepest frame (`i = 2`) prints first, so the output is `30 20 10`.
+
+**E3 — reference solution**
+
+```cpp
+string toBinary(int n) {
+    if (n < 2) return string(1, char('0' + n));      // Base case: "0" or "1"
+    return toBinary(n / 2) + char('0' + n % 2);       // Higher bits first, then this bit
+}
+```
+
+Time $O(\log n)$ calls (string concatenation adds an $O(\log n)$ factor in total, i.e. $O(\log^2 n)$ character copies), space $O(\log n)$ stack. Trace for 13: `toBinary(13) = toBinary(6) + '1' = (toBinary(3) + '0') + '1' = ((toBinary(1) + '1') + '0') + '1' = "1101"`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

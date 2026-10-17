@@ -348,6 +348,138 @@ int sumIterative(int n) {
 
 ---
 
+## Practice & Self-Check
+
+Work these on paper first — draw the call stack or recursion tree exactly as Section 6 recommends — then check yourself against the answers at the bottom.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Fill in the dry-run table for `sum(4)`.** Using the chapter's `sum(int n)` (base case `n == 1`), complete the table below. What value is returned, and what is the maximum stack size reached?
+
+| Step | Function Call | n | Base Case? | Action | Stack Size |
+|------|---------------|---|------------|--------|------------|
+| 1 | `sum(4)` | 4 | No | Push `sum(4)`, call `sum(3)` | 1 |
+| 2 | ? | ? | ? | ? | ? |
+| 3 | ? | ? | ? | ? | ? |
+| 4 | ? | ? | ? | ? | ? |
+| 5–7 | unwind | – | – | ? | ? |
+
+**Q2. Count the nodes.** The chapter shows that `fib(4)` makes 9 calls in total. How many total calls does `fib(5)` make, and what is the maximum number of `fib` frames on the call stack at the same time? (Remember: *Time = total nodes, Space = max depth*.)
+
+**Q3. Tail-recursive accumulator.** Using the chapter's `sumHelper(int n, int accumulator)` and wrapper `sum(n)` which calls `sumHelper(n, 1)`, list every call made by `sum(4)` with its `(n, accumulator)` pair. What is returned?
+
+**Q4. Fast power.** Trace the chapter's `power(double x, int n)` for `power(3, 5)`. List each call, the value of `half`, and which branch (even/odd) of the combine step is taken. How many calls to `power` are made in total, and what is returned?
+
+**Q5. Spot the bug.** A student calls the chapter's `sum(int n)` with `n = 0`. What happens, and which line of the "Common Recursion Mistakes" list does this fall under? Give a one-line fix to the base case that makes `sum(0)` return `0`.
+
+### Coding Exercises
+
+**E1 (Easy). Digit sum.** Write a recursive function that returns the sum of the decimal digits of a non-negative integer. Identify the base case and the recursive step explicitly.
+
+```cpp
+int digitSum(int n);
+// digitSum(1234) -> 10
+// digitSum(7)    -> 7
+```
+
+**E2 (Easy–Medium). Recursive palindrome check.** Using two indices that move toward each other, decide whether a string is a palindrome. No loops allowed.
+
+```cpp
+bool isPalindrome(const string& s, int left, int right);
+// isPalindrome("racecar", 0, 6) -> true
+// isPalindrome("abca", 0, 3)    -> false
+```
+
+**E3 (Medium). Modular fast power.** Extend the chapter's `power(x, n)` (halving trick) to compute $x^n \bmod m$ for $n \ge 0$ without overflow for $m \le 10^9$. It must run in $O(\log n)$ time.
+
+```cpp
+long long powMod(long long x, long long n, long long m);
+// powMod(2, 10, 1000) -> 24   (1024 mod 1000)
+// powMod(3, 5, 7)     -> 5    (243 mod 7)
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **10**; maximum stack size is **4**.
+
+| Step | Function Call | n | Base Case? | Action | Stack Size |
+|------|---------------|---|------------|--------|------------|
+| 1 | `sum(4)` | 4 | No | Push `sum(4)`, call `sum(3)` | 1 |
+| 2 | `sum(3)` | 3 | No | Push `sum(3)`, call `sum(2)` | 2 |
+| 3 | `sum(2)` | 2 | No | Push `sum(2)`, call `sum(1)` | 3 |
+| 4 | `sum(1)` | 1 | Yes | Return 1 | 4 |
+| 5 | `sum(2)` | 2 | – | Receive 1, return 2+1=3 | 3 |
+| 6 | `sum(3)` | 3 | – | Receive 3, return 3+3=6 | 2 |
+| 7 | `sum(4)` | 4 | – | Receive 6, return 4+6=10 | 1 → 0 |
+
+**Q2.** **15 calls**, **5 frames** maximum. Let $C(n)$ be the number of calls made by `fib(n)`: $C(0)=C(1)=1$ and $C(n)=1+C(n-1)+C(n-2)$.
+
+| n | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| $C(n)$ | 1 | 1 | 3 | 5 | 9 | 15 |
+
+The deepest path is `fib(5) → fib(4) → fib(3) → fib(2) → fib(1)`, i.e. 5 frames alive at once — $O(N)$ space even though the time is exponential.
+
+**Q3.** Returns **10**.
+
+| Call | n | accumulator | Next call computes |
+|------|---|-------------|--------------------|
+| `sumHelper(4, 1)` | 4 | 1 | `sumHelper(3, 4+1)` |
+| `sumHelper(3, 5)` | 3 | 5 | `sumHelper(2, 3+5)` |
+| `sumHelper(2, 8)` | 2 | 8 | `sumHelper(1, 2+8)` |
+| `sumHelper(1, 10)` | 1 | 10 | base case → return 10 |
+
+**Q4.** **3 calls**, returns **243**.
+
+| Call | n | half | n even? | Returns |
+|------|---|------|---------|---------|
+| `power(3, 5)` | 5 | `power(3, 2)` = 9 | No (odd) | 9 × 9 × 3 = 243 |
+| `power(3, 2)` | 2 | `power(3, 1)` = 3 | Yes | 3 × 3 = 9 |
+| `power(3, 1)` | 1 | – | – | base case → 3 |
+
+Note `5 / 2 = 2` in integer division, which is why the odd branch multiplies by one extra `x`.
+
+**Q5.** `sum(0)` never reaches `n == 1`: it calls `sum(-1)`, `sum(-2)`, … forever until the stack overflows. This is "Input not moving toward base case" (equivalently, the wrong base case). Fix: replace the base case with `if (n <= 0) return 0;` — then `sum(1) = 1 + sum(0) = 1` still works and `sum(0) = 0`.
+
+**E1 — reference solution**
+
+```cpp
+int digitSum(int n) {
+    if (n < 10) return n;              // Base case: a single digit
+    return (n % 10) + digitSum(n / 10); // Last digit + sum of the rest
+}
+```
+
+Time $O(d)$, space $O(d)$ where $d$ is the number of digits (about $\log_{10} n$). Trace: `digitSum(1234) = 4 + digitSum(123) = 4 + 3 + digitSum(12) = 4 + 3 + 2 + 1 = 10`.
+
+**E2 — reference solution**
+
+```cpp
+bool isPalindrome(const string& s, int left, int right) {
+    if (left >= right) return true;               // 0 or 1 chars left
+    if (s[left] != s[right]) return false;        // Mismatch: stop early
+    return isPalindrome(s, left + 1, right - 1);  // Shrink toward the middle
+}
+```
+
+Time $O(n)$, space $O(n)$ stack (about $n/2$ frames). For `"abca"`: `'a' == 'a'`, then compare `s[1]='b'` with `s[2]='c'` → mismatch → `false`.
+
+**E3 — reference solution**
+
+```cpp
+long long powMod(long long x, long long n, long long m) {
+    if (n == 0) return 1 % m;                 // x^0 = 1 (handles m == 1)
+    long long half = powMod(x, n / 2, m);     // Recursive step: halve n
+    long long result = (half * half) % m;     // Combine
+    if (n % 2 == 1) result = (result * (x % m)) % m;  // Odd: one extra x
+    return result;
+}
+```
+
+Time $O(\log n)$, space $O(\log n)$. Each product is below $m^2 \le 10^{18}$, which fits in `long long`. Check: `powMod(3, 5, 7)` → `powMod(3,2,7) = 9 % 7 = 2` → `2 × 2 = 4`, odd so `4 × 3 = 12 % 7 = 5`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

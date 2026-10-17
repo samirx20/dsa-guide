@@ -497,6 +497,164 @@ Use backtracking when you need ALL solutions with hard constraints. Use DP for O
 
 ---
 
+## Practice & Self-Check
+
+For every trace, keep two columns: what `current` holds, and what has been pushed into `result`. Most backtracking bugs show up as a mismatch between those two.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Subsets of a bigger input.** Run the Section 4 `subsets` code on `nums = [1, 2, 3, 4]`. (a) How many entries does `result` hold at the end? (b) What are the **7th** and **10th** entries pushed (counting `[]` as the 1st)? (c) How many of the recorded subsets contain the element `1`?
+
+**Q2. Permutation order.** Run the Section 5 `permute` code on `nums = [1, 2, 3]`. List the 6 permutations in the exact order they are pushed. What is the state of `current` and `used[]` immediately *after* the 2nd permutation is pushed and the base-case frame returns (i.e. after the next `pop_back` / `used[i] = false` pair runs)?
+
+**Q3. The forgotten `pop_back` (Mistake 1).** Take the Section 4 `subsets` code and **delete** the line `current.pop_back();`. What does `result` contain for `nums = [1, 2, 3]`? (Hint: the number of entries does not change — only their contents do.)
+
+**Q4. N-Queens, n = 4.** The chapter's `solveNQueens` tries columns left to right in every row. (a) How many boards end up in `result`? (b) The chapter shows the first board found. Draw the *second* one. (c) Why does placing the row-0 queen at column 0 never lead to a solution?
+
+### Coding Exercises
+
+**E1 (Easy). Subsets that hit a target sum.** Given distinct positive integers, return every subset (each element used at most once) whose sum equals `target`. Use the Golden Template with `index`, and prune when the running sum exceeds `target`.
+
+```cpp
+vector<vector<int>> subsetsWithSum(vector<int>& nums, int target);
+// nums = [1, 2, 3, 4], target = 5 -> [[1, 4], [2, 3]]
+// nums = [2, 4],      target = 5 -> []
+```
+
+**E2 (Easy–Medium). Letter case permutation.** For each letter in `s`, branch on lowercase/uppercase; digits have only one choice. Modify the string in place (choose), recurse (explore), and restore it (unchoose).
+
+```cpp
+vector<string> letterCasePermutation(string s);
+// "a1b" -> ["a1b", "a1B", "A1b", "A1B"]
+// "3z4" -> ["3z4", "3Z4"]
+```
+
+**E3 (Medium). Count N-Queens in O(1) per safety check.** The chapter's `isSafe` scans the board in $O(N)$. Replace it with three boolean arrays — `cols[c]`, `diag1[r + c]`, `diag2[r - c + n - 1]` — that are set on choose and cleared on unchoose. Return only the number of solutions.
+
+```cpp
+int totalNQueens(int n);
+// totalNQueens(4) -> 2
+// totalNQueens(8) -> 92
+```
+
+#### Dry-Run: Answers
+
+**Q1.** (a) $2^4 =$ **16** entries. (b) The full push order is `[]`, `[1]`, `[1,2]`, `[1,2,3]`, `[1,2,3,4]`, `[1,2,4]`, `[1,3]`, `[1,3,4]`, `[1,4]`, `[2]`, `[2,3]`, `[2,3,4]`, `[2,4]`, `[3]`, `[3,4]`, `[4]`, so the **7th is `[1,3]`** and the **10th is `[2]`**. (c) **8** — every subset recorded while `1` sits at the bottom of `current` (entries 2 through 9), i.e. $2^3$ choices for the remaining three elements.
+
+**Q2.** Push order: `[1,2,3]`, `[1,3,2]`, `[2,1,3]`, `[2,3,1]`, `[3,1,2]`, `[3,2,1]`.
+
+| Moment | current | used[0..2] |
+|--------|---------|------------|
+| 2nd permutation pushed | `[1,3,2]` | T, T, T |
+| Base frame returns; depth-2 frame (`i = 1`, value 2) unchooses | `[1,3]` | T, F, T |
+
+The depth-2 loop then finds no unused index after `i = 1`, so it returns and the depth-1 frame pops `3` next.
+
+**Q3.** `result` = `[]`, `[1]`, `[1,2]`, `[1,2,3]`, `[1,2,3,3]`, `[1,2,3,3,2]`, `[1,2,3,3,2,3]`, `[1,2,3,3,2,3,3]`. Still 8 entries (the recursion tree's shape is unchanged), but every choice is appended on top of all previous ones:
+
+| Push into current | Recorded |
+|-------------------|----------|
+| (start) | `[]` |
+| +1 | `[1]` |
+| +2 | `[1,2]` |
+| +3 | `[1,2,3]` |
+| +3 (frame `index=1`, `i=2`) | `[1,2,3,3]` |
+| +2 (frame `index=0`, `i=1`) | `[1,2,3,3,2]` |
+| +3 | `[1,2,3,3,2,3]` |
+| +3 (frame `index=0`, `i=2`) | `[1,2,3,3,2,3,3]` |
+
+**Q4.** (a) **2** boards. (b) The second board:
+
+```
+. . Q .
+Q . . .
+. . . Q
+. Q . .
+```
+
+(c) With a queen at (0,0): row 1 can use column 2 or 3. Column 2 leaves no safe square in row 2. Column 3 allows only (2,1), and then every square in row 3 is attacked (columns 0, 1, 3 by column checks, column 2 by the diagonal from (2,1)). Every branch dies, so `isSafe` prunes the whole subtree and the loop moves to column 1.
+
+**E1 — reference solution**
+
+```cpp
+void bt(vector<int>& nums, int index, int target, int sum,
+        vector<int>& current, vector<vector<int>>& result) {
+    if (sum == target) {                  // Valid solution: record it
+        result.push_back(current);
+        return;                           // Positive numbers: going deeper only grows sum
+    }
+    for (int i = index; i < (int)nums.size(); i++) {
+        if (sum + nums[i] > target) continue;   // PRUNE before choosing
+        current.push_back(nums[i]);             // CHOOSE
+        bt(nums, i + 1, target, sum + nums[i], current, result);  // EXPLORE
+        current.pop_back();                     // UNCHOOSE
+    }
+}
+
+vector<vector<int>> subsetsWithSum(vector<int>& nums, int target) {
+    vector<vector<int>> result;
+    vector<int> current;
+    bt(nums, 0, target, 0, current, result);
+    return result;
+}
+```
+
+Worst case $O(N \cdot 2^N)$, stack $O(N)$. For `[1,2,3,4]`, 5: the path `1 → 2` reaches sum 3, then `+3` and `+4` are pruned (6, 7 > 5); `1 → 4` hits 5; `2 → 3` hits 5.
+
+**E2 — reference solution**
+
+```cpp
+void bt(string& s, int i, vector<string>& result) {
+    if (i == (int)s.size()) {              // Every position decided
+        result.push_back(s);
+        return;
+    }
+    if (isdigit(s[i])) {                   // Only one choice
+        bt(s, i + 1, result);
+        return;
+    }
+    s[i] = tolower(s[i]);                  // CHOOSE lowercase
+    bt(s, i + 1, result);
+    s[i] = toupper(s[i]);                  // CHOOSE uppercase (undo + redo in one step)
+    bt(s, i + 1, result);
+    s[i] = tolower(s[i]);                  // UNCHOOSE: restore a canonical state
+}
+
+vector<string> letterCasePermutation(string s) {
+    vector<string> result;
+    bt(s, 0, result);
+    return result;
+}
+```
+
+$O(N \cdot 2^L)$ where $L$ is the number of letters. Restoring `s[i]` is the "unchoose" — without it the parent frame would see a mutated string. (The last line leaves letters lowercase, so input like `"A1b"` produces the same four strings, starting from `"a1b"`.)
+
+**E3 — reference solution**
+
+```cpp
+int solve(int row, int n, vector<bool>& cols,
+          vector<bool>& d1, vector<bool>& d2) {
+    if (row == n) return 1;                       // All queens placed
+    int count = 0;
+    for (int c = 0; c < n; c++) {
+        if (cols[c] || d1[row + c] || d2[row - c + n - 1]) continue;  // O(1) isSafe
+        cols[c] = d1[row + c] = d2[row - c + n - 1] = true;           // CHOOSE
+        count += solve(row + 1, n, cols, d1, d2);                      // EXPLORE
+        cols[c] = d1[row + c] = d2[row - c + n - 1] = false;          // UNCHOOSE
+    }
+    return count;
+}
+
+int totalNQueens(int n) {
+    vector<bool> cols(n, false), d1(2 * n - 1, false), d2(2 * n - 1, false);
+    return solve(0, n, cols, d1, d2);
+}
+```
+
+Every square on one "/" anti-diagonal shares `r + c`, and every square on one "\" diagonal shares `r - c` (shifted by `n - 1` to stay non-negative). Time is still $O(N!)$ in the worst case, but each node does $O(1)$ work instead of $O(N)$. Known counts: n = 4 → 2, 5 → 10, 6 → 4, 8 → 92.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
