@@ -447,6 +447,180 @@ if __name__ == "__main__":
 
 ---
 
+### Practice & Self-Check
+
+**Predict the Output / Trace by Hand**
+
+All questions use an arm with **unequal** links, $L_1 = 2.0\text{ m}$ and $L_2 = 1.0\text{ m}$, unless stated otherwise.
+
+**Q1. Forward kinematics (Section 2.1).** Compute the elbow $(x_1, y_1)$, gripper $(x, y)$ and orientation $\phi$ for
+
+1. $\theta_1 = 90^\circ$, $\theta_2 = -90^\circ$
+2. $\theta_1 = 30^\circ$, $\theta_2 = 60^\circ$
+
+Then: what gripper position would the buggy FK from the Common Mistakes table (`L2 * cos(theta2)`, `L2 * sin(theta2)`) report for pose 1?
+
+**Q2. Reachability (Section 3.1).** What is the reachable annulus for this arm? Classify each target as *reachable*, *boundary* or *unreachable*, and say why: $(0.5, 0.5)$, $(3.0, 0.0)$, $(2.0, 2.0)$, $(0.0, -1.0)$.
+
+**Q3. Analytical IK by hand (Section 5.3 style).** Run `analyticalIK(2.0, 1.0)` for both postures. Fill in $r^2$, $\cos\theta_2$, $\sin\theta_2$, $\theta_2$, $\gamma$, $\beta$, $\theta_1$ for Elbow-Down and Elbow-Up, then verify the Elbow-Up answer with FK.
+
+**Q4. Jacobian, velocity and force (Sections 4.1 and 4.4).** Now use $L_1 = L_2 = 1.0\text{ m}$ at the chapter's L-Shape pose $\theta_1 = 0^\circ$, $\theta_2 = 90^\circ$.
+
+1. Write out $\mathbf{J}$ numerically and check $\det(\mathbf{J}) = L_1 L_2 \sin\theta_2$.
+2. What gripper velocity results from $\dot{\mathbf{q}} = [1, 0]^T$? From $\dot{\mathbf{q}} = [0, 1]^T$?
+3. To support a 10 N weight, the gripper must push **up** on it with $\mathbf{F} = [0, +10]^T\text{ N}$. What joint torques $\boldsymbol{\tau} = \mathbf{J}^T\mathbf{F}$ are required? Explain $\tau_2$ physically.
+
+**Q5. Approaching a singularity (Section 4.2).** Back to $L_1 = 2$, $L_2 = 1$, with $\theta_1 = 0$. You want the gripper to move at $\dot{\mathbf{x}}_{\text{des}} = [0.1, 0]^T\text{ m/s}$. Compute $\det(\mathbf{J})$ and $\dot{\mathbf{q}} = \mathbf{J}^{-1}\dot{\mathbf{x}}_{\text{des}}$ for $\theta_2 = 90^\circ$ and for $\theta_2 = 5^\circ$. What happens to the required joint speeds?
+
+**Coding Exercises**
+
+**E1 (Easy). FK with wrapped orientation.** Return the elbow point, the gripper point, and the gripper orientation $\phi = \theta_1 + \theta_2$ wrapped into $(-\pi, \pi]$.
+
+```python
+def fk_full(l1: float, l2: float, t1: float, t2: float) -> tuple[tuple[float, float], tuple[float, float], float]: ...
+# fk_full(1.0, 1.0, math.pi/4, math.pi)
+#   -> ((0.7071, 0.7071), (0.0, 0.0), -2.3562)    # the "Folded Back" row; phi = 225 deg -> -135 deg
+# fk_full(2.0, 1.0, math.pi/2, -math.pi/2)
+#   -> ((0.0, 2.0), (1.0, 2.0), 0.0)
+```
+
+**E2 (Easy–Medium). IK that never flips posture.** Fix the third Common Mistakes row: compute **both** analytical IK solutions and return the one closest to the previous joint state `q_prev` (sum of absolute joint differences). Return `None` if the target is unreachable. Remember to clamp $\cos\theta_2$.
+
+```python
+def ik_closest(l1: float, l2: float, x: float, y: float,
+               q_prev: tuple[float, float]) -> tuple[float, float] | None: ...
+# ik_closest(1.0, 1.0, 1.0, 1.0, (1.5, -1.4))  -> (1.5708, -1.5708)   # Elbow-Up
+# ik_closest(1.0, 1.0, 1.0, 1.0, (0.1, 1.4))   -> (0.0, 1.5708)       # Elbow-Down
+# ik_closest(1.0, 1.0, 2.5, 0.0, (0.0, 0.0))   -> None
+```
+
+**E3 (Medium). Jacobian of a 3-link planar arm in C++.** Generalise Section 4.1 to three revolute joints. Joint $i$'s absolute angle is $\theta_1 + \cdots + \theta_i$. Return the $2 \times 3$ Jacobian of the tip position.
+
+```cpp
+#include <array>
+using Jac23 = std::array<std::array<double, 3>, 2>;
+Jac23 jacobian3(const std::array<double, 3>& L, const std::array<double, 3>& q);
+// L = {1,1,1}, q = {0, 0, 0}      -> [[0, 0, 0], [3, 2, 1]]
+// L = {1,1,1}, q = {0, pi/2, 0}   -> [[-2, -2, -1], [1, 0, 0]]
+```
+
+#### Dry-Run: Answers
+
+**Q1 — pose 1: elbow $(0, 2)$, gripper $(1, 2)$, $\phi = 0^\circ$; pose 2: elbow $(1.732, 1.000)$, gripper $(1.732, 2.000)$, $\phi = 90^\circ$; buggy FK reports $(0, 1)$.**
+
+| Pose | $\theta_1$ | $\theta_1 + \theta_2$ | Elbow $(2\cos\theta_1, 2\sin\theta_1)$ | + Link 2 $(\cos(\theta_1+\theta_2), \sin(\theta_1+\theta_2))$ | Gripper |
+|---|---|---|---|---|---|
+| 1 | 90° | 0° | (0, 2) | (1, 0) | **(1, 2)** |
+| 2 | 30° | 90° | (1.732, 1.000) | (0, 1) | **(1.732, 2.000)** |
+
+Buggy FK for pose 1 uses $\theta_2 = -90^\circ$ alone: Link 2 contributes $(\cos(-90^\circ), \sin(-90^\circ)) = (0, -1)$, so it reports $(0, 2) + (0, -1) = (0, 1)$ — the forearm pointing straight down instead of along $+X$.
+
+**Q2 — annulus $1.0 \le r \le 3.0\text{ m}$.**
+
+| Target | $r$ | Verdict |
+|---|---|---|
+| (0.5, 0.5) | 0.707 | **Unreachable** — inside the dead zone of radius $\lvert 2 - 1 \rvert = 1$ |
+| (3.0, 0.0) | 3.000 | **Boundary** — fully stretched, $\theta_2 = 0$, single solution |
+| (2.0, 2.0) | 2.828 | **Reachable** — two solutions |
+| (0.0, −1.0) | 1.000 | **Boundary** — fully folded, $\theta_2 = \pi$, single solution |
+
+**Q3 — Elbow-Down $(\theta_1, \theta_2) = (0^\circ, +90^\circ)$; Elbow-Up $(53.13^\circ, -90^\circ)$.**
+
+| Step | Elbow-Down | Elbow-Up |
+|---|---|---|
+| $r^2 = 2^2 + 1^2$ | 5 | 5 |
+| $\cos\theta_2 = \frac{5 - 4 - 1}{2 \cdot 2 \cdot 1}$ | 0 | 0 |
+| $\sin\theta_2$ | +1 | −1 |
+| $\theta_2$ | +90° | −90° |
+| $\gamma = \text{atan2}(1, 2)$ | 26.57° | 26.57° |
+| $\beta = \text{atan2}(1 \cdot \sin\theta_2,\ 2 + 1 \cdot 0)$ | atan2(1, 2) = +26.57° | atan2(−1, 2) = −26.57° |
+| $\theta_1 = \gamma - \beta$ | **0°** | **53.13°** |
+
+FK check (Elbow-Up): elbow $= 2(\cos 53.13^\circ, \sin 53.13^\circ) = (1.2, 1.6)$; Link 2 angle $= 53.13^\circ - 90^\circ = -36.87^\circ$ gives $(0.8, -0.6)$; sum $= (2.0, 1.0)$ ✓.
+
+**Q4 — $\mathbf{J} = \begin{bmatrix} -1 & -1 \\ 1 & 0 \end{bmatrix}$, $\det = 1$; velocities $(-1, 1)$ and $(-1, 0)$; torques $\boldsymbol{\tau} = [10, 0]^T\text{ N·m}$.**
+
+1. With $\sin\theta_1 = 0$, $\cos\theta_1 = 1$, $\sin(\theta_1+\theta_2) = 1$, $\cos(\theta_1+\theta_2) = 0$: $J_{11} = -0 - 1 = -1$, $J_{12} = -1$, $J_{21} = 1 + 0 = 1$, $J_{22} = 0$. $\det = (-1)(0) - (-1)(1) = 1 = 1 \cdot 1 \cdot \sin 90^\circ$ ✓.
+2. $\dot{\mathbf{q}} = [1, 0]^T$ picks column 1: $(-1, 1)\text{ m/s}$ — the gripper at $(1, 1)$ swings around the shoulder, perpendicular to the line from the origin. $\dot{\mathbf{q}} = [0, 1]^T$ picks column 2: $(-1, 0)\text{ m/s}$ — the gripper swings around the elbow at $(1, 0)$.
+3. $\mathbf{J}^T = \begin{bmatrix} -1 & 1 \\ -1 & 0 \end{bmatrix}$, so $\tau_1 = (-1)(0) + (1)(10) = 10\text{ N·m}$ and $\tau_2 = (-1)(0) + (0)(10) = 0$. The forearm points straight up from the elbow, so the vertical force acts along the forearm and passes **through** the elbow axis — zero lever arm, zero elbow torque. The shoulder sees a 1 m horizontal lever arm (gripper at $x = 1$), hence 10 N·m counter-clockwise (positive).
+
+**Q5 — $\det(\mathbf{J}) = 2\sin\theta_2$: 2.0 at 90°, 0.1743 at 5°; required joint speeds jump from $(0, -0.1)$ to about $(0.572, -1.719)\text{ rad/s}$.**
+
+At $\theta_2 = 90^\circ$: $\mathbf{J} = \begin{bmatrix} -1 & -1 \\ 2 & 0 \end{bmatrix}$, $\det = 2$, $\mathbf{J}^{-1} = \frac{1}{2}\begin{bmatrix} 0 & 1 \\ -2 & -1 \end{bmatrix}$, so $\dot{\mathbf{q}} = (0, -0.1)\text{ rad/s}$.
+
+At $\theta_2 = 5^\circ$ ($\sin = 0.08716$, $\cos = 0.99619$): $\mathbf{J} = \begin{bmatrix} -0.08716 & -0.08716 \\ 2.99619 & 0.99619 \end{bmatrix}$, $\det = 0.08716 \times (2.99619 - 0.99619) = 0.17431$.
+
+$$\dot{\mathbf{q}} = \frac{1}{0.17431}\begin{bmatrix} 0.99619 & 0.08716 \\ -2.99619 & -0.08716 \end{bmatrix}\begin{bmatrix} 0.1 \\ 0 \end{bmatrix} \approx \begin{bmatrix} 0.572 \\ -1.719 \end{bmatrix}\text{ rad/s}$$
+
+The same 0.1 m/s radial request now needs about 17× more elbow speed; as $\theta_2 \to 0$ it diverges, which is why DLS adds $\lambda^2\mathbf{I}$.
+
+**E1 — reference solution.**
+
+```python
+import math
+
+def fk_full(l1, l2, t1, t2):
+    elbow = (l1 * math.cos(t1), l1 * math.sin(t1))
+    gripper = (elbow[0] + l2 * math.cos(t1 + t2),       # Link 2 uses the ABSOLUTE angle
+               elbow[1] + l2 * math.sin(t1 + t2))
+    phi = math.atan2(math.sin(t1 + t2), math.cos(t1 + t2))  # wraps into (-pi, pi]
+    return elbow, gripper, phi
+```
+
+$O(1)$. Wrapping through `atan2(sin, cos)` avoids `while` loops and handles any number of extra turns. For the Folded Back example, $\phi = 5\pi/4$ maps to $-3\pi/4 \approx -2.3562$; the gripper is $(0, 0)$ up to rounding (about $10^{-16}$).
+
+**E2 — reference solution.**
+
+```python
+import math
+
+def ik_closest(l1, l2, x, y, q_prev):
+    r = math.hypot(x, y)
+    if r > l1 + l2 + 1e-9 or r < abs(l1 - l2) - 1e-9:
+        return None                                        # outside the annulus
+    c2 = (x * x + y * y - l1 * l1 - l2 * l2) / (2.0 * l1 * l2)
+    c2 = max(-1.0, min(1.0, c2))                           # clamp before sqrt
+    best, best_cost = None, float("inf")
+    for sign in (+1.0, -1.0):                              # Elbow-Down, Elbow-Up
+        s2 = sign * math.sqrt(1.0 - c2 * c2)
+        t2 = math.atan2(s2, c2)
+        t1 = math.atan2(y, x) - math.atan2(l2 * s2, l1 + l2 * c2)
+        cost = abs(t1 - q_prev[0]) + abs(t2 - q_prev[1])
+        if cost < best_cost:
+            best, best_cost = (t1, t2), cost
+    return best
+```
+
+$O(1)$. For target $(1, 1)$ the candidates are $(0, \pi/2)$ and $(\pi/2, -\pi/2)$. From `q_prev = (1.5, -1.4)` the costs are $1.5 + 2.97 = 4.47$ vs $0.07 + 0.17 = 0.24$ → Elbow-Up. From `(0.1, 1.4)` the costs are $0.1 + 0.17 = 0.27$ vs $1.47 + 2.97 = 4.44$ → Elbow-Down. (A production version should also wrap angle differences into $(-\pi, \pi]$.)
+
+**E3 — reference solution.** Differentiating $x = \sum_i L_i \cos\Theta_i$, $y = \sum_i L_i \sin\Theta_i$ with $\Theta_i = \theta_1 + \cdots + \theta_i$: joint $j$ affects every link $i \ge j$.
+
+```cpp
+#include <array>
+#include <cmath>
+using Jac23 = std::array<std::array<double, 3>, 2>;
+
+Jac23 jacobian3(const std::array<double, 3>& L, const std::array<double, 3>& q) {
+    std::array<double, 3> th{};                 // absolute link angles
+    th[0] = q[0];
+    th[1] = th[0] + q[1];
+    th[2] = th[1] + q[2];
+
+    Jac23 J{};
+    for (int j = 0; j < 3; ++j) {
+        for (int i = j; i < 3; ++i) {           // links at or beyond joint j move
+            J[0][j] += -L[i] * std::sin(th[i]); // d x / d q_j
+            J[1][j] +=  L[i] * std::cos(th[i]); // d y / d q_j
+        }
+    }
+    return J;
+}
+```
+
+$O(n^2)$ for $n$ joints (fine for 3; a suffix sum makes it $O(n)$). Check `q = {0, pi/2, 0}`: absolute angles $0, 90^\circ, 90^\circ$. Column 1 sums links 1–3: $x$: $-(0 + 1 + 1) = -2$, $y$: $1 + 0 + 0 = 1$. Column 2 sums links 2–3: $(-2, 0)$. Column 3 is link 3 only: $(-1, 0)$. Result $[[-2, -2, -1], [1, 0, 0]]$, up to $\sim 10^{-16}$ rounding in the zero entries.
+
+---
+
 ### 8. Interactive Visualization & `shadcn/ui` Specification
 
 > **For Claude (Frontend Implementation Guide):** Build an interactive **2-Link Manipulator FK, IK & Singularity Explorer** using React, Tailwind CSS, SVG/Canvas, and `shadcn/ui` components. Never use raw HTML `<input>`, `<select>`, or `<button>` elements.

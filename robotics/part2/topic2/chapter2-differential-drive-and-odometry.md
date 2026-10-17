@@ -430,6 +430,190 @@ if __name__ == "__main__":
 
 ---
 
+### Practice & Self-Check
+
+**Predict the Output / Trace by Hand**
+
+Unless stated otherwise, use a small robot with $r = 0.05\text{ m}$ and $L = 0.4\text{ m}$.
+
+**Q1. Forward velocity kinematics (Section 2.1).** The motors report $\omega_L = 10\text{ rad/s}$ and $\omega_R = 14\text{ rad/s}$. Compute $v_L$, $v_R$, $v$, $\omega$ and the signed turn radius $R$. Which way does the robot turn, and where is the ICC? Separately: what is $120\text{ RPM}$ in rad/s?
+
+**Q2. What does the chapter's `main()` print?** Trace `DiffDriveRobot amr(0.10, 0.50, 4096, 15.0)` through `cmdVelToWheelSpeeds(1.2, 2.0)` and then `updateOdometry(2048, 2048)`. Give both printed lines (3 decimals, as set by `std::setprecision(3)`).
+
+**Q3. Saturation: scale vs. clamp (Section 3.2).** On the small robot with $\omega_{\max} = 15\text{ rad/s}$, a planner sends `cmd_vel` $v = 0.8\text{ m/s}$, $\omega = 2.0\text{ rad/s}$.
+
+1. What raw wheel speeds $(\omega_L, \omega_R)$ does inverse kinematics produce?
+2. What does `cmdVelToWheelSpeeds` return after curvature-preserving scaling, and what $(v, \omega, R)$ does the robot actually execute?
+3. What $(v, \omega, R)$ would the naive "clamp only the right wheel" bug execute instead?
+
+**Q4. Encoder odometry, two ticks (Sections 5.2–5.3).** Small robot, $N_{\text{ticks}} = 1000$, starting at $(0, 0, 0)$. Run the chapter's midpoint `updateOdometry` for
+
+* tick 1: $\Delta\text{ticks}_L = 1000$, $\Delta\text{ticks}_R = 1000$
+* tick 2: $\Delta\text{ticks}_L = 500$, $\Delta\text{ticks}_R = 1500$
+
+Give $\Delta s_L$, $\Delta s_R$, $\Delta s$, $\Delta\theta$, $\theta_{\text{mid}}$ and the pose after each tick. For tick 2, what would plain Euler odometry and exact circular-arc integration give?
+
+**Q5. The 16-bit wrap-around trap (Section 5.1).** An `int16_t` encoder register reads `prev = 32760` on one tick and `curr = -32766` on the next (the wheel kept rolling forward). What delta does `int32_t delta = curr - prev` give? What does `static_cast<int16_t>(curr - prev)` give? How far did the wheel actually roll on the small robot with $N_{\text{ticks}} = 1000$?
+
+**Coding Exercises**
+
+**E1 (Easy). RPM to body twist (Python).** Convert two wheel speeds in RPM into $(v, \omega, R)$. Return `math.inf` for $R$ when driving straight.
+
+```python
+def rpm_to_body_twist(rpm_l: float, rpm_r: float, r: float, L: float) -> tuple[float, float, float]: ...
+# rpm_to_body_twist(60, 60, 0.1, 0.5)   -> (0.6283, 0.0, inf)     # straight line
+# rpm_to_body_twist(-30, 30, 0.1, 0.5)  -> (0.0, 1.2566, 0.0)     # spin in place
+```
+
+**E2 (Easy–Medium). Exact circular-arc odometry (Python).** Implement the Exact Circular Arc (ICC) update from Section 5.3, falling back to a straight-line update when $|\Delta\theta| < 10^{-9}$ to avoid the $0/0$ division. Wrap $\theta$ into $(-\pi, \pi]$.
+
+```python
+def exact_arc_update(x: float, y: float, theta: float, ds: float, dtheta: float) -> tuple[float, float, float]: ...
+# exact_arc_update(0.0, 0.0, 0.0, math.pi / 2, math.pi / 2) -> (1.0, 1.0, 1.5708)   # quarter circle, R = 1
+# exact_arc_update(0.5, 0.0, 0.0, 0.7854, 1.5708)          -> (1.0, 0.5, 1.5708)   # tick 2 of the 6.1 dry run
+# exact_arc_update(1.0, 2.0, 0.0, 0.3, 0.0)                -> (1.3, 2.0, 0.0)
+```
+
+**E3 (Medium). Wrap-safe encoder odometry class (C++).** Write a class that receives **raw** `int16_t` register readings for both wheels each tick. The first reading only seeds the previous counts (no motion). After that, compute wrap-safe deltas and apply the midpoint update.
+
+```cpp
+class RawEncoderOdometry {
+public:
+    RawEncoderOdometry(double r, double L, int ticksPerRev);
+    void onReading(int16_t countL, int16_t countR);
+    double x() const; double y() const; double theta() const;
+};
+// r = 0.05, L = 0.4, ticksPerRev = 1000. Readings (L, R):
+//   (32000, 32000)    -> seed only, pose (0, 0, 0)
+//   (-32536, -32536)  -> both wheels +1000 ticks across the wrap, pose (0.3142, 0, 0)
+//   (-32036, -31036)  -> +500 / +1500 ticks, pose (0.6044, 0.1202, 0.7854)
+```
+
+#### Dry-Run: Answers
+
+**Q1 — $v = 0.6\text{ m/s}$, $\omega = +0.5\text{ rad/s}$ (counter-clockwise, a left turn), $R = 1.2\text{ m}$; $120\text{ RPM} = 4\pi \approx 12.566\text{ rad/s}$.**
+
+| Quantity | Formula | Value |
+|---|---|---|
+| $v_L$ | $r\omega_L = 0.05 \times 10$ | 0.5 m/s |
+| $v_R$ | $r\omega_R = 0.05 \times 14$ | 0.7 m/s |
+| $v$ | $(0.7 + 0.5)/2$ | 0.6 m/s |
+| $\omega$ | $(0.7 - 0.5)/0.4$ | 0.5 rad/s |
+| $R$ | $v/\omega = 0.6/0.5$ | 1.2 m |
+
+$v_R > v_L$, so $\omega > 0$: the ICC lies 1.2 m to the robot's **left** (along $+Y_{\text{body}}$), beyond the left wheel at $R - L/2 = 1.0\text{ m}$. RPM: $120 \times \frac{2\pi}{60} = 4\pi$.
+
+**Q2 — prints**
+
+```
+Saturated Wheel Cmd : omega_L = 6.176 rad/s, omega_R = 15.000 rad/s
+Pose after 0.5 rev  : x = 0.314 m, y = 0.000 m, theta = 0.000 rad
+```
+
+Raw speeds: $\omega_L = (1.2 - 0.5 \cdot 2.0 \cdot 0.5)/0.1 = 7.0$, $\omega_R = (1.2 + 0.5)/0.1 = 17.0$. Peak $17 > 15$ → scale $= 15/17 = 0.88235$ → $(6.176, 15.000)$. Odometry: meters per tick $= 2\pi(0.1)/4096$, so 2048 ticks $= \pi(0.1) = 0.31416\text{ m}$ on each wheel; $\Delta\theta = 0$, so the robot moves straight along $+X$.
+
+**Q3 — raw $(8, 24)$; scaled $(5, 15)$ executing $R = 0.40\text{ m}$; clamped $(8, 15)$ executing $R \approx 0.657\text{ m}$.**
+
+1. $\omega_L = (0.8 - 2.0 \cdot 0.4/2)/0.05 = 0.4/0.05 = 8$, $\omega_R = (0.8 + 0.4)/0.05 = 24\text{ rad/s}$. Desired $R = 0.8/2.0 = 0.4\text{ m}$.
+2. Scale $= 15/24 = 0.625$ → $(5, 15)\text{ rad/s}$, i.e. $v_L = 0.25$, $v_R = 0.75\text{ m/s}$: $v = 0.5\text{ m/s}$, $\omega = 0.5/0.4 = 1.25\text{ rad/s}$, $R = 0.5/1.25 = 0.40\text{ m}$ — same curve, just slower.
+3. Clamp → $(8, 15)\text{ rad/s}$, i.e. $v_L = 0.40$, $v_R = 0.75\text{ m/s}$: $v = 0.575\text{ m/s}$, $\omega = 0.35/0.4 = 0.875\text{ rad/s}$, $R = 0.575/0.875 \approx 0.657\text{ m}$ — about 64% wider than planned.
+
+**Q4 — after tick 1: $(0.3142, 0, 0)$; after tick 2: $(0.6044, 0.1202, 0.7854)$.** Meters per tick $= 2\pi(0.05)/1000 = 0.00031416\text{ m}$.
+
+| Tick | $\Delta s_L$ | $\Delta s_R$ | $\Delta s$ | $\Delta\theta = (\Delta s_R - \Delta s_L)/0.4$ | $\theta_{\text{mid}}$ | Pose after |
+|---|---|---|---|---|---|---|
+| 1 | 0.31416 | 0.31416 | 0.31416 | 0 | 0 | (0.3142, 0.0000, 0.0000) |
+| 2 | 0.15708 | 0.47124 | 0.31416 | 0.7854 (45°) | 0.3927 (22.5°) | (0.6044, 0.1202, 0.7854) |
+
+Tick 2 midpoint: $x = 0.31416 + 0.31416\cos 22.5^\circ = 0.31416 + 0.29025$; $y = 0.31416 \sin 22.5^\circ = 0.12022$.
+
+* **Euler** (old heading 0): $(0.31416 + 0.31416,\ 0) = (0.6283, 0.0000)$ — all of the turn's sideways motion is lost.
+* **Exact arc**: $R = \Delta s/\Delta\theta = 0.4\text{ m}$; $x = 0.31416 + 0.4\sin 45^\circ = 0.5970$, $y = 0.4(1 - \cos 45^\circ) = 0.1172$.
+
+With a coarse 45° step, midpoint is off by about 7 mm in $x$ and 3 mm in $y$; Euler is off by 3 cm and 12 cm.
+
+**Q5 — `int32_t` gives −65526 (bogus); `int16_t` cast gives +10; the wheel rolled $10 \times 0.00031416 = 0.0031416\text{ m}$ (about 3.1 mm).** $-32766 - 32760 = -65526$. Modulo $2^{16} = 65536$: $-65526 + 65536 = +10$, which is inside the `int16_t` range. Check: counting forward from 32760, seven ticks reach 32767, the eighth wraps to −32768, and two more reach −32766: $7 + 1 + 2 = 10$.
+
+**E1 — reference solution.**
+
+```python
+import math
+
+def rpm_to_body_twist(rpm_l, rpm_r, r, L):
+    w_l = rpm_l * 2.0 * math.pi / 60.0          # RPM -> rad/s
+    w_r = rpm_r * 2.0 * math.pi / 60.0
+    v = 0.5 * r * (w_r + w_l)
+    omega = r * (w_r - w_l) / L
+    R = math.inf if abs(omega) < 1e-12 else v / omega
+    return v, omega, R
+```
+
+$O(1)$. Spin in place: $\pm 30\text{ RPM} = \pm\pi\text{ rad/s}$ → $v_{L,R} = \mp 0.31416\text{ m/s}$, $v = 0$, $\omega = 0.62832/0.5 = 1.2566\text{ rad/s}$, $R = 0$ (ICC at the axle centre, as in regime 2 of the table).
+
+**E2 — reference solution.**
+
+```python
+import math
+
+def exact_arc_update(x, y, theta, ds, dtheta):
+    if abs(dtheta) < 1e-9:                       # straight: R -> infinity
+        x += ds * math.cos(theta)
+        y += ds * math.sin(theta)
+    else:
+        R = ds / dtheta                          # signed radius around the ICC
+        x += R * (math.sin(theta + dtheta) - math.sin(theta))
+        y -= R * (math.cos(theta + dtheta) - math.cos(theta))
+    theta = math.atan2(math.sin(theta + dtheta), math.cos(theta + dtheta))
+    return x, y, theta
+```
+
+$O(1)$. Quarter circle: $R = 1$, $x = \sin 90^\circ - \sin 0 = 1$, $y = -(\cos 90^\circ - \cos 0) = 1$. The second example shows the chapter's 6.1 tick 2 exactly: $R = 0.5$, ending at $(1.0, 0.5)$, while midpoint odometry reported $(1.055, 0.555)$ — the midpoint error is visible only because a 90° step is very coarse.
+
+**E3 — reference solution.**
+
+```cpp
+#include <cstdint>
+#include <cmath>
+
+class RawEncoderOdometry {
+public:
+    RawEncoderOdometry(double r, double L, int ticksPerRev)
+        : L_(L), metersPerTick_(2.0 * 3.14159265358979323846 * r / ticksPerRev) {}
+
+    void onReading(int16_t countL, int16_t countR) {
+        if (!seeded_) {                                   // first reading: no x_{k-1} yet
+            prevL_ = countL; prevR_ = countR; seeded_ = true;
+            return;
+        }
+        int16_t dL = static_cast<int16_t>(countL - prevL_); // wrap-safe two's-complement delta
+        int16_t dR = static_cast<int16_t>(countR - prevR_);
+        prevL_ = countL; prevR_ = countR;
+
+        double dsL = dL * metersPerTick_, dsR = dR * metersPerTick_;
+        double ds = 0.5 * (dsR + dsL);
+        double dtheta = (dsR - dsL) / L_;
+        double thetaMid = theta_ + 0.5 * dtheta;          // midpoint (2nd-order) update
+        x_ += ds * std::cos(thetaMid);
+        y_ += ds * std::sin(thetaMid);
+        theta_ = std::atan2(std::sin(theta_ + dtheta), std::cos(theta_ + dtheta));
+    }
+
+    double x() const { return x_; }
+    double y() const { return y_; }
+    double theta() const { return theta_; }
+
+private:
+    double L_, metersPerTick_;
+    bool seeded_ = false;
+    int16_t prevL_ = 0, prevR_ = 0;
+    double x_ = 0.0, y_ = 0.0, theta_ = 0.0;
+};
+```
+
+$O(1)$ per reading. Trace: `int16_t(-32536 - 32000) = int16_t(-64536) = 1000` on both wheels (straight 0.3142 m); then $-32036 - (-32536) = 500$ and $-31036 - (-32536) = 1500$, which is exactly Q4's tick 2, ending at $(0.6044, 0.1202, 0.7854)$. The seed step mirrors the `initialized_` guard from the derivatives chapter: without it the first delta would be measured against 0 and teleport the robot.
+
+---
+
 ### 9. Interactive Visualization & `shadcn/ui` Specification
 
 > **For Claude (Frontend Implementation Guide):** Build an interactive **Differential-Drive ICC, `cmd_vel` Saturation & Odometry Drift Arena** using React, Tailwind CSS, HTML5 Canvas/SVG, and `shadcn/ui` primitives. Do not use native HTML `<input>`, `<select>`, or `<button>` controls.

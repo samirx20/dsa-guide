@@ -508,6 +508,160 @@ if __name__ == "__main__":
 
 ---
 
+### Practice & Self-Check
+
+**Predict the Output / Trace by Hand**
+
+**Q1. Backward differences at 50 Hz.** A gantry encoder runs at $f = 50\text{ Hz}$. It reports $x_0 = 0.100$, $x_1 = 0.112$, $x_2 = 0.118$, $x_3 = 0.134$ (meters). What is $\Delta t$? Using Section 3.1's formulas, compute the raw velocity $v_k$ for $k = 1, 2, 3$ and the raw acceleration $a_k$ for $k = 2, 3$. By what factor does this loop amplify a position error when computing acceleration?
+
+**Q2. Tracing `FilteredDerivative`.** Assume the filter's time constant is $\tau = 0.04\text{ s}$ and every call uses `dt = 0.01`. What is $\alpha$? The positions passed to `update()` are `2.00, 2.01, 2.03, 2.03`. What does each of the four calls return? Then: what would the **first** call return if the `if (!initialized_)` guard were deleted (so `x_prev_` starts at `0.0`)?
+
+**Q3. Integrator race with new numbers.** Repeat the Section 4.3 dry run for a robot starting from rest with $a = 4.0\text{ m/s}^2$ and $\Delta t = 0.25\text{ s}$, for ticks $k = 1, 2, 3$. Fill in exact position, Forward Euler, Semi-Implicit Euler and Trapezoidal columns.
+
+**Q4. Inside `Drone1DPlant`.** For the chapter's `main()` (mass $1.5\text{ kg}$, $b = 0.3$, thrust $20\text{ N}$, `dt = 0.01`):
+
+1. What numbers are printed on the `k = 0` row (acceleration, velocity, altitude)?
+2. What are `a`, `v`, `z` after the **first** and **second** calls to `stepSemiImplicitEuler`?
+3. What terminal velocity does the drone approach?
+
+**Q5. Spot the bug.** This Python loop reproduces the first row of the Common Mistakes table. What does it print, and which line is wrong?
+
+```python
+dt = 0.01
+x_prev = 0.0
+for x_curr in [1.00, 1.02, 1.05]:
+    x_prev = x_curr
+    v = (x_curr - x_prev) / dt
+    print(round(v, 3))
+```
+
+**Coding Exercises**
+
+**E1 (Easy). Offline central difference.** For a recorded log (offline analysis, so the future sample *is* available), return the central-difference velocity $v_k = \frac{x_{k+1} - x_{k-1}}{2\Delta t}$ for every interior sample $k = 1, \ldots, n-2$.
+
+```python
+def central_difference(xs: list[float], dt: float) -> list[float]: ...
+# central_difference([0.0, 0.01, 0.04, 0.09, 0.16], 0.1) -> [0.2, 0.4, 0.6]   (x = t^2, so v = 2t)
+# central_difference([5.0, 5.0], 0.01)                   -> []
+```
+
+**E2 (Easy–Medium). Trapezoidal integration with real timestamps.** The last row of Common Mistakes warns that the real $\Delta t$ jitters. Integrate a velocity stream using each sample's **measured** timestamp, so every slice uses its own $\Delta t_k = t_k - t_{k-1}$. Return the position at every timestamp.
+
+```python
+def integrate_trapezoid(ts: list[float], vs: list[float], x0: float = 0.0) -> list[float]: ...
+# ts = [0.0, 0.1, 0.3, 0.4], vs = [0.0, 1.0, 3.0, 4.0]  (v = 10 t, exact x = 5 t^2)
+#   -> [0.0, 0.05, 0.45, 0.8]
+```
+
+**E3 (Medium). One RK4 step in C++.** Implement Section 4.2's RK4 for an undamped spring–mass, $\dot{x} = v$, $\dot{v} = -\omega_0^2 x$, with state $\mathbf{s} = [x, v]^T$.
+
+```cpp
+struct State { double x; double v; };
+State rk4Step(State s, double omega0, double dt);
+// rk4Step({1.0, 0.0}, 1.0, 0.1) -> x ≈ 0.99500417, v ≈ -0.09983333
+// (exact: cos(0.1) = 0.99500417, -sin(0.1) = -0.09983342)
+```
+
+#### Dry-Run: Answers
+
+**Q1 — $\Delta t = 0.02\text{ s}$; $v = [0.6, 0.3, 0.8]\text{ m/s}$; $a_2 = -15$, $a_3 = +25\text{ m/s}^2$; amplification $1/\Delta t^2 = 2500$.**
+
+| k | $x_k$ (m) | $\Delta x$ (m) | $v_k = \Delta x / 0.02$ (m/s) | $a_k = \Delta v / 0.02$ (m/s²) |
+|---|---|---|---|---|
+| 0 | 0.100 | — | — | — |
+| 1 | 0.112 | 0.012 | 0.6 | — |
+| 2 | 0.118 | 0.006 | 0.3 | (0.3 − 0.6)/0.02 = −15 |
+| 3 | 0.134 | 0.016 | 0.8 | (0.8 − 0.3)/0.02 = +25 |
+
+Millimetre-level differences in $\Delta x$ already produce double-digit accelerations, because $1/\Delta t^2 = 1/0.0004 = 2500$.
+
+**Q2 — $\alpha = 0.2$; returns `0.0, 0.2, 0.56, 0.448`; without the guard the first call returns `40.0`.** $\alpha = \frac{0.01}{0.04 + 0.01} = 0.2$.
+
+| Call | x_curr | x_prev_ | v_raw | v_filt = 0.2 v_raw + 0.8 v_filt(prev) | returned |
+|---|---|---|---|---|---|
+| 1 | 2.00 | (seeded to 2.00) | — | initialisation branch | 0.0 |
+| 2 | 2.01 | 2.00 | 1.0 | 0.2(1.0) + 0.8(0.0) | 0.2 |
+| 3 | 2.03 | 2.01 | 2.0 | 0.2(2.0) + 0.8(0.2) = 0.4 + 0.16 | 0.56 |
+| 4 | 2.03 | 2.03 | 0.0 | 0.2(0.0) + 0.8(0.56) | 0.448 |
+
+Without the guard: $v_{\text{raw}} = (2.00 - 0.0)/0.01 = 200$, and $v_{\text{filt}} = 0.2 \times 200 + 0.8 \times 0 = 40.0\text{ m/s}$ — the "First-Tick Startup Spike", only softened (not removed) by the filter.
+
+**Q3 — exact $x = 2t^2$ gives $0.125, 0.5, 1.125$; Trapezoidal matches exactly.** True $v_k = 4t_k = 1, 2, 3\text{ m/s}$.
+
+| k | $t_k$ | $v_k$ | Exact | Forward Euler | Semi-Implicit Euler | Trapezoidal |
+|---|---|---|---|---|---|---|
+| 0 | 0.00 | 0 | 0.000 | 0.00 | 0.00 | 0.000 |
+| 1 | 0.25 | 1 | 0.125 | 0 + 0(0.25) = 0.00 | 0 + 1(0.25) = 0.25 | 0 + 0.5(0.25) = 0.125 |
+| 2 | 0.50 | 2 | 0.500 | 0 + 1(0.25) = 0.25 | 0.25 + 2(0.25) = 0.75 | 0.125 + 1.5(0.25) = 0.500 |
+| 3 | 0.75 | 3 | 1.125 | 0.25 + 2(0.25) = 0.75 | 0.75 + 3(0.25) = 1.50 | 0.5 + 2.5(0.25) = 1.125 |
+
+Same pattern as the chapter: Forward Euler undershoots by $0.375\text{ m}$, Semi-Implicit overshoots by $0.375\text{ m}$, Trapezoidal is exact for constant acceleration.
+
+**Q4 — (1) `0.0000 | 0.0000 | 0.0000`; (2) see table; (3) $v_t \approx 17.62\text{ m/s}$.**
+
+1. The loop prints **before** it calls `stepSemiImplicitEuler`, so row `k = 0` shows the default-constructed state: `a = 0`, `v = 0`, `z = 0` (with time `0.0000`).
+2. Net force at rest is $20 - 1.5 \times 9.81 - 0 = 5.285\text{ N}$.
+
+| Call | f_drag = 0.3 v | a = f_net / 1.5 | v += a·dt | z += v·dt |
+|---|---|---|---|---|
+| 1 | 0 | 5.285 / 1.5 = 3.52333 | 0.0352333 | 0.000352333 |
+| 2 | 0.3 × 0.0352333 = 0.01057 | 5.27443 / 1.5 = 3.51629 | 0.0703962 | 0.0010563 |
+
+Note that `z` uses the **new** `v` on each call (semi-implicit). Drag has already shaved a little off `a` on the second call.
+
+3. Terminal velocity is where $a = 0$: $20 - 14.715 = 0.3\,v$ → $v_t = 5.285 / 0.3 \approx 17.62\text{ m/s}$.
+
+**Q5 — prints `0.0` three times; the bug is `x_prev = x_curr` placed before the derivative.** After that assignment `x_curr - x_prev` is always `0`. Fix: compute `v = (x_curr - x_prev) / dt` first, then shift `x_prev = x_curr` at the bottom of the loop (and seed `x_prev` from the first sample, as in Q2). With the fix (and seeding), the outputs are `0.0`, then $0.02/0.01 = 2.0$, then $0.03/0.01 = 3.0$.
+
+**E1 — reference solution.**
+
+```python
+def central_difference(xs: list[float], dt: float) -> list[float]:
+    """Offline only: needs x_{k+1}, which a live control loop never has."""
+    return [(xs[k + 1] - xs[k - 1]) / (2.0 * dt) for k in range(1, len(xs) - 1)]
+```
+
+$O(n)$. For $x = t^2$ the central difference is exact: $\frac{(t+h)^2 - (t-h)^2}{2h} = 2t$, so the outputs are exactly $0.2, 0.4, 0.6$ (up to floating-point rounding). It is second-order accurate, $\mathcal{O}(\Delta t^2)$, versus first-order for the backward difference.
+
+**E2 — reference solution.**
+
+```python
+def integrate_trapezoid(ts: list[float], vs: list[float], x0: float = 0.0) -> list[float]:
+    xs = [x0]
+    for k in range(1, len(ts)):
+        dt_k = ts[k] - ts[k - 1]          # measured, not assumed
+        if dt_k <= 0.0:                   # duplicate/out-of-order timestamp: skip slice
+            xs.append(xs[-1])
+            continue
+        xs.append(xs[-1] + 0.5 * (vs[k - 1] + vs[k]) * dt_k)
+    return xs
+```
+
+$O(n)$. Trace: $0 + \frac{0+1}{2}(0.1) = 0.05$; $0.05 + \frac{1+3}{2}(0.2) = 0.45$; $0.45 + \frac{3+4}{2}(0.1) = 0.80$. These equal $5t^2$ exactly because $v$ is linear in $t$ (constant acceleration), even though the steps are uneven.
+
+**E3 — reference solution.**
+
+```cpp
+struct State { double x; double v; };
+
+State deriv(const State& s, double omega0) {
+    return { s.v, -omega0 * omega0 * s.x };       // [x_dot, v_dot]
+}
+
+State rk4Step(State s, double omega0, double dt) {
+    State k1 = deriv(s, omega0);
+    State k2 = deriv({s.x + 0.5 * dt * k1.x, s.v + 0.5 * dt * k1.v}, omega0);
+    State k3 = deriv({s.x + 0.5 * dt * k2.x, s.v + 0.5 * dt * k2.v}, omega0);
+    State k4 = deriv({s.x + dt * k3.x,       s.v + dt * k3.v},       omega0);
+    return { s.x + dt / 6.0 * (k1.x + 2.0 * k2.x + 2.0 * k3.x + k4.x),
+             s.v + dt / 6.0 * (k1.v + 2.0 * k2.v + 2.0 * k3.v + k4.v) };
+}
+```
+
+Four slope evaluations per step. Hand check for $\omega_0 = 1$, $s = (1, 0)$, $\Delta t = 0.1$: $k_1 = (0, -1)$, $k_2 = (-0.05, -1)$, $k_3 = (-0.05, -0.9975)$, $k_4 = (-0.09975, -0.995)$, giving $x = 1 + \frac{0.1}{6}(-0.29975) = 0.99500417$ and $v = \frac{0.1}{6}(-5.99) = -0.09983333$. The error versus $\cos(0.1)$ is about $1.4 \times 10^{-9}$ in $x$ — compare Forward Euler, which would give $x = 1.0$, $v = -0.1$.
+
+---
+
 ### 8. Interactive Visualization & `shadcn/ui` Specification
 
 > **For Claude (Frontend Implementation Guide):** Build an interactive **Discrete Calculus & Physics Loop Workbench** using React, Tailwind CSS, HTML5 Canvas / SVG, and `shadcn/ui` primitives. Do **not** use raw `<input type="range">`, `<select>`, or `<button>` HTML tags; strictly use the `shadcn/ui` components specified below.
