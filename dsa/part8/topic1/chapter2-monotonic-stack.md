@@ -439,6 +439,155 @@ their rectangle width using the new top of stack as the left boundary.
 
 ---
 
+## Practice & Self-Check
+
+Trace each question with a stack-of-indices column, exactly like the dry-run tables in Sections 3 and 4. Only then open the answers.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Daily Temperatures on a new input.** Run the Golden Template `dailyTemperatures` on `[30, 40, 35, 32, 45]`. What is the final `result`, and what does the stack (indices) look like just **before** index 4 is processed?
+
+**Q2. The `>=` bug (Mistake 3).** A value-returning "next greater" (same loop as `nextSmallerElement` in Section 6, but with the comparison flipped to `nums[i] > nums[st.back()]`) is run on `[3, 1, 3, 5, 2]`.
+(a) What is the correct output?
+(b) What is the output if the comparison is accidentally written as `nums[i] >= nums[st.back()]`? Which entry changes, and why?
+
+**Q3. Stock Span.** Run the chapter's `stockSpan` on `[10, 4, 5, 90, 120, 80]`. Give the span array and the stack after each day.
+
+**Q4. Largest Rectangle with equal heights.** Run `largestRectangleArea` on `[3, 1, 3, 2, 2]`. List every pop as (i, popped height, width, area). What is the answer, and which pop produces it?
+
+**Q5. Counting pops.** For `dailyTemperatures` on an input of length $N$, how many total pops happen if the temperatures are (a) strictly increasing, (b) strictly decreasing? How does this support the $O(N)$ argument in Section 5?
+
+### Coding Exercises
+
+**E1 (Easy). Previous Smaller Element.** For each index, return the nearest element to its **left** that is strictly smaller, or `-1`.
+
+```cpp
+vector<int> prevSmaller(const vector<int>& nums);
+// [4, 5, 2, 10, 8] -> [-1, 4, -1, 2, 2]
+// [3, 3, 1]        -> [-1, -1, -1]
+```
+
+**E2 (Easy–Medium). Next Greater Element in a Circular Array.** The element after the last one is the first one. Return the next strictly greater value (wrapping around), or `-1`.
+
+```cpp
+vector<int> nextGreaterCircular(const vector<int>& nums);
+// [1, 2, 1]       -> [2, -1, 2]
+// [5, 4, 3, 2, 1] -> [-1, 5, 5, 5, 5]
+```
+
+**E3 (Medium). Remove K Digits.** Given a non-negative integer as a string, remove exactly `k` digits so the remaining number is as small as possible. Strip leading zeros; return `"0"` if nothing is left.
+
+```cpp
+string removeKdigits(const string& num, int k);
+// "1432219", k = 3 -> "1219"
+// "10200",   k = 1 -> "200"
+// "10",      k = 2 -> "0"
+```
+
+#### Dry-Run: Answers
+
+**Q1.** `result = [1, 3, 2, 1, 0]`. Stack before index 4 is `[1, 2, 3]` (temps 40, 35, 32 — decreasing, all waiting).
+
+| i | Temp | Pops (result) | Stack after |
+|---|------|---------------|-------------|
+| 0 | 30 | — | [0] |
+| 1 | 40 | pop 0 → result[0]=1 | [1] |
+| 2 | 35 | — | [1, 2] |
+| 3 | 32 | — | [1, 2, 3] |
+| 4 | 45 | pop 3 → 1, pop 2 → 2, pop 1 → 3 | [4] |
+
+Index 4 is never popped, so it keeps its initial 0.
+
+**Q2.** (a) `[5, 3, 5, -1, -1]`. (b) `[3, 3, 5, -1, -1]` — entry 0 changes from 5 to 3.
+At i = 2 (value 3) the stack is `[0, 1]` (values 3, 1). With `>`, it pops index 1 (3 > 1) and stops because 3 > 3 is false. With `>=`, it also pops index 0 because 3 >= 3, wrongly recording an **equal** value as the "next greater" for index 0.
+
+**Q3.** `span = [1, 1, 2, 4, 5, 1]`.
+
+| i | Price | Pops (`prices[top] <= price`) | Span | Stack after |
+|---|-------|-------------------------------|------|-------------|
+| 0 | 10 | — | empty → 0+1 = 1 | [0] |
+| 1 | 4 | — | 1-0 = 1 | [0, 1] |
+| 2 | 5 | pop 1 (4) | 2-0 = 2 | [0, 2] |
+| 3 | 90 | pop 2 (5), pop 0 (10) | empty → 3+1 = 4 | [3] |
+| 4 | 120 | pop 3 (90) | empty → 4+1 = 5 | [4] |
+| 5 | 80 | — | 5-4 = 1 | [4, 5] |
+
+**Q4.** Answer **6**, produced at i = 5 (sentinel height 0) when popping the **first** height-2 bar (index 3).
+
+| i | Popped (index, h) | Width | Area |
+|---|-------------------|-------|------|
+| 1 | (0, 3) | stack empty → i = 1 | 3 |
+| 3 | (2, 3) | 3 - 1 - 1 = 1 | 3 |
+| 5 | (4, 2) | 5 - 3 - 1 = 1 | 2 |
+| 5 | (3, 2) | 5 - 1 - 1 = 3 | **6** |
+| 5 | (1, 1) | stack empty → i = 5 | 5 |
+
+At i = 4, `2 < 2` is false, so index 4 sits on top of index 3. The later bar's area is under-counted (width 1), but the earlier equal bar gets the full width 3, so the maximum is still correct.
+
+**Q5.** (a) Strictly increasing: every new element pops exactly the one before it, so $N-1$ pops. (b) Strictly decreasing: **0** pops; all $N$ indices stay on the stack. In both cases pushes $= N$ and pops $\le N$, so total work is at most $2N = O(N)$, regardless of how the pops are distributed across iterations.
+
+**E1 — reference solution.** Keep an increasing stack; pop anything `>=` the current value (it can never be a strictly smaller answer for anyone to the right of `i`), and whatever remains on top is the answer.
+
+```cpp
+vector<int> prevSmaller(const vector<int>& nums) {
+    int n = nums.size();
+    vector<int> result(n, -1);
+    vector<int> st;                       // indices, increasing values
+    for (int i = 0; i < n; i++) {
+        while (!st.empty() && nums[st.back()] >= nums[i]) st.pop_back();
+        if (!st.empty()) result[i] = nums[st.back()];
+        st.push_back(i);
+    }
+    return result;
+}
+```
+Time $O(N)$, space $O(N)$. Note the answer is read from the top **after** popping, unlike "next greater" where answers are written **during** popping.
+
+**E2 — reference solution.** Walk the array twice (indices `k = 0 .. 2n-1`, real index `k % n`). The second pass lets elements near the end find answers near the start; only push during the first pass.
+
+```cpp
+vector<int> nextGreaterCircular(const vector<int>& nums) {
+    int n = nums.size();
+    vector<int> result(n, -1);
+    vector<int> st;                       // decreasing stack of indices
+    for (int k = 0; k < 2 * n; k++) {
+        int i = k % n;
+        while (!st.empty() && nums[i] > nums[st.back()]) {
+            result[st.back()] = nums[i];
+            st.pop_back();
+        }
+        if (k < n) st.push_back(i);
+    }
+    return result;
+}
+// [1, 2, 1]: pass 1 gives [2, -1, _] with stack [1, 2];
+//            pass 2 at k=3 (value 1) pops nothing, k=4 (value 2) pops index 2 -> 2.
+```
+Time $O(N)$ (each index pushed once, popped at most once), space $O(N)$.
+
+**E3 — reference solution.** A greedy increasing stack of digits: a larger digit followed by a smaller one should be removed, because the left digit is more significant.
+
+```cpp
+string removeKdigits(const string& num, int k) {
+    string st;                                     // increasing digits
+    for (char c : num) {
+        while (k > 0 && !st.empty() && st.back() > c) {
+            st.pop_back();
+            k--;
+        }
+        st.push_back(c);
+    }
+    while (k > 0 && !st.empty()) { st.pop_back(); k--; }   // e.g. "12345"
+    size_t start = st.find_first_not_of('0');
+    if (start == string::npos) return "0";
+    return st.substr(start);
+}
+// "1432219", k=3: 1 -> 14 -> 13 (pop 4) -> 12 (pop 3) -> 122 -> 121 (pop 2, k=0) -> 1219
+```
+Time $O(n)$, space $O(n)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

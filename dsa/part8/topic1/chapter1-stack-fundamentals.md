@@ -404,6 +404,142 @@ Char: ']'  -> closing, top is '(' -> mismatch!
 
 ---
 
+## Practice & Self-Check
+
+Work these on paper first (draw the stack bottom→top, like the dry-run table in Section 4), then check yourself against the folded answers at the end.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Push/pop sequence.** Starting from an empty `vector<int> st`, run:
+`push(4) -> push(7) -> pop() -> push(2) -> push(9) -> top() -> pop() -> push(6)`.
+Fill in a dry-run table (Operation | Stack bottom→top | Return Value). What is the final stack, and what values did `pop()`/`top()` return?
+
+**Q2. Operand order in RPN.** Using the chapter's basic `evalRPN`, what is returned for the tokens `["6", "2", "3", "-", "*"]`? Then: if someone accidentally wrote `int left = st.back(); st.pop_back(); int right = st.back(); st.pop_back();` (popping `left` first), what would the same input return?
+
+**Q3. Where does `isValid` fail?** For the chapter's `isValid`, give the return value and the **index** of the character at which the function decides, for each input:
+(a) `"([)]"`  (b) `"(("`  (c) `"]"`
+
+**Q4. Negative tokens and truncation.** What does `evalRPN` return for `["7", "-2", "/"]`? Why is the token `"-2"` pushed as a number instead of being treated as the `-` operator?
+
+**Q5. Complexity.** `isValid` is called on a string of length $n$ consisting of $n/2$ `'('` followed by $n/2$ `')'`. What is the maximum stack size reached, and what are the time and space complexities?
+
+### Coding Exercises
+
+**E1 (Easy). Remove All Adjacent Duplicates.** Repeatedly delete pairs of equal adjacent characters until none remain.
+
+```cpp
+string removeDuplicates(const string& s);
+// "abbaca" -> "ca"      ("bb" removed, then "aa" removed)
+// "azxxzy" -> "ay"
+```
+
+**E2 (Easy–Medium). Minimum Add to Make Parentheses Valid.** Given a string of only `'('` and `')'`, return the minimum number of brackets you must insert to make it valid.
+
+```cpp
+int minAddToMakeValid(const string& s);
+// "())"    -> 1
+// "()))((" -> 4
+```
+
+**E3 (Medium). Simplify a Unix Path.** Convert an absolute path to its canonical form: `"."` means "stay", `".."` means "go up one directory" (never above root), and multiple slashes collapse to one.
+
+```cpp
+string simplifyPath(const string& path);
+// "/a/./b/../../c/" -> "/c"
+// "/home//foo/"     -> "/home/foo"
+// "/../"            -> "/"
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Final stack `[4, 2, 6]`; `pop()` returned 7, `top()` returned 9, `pop()` returned 9.
+
+| Operation | Stack (bottom→top) | Return Value |
+|-----------|-------------------|--------------|
+| push(4) | [4] | - |
+| push(7) | [4, 7] | - |
+| pop() | [4] | 7 |
+| push(2) | [4, 2] | - |
+| push(9) | [4, 2, 9] | - |
+| top() | [4, 2, 9] | 9 |
+| pop() | [4, 2] | 9 |
+| push(6) | [4, 2, 6] | - |
+
+**Q2.** Correct code returns **-6**; the buggy version returns **6**.
+
+| Token | Action | Stack |
+|-------|--------|-------|
+| "6" | push | [6] |
+| "2" | push | [6, 2] |
+| "3" | push | [6, 2, 3] |
+| "-" | right=3, left=2, 2-3 = -1 | [6, -1] |
+| "*" | right=-1, left=6, 6 * -1 = -6 | [-6] |
+
+With the swapped pops, `"-"` computes `3 - 2 = 1`, and `"*"` computes `1 * 6 = 6`. Subtraction and division are not commutative, so the **first** value popped must be the **right** operand.
+
+**Q3.**
+- (a) `"([)]"` returns **false at index 2**: stack is `['(', '[']`, the char `')'` pops `'['`, which does not match `'('`.
+- (b) `"(("` returns **false after the loop** (no index triggers it): stack ends as `['(', '(']`, so `st.empty()` is false.
+- (c) `"]"` returns **false at index 0**: it is a closing bracket and `st.empty()` is true, so the guard returns before calling `st.back()` on an empty vector.
+
+**Q4.** Returns **-3**. Trace: push 7 → `[7]`; `"-2"` is compared as a whole string against `"+"`, `"-"`, `"*"`, `"/"`; it equals none of them, so `stoi("-2")` pushes -2 → `[7, -2]`; `"/"` gives right = -2, left = 7, and `7 / -2` truncates toward zero to $-3$ (not $-4$) → `[-3]`.
+
+**Q5.** The stack peaks at $n/2$ elements (just before the first `')'`). Time $O(n)$ (each char is pushed and popped at most once), space $O(n)$ (precisely $n/2$ chars in the worst case).
+
+**E1 — reference solution.** The result string itself is the stack: if the incoming char equals the top, the pair cancels.
+
+```cpp
+string removeDuplicates(const string& s) {
+    string st;                       // std::string works as a char stack
+    for (char c : s) {
+        if (!st.empty() && st.back() == c) st.pop_back();  // cancel the pair
+        else st.push_back(c);
+    }
+    return st;
+}
+// "abbaca": a -> ab -> a (b cancels) -> "" (a cancels) -> c -> ca
+```
+Time $O(n)$, space $O(n)$.
+
+**E2 — reference solution.** Same matching idea as `isValid`, but count failures instead of returning early.
+
+```cpp
+int minAddToMakeValid(const string& s) {
+    vector<char> st;
+    int unmatchedClose = 0;
+    for (char c : s) {
+        if (c == '(') st.push_back(c);
+        else if (!st.empty()) st.pop_back();   // ')' matches a waiting '('
+        else unmatchedClose++;                 // ')' with nothing to match
+    }
+    return unmatchedClose + (int)st.size();    // + leftover '('
+}
+// "()))((": ( push, ) pop, ) close=1, ) close=2, ( push, ( push -> 2 + 2 = 4
+```
+Time $O(n)$, space $O(n)$ (reducible to $O(1)$ by replacing the stack with a counter, since only one bracket type exists).
+
+**E3 — reference solution.** Directory names are pushed; `".."` is an "undo" (pop), which is exactly the stack trigger from Section 1.
+
+```cpp
+string simplifyPath(const string& path) {
+    vector<string> st;
+    stringstream ss(path);
+    string part;
+    while (getline(ss, part, '/')) {
+        if (part.empty() || part == ".") continue;   // "//" or "."
+        if (part == "..") { if (!st.empty()) st.pop_back(); }
+        else st.push_back(part);
+    }
+    string res;
+    for (const string& dir : st) res += "/" + dir;   // vector lets us iterate
+    return res.empty() ? "/" : res;
+}
+// "/a/./b/../../c/": [a] -> [a] -> [a,b] -> [a] -> [] -> [c] -> "/c"
+```
+Time $O(n)$, space $O(n)$. Note how using `vector` instead of `std::stack` lets us build the answer bottom→top without reversing.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

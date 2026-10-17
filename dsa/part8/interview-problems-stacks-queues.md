@@ -571,6 +571,181 @@ Front = current window maximum.
 
 ---
 
+## Practice & Self-Check
+
+These questions reuse the eight solutions above on new inputs. Trace them with a table before checking the answers.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Min Stack with duplicates (two-stack version).** Run `push(2) -> push(5) -> push(2) -> pop() -> getMin()` on the **two-stack** `MinStack` (Problem 2, alternative approach).
+(a) Show `st` and `minSt` after each operation. What does `getMin()` return?
+(b) Now suppose the push condition is written `val < minSt.top()` instead of `val <= minSt.top()`. What goes wrong on the same sequence?
+
+**Q2. Car Fleet on a new input.** `target = 12`, `position = [3, 7, 9, 1]`, `speed = [3, 1, 1, 2]`. Compute each car's time, sort, and run the stack logic from Problem 5. How many fleets arrive?
+
+**Q3. Queue using Stacks.** On `MyQueue` (Problem 7) run:
+`push(1) -> push(2) -> push(3) -> pop() -> push(4) -> pop() -> pop() -> pop()`.
+Give `s1`, `s2` (bottom→top) and the return value after each operation. How many elements are moved by `pour()` in total?
+
+**Q4. Largest Rectangle.** Run Problem 6's `largestRectangleArea` on `[6, 2, 5, 4, 5, 1, 6]`. List every pop as (i, popped index, height, width, area). What is the answer?
+
+**Q5. Name the pattern.** Using the Classification Table, pick the pattern and data structure for each new prompt:
+(a) "For each day's stock price, how many days until a strictly higher price?"
+(b) "A robot streams sensor readings; after each reading report the max of the last 50."
+(c) "Check that every `<tag>` in a string is closed by `</tag>` in the right nesting order."
+
+### Coding Exercises
+
+**E1 (Easy). Max Stack.** Mirror the pair-based Min Stack: support `push`, `pop`, `top`, and `getMax` in $O(1)$.
+
+```cpp
+class MaxStack {
+public:
+    void push(int val);
+    void pop();
+    int top();
+    int getMax();
+};
+// push(2), push(7), push(3): getMax() -> 7
+// pop(), pop():              getMax() -> 2, top() -> 2
+```
+
+**E2 (Easy–Medium). Stack using One Queue.** The reverse of Problem 7: implement LIFO behaviour with a single `std::queue`.
+
+```cpp
+class MyStack {
+public:
+    void push(int x);
+    int pop();
+    int top();
+    bool empty();
+};
+// push(1), push(2), push(3): top() -> 3, pop() -> 3, pop() -> 2, top() -> 1
+```
+
+**E3 (Medium). Asteroid Collision.** Positive = moving right, negative = moving left, magnitude = size. When two meet, the smaller explodes; equal sizes both explode. Return the survivors in order.
+
+```cpp
+vector<int> asteroidCollision(const vector<int>& asteroids);
+// [5, 10, -5]    -> [5, 10]
+// [10, 2, -5]    -> [10]
+// [8, -8]        -> []
+// [-2, -1, 1, 2] -> [-2, -1, 1, 2]   (nothing collides)
+```
+
+#### Dry-Run: Answers
+
+**Q1.** (a) `getMin()` returns **2**.
+
+| Operation | st | minSt | Note |
+|-----------|----|-------|------|
+| push(2) | [2] | [2] | minSt empty → push |
+| push(5) | [2, 5] | [2] | 5 <= 2? no |
+| push(2) | [2, 5, 2] | [2, 2] | 2 <= 2? yes |
+| pop() | [2, 5] | [2] | top 2 == minSt.top 2 → pop both |
+| getMin() | [2, 5] | [2] | returns 2 |
+
+(b) With `<`, the second 2 is **not** pushed to `minSt` (2 < 2 is false), so `minSt = [2]`. The `pop()` still sees `st.top() == minSt.top()` and pops `minSt`, leaving it **empty** while `st = [2, 5]`. `getMin()` then calls `top()` on an empty stack: undefined behaviour. Duplicates of the minimum must be pushed, which is why the code uses `<=`.
+
+**Q2.** **3 fleets.**
+
+| Car (pos) | Time = (12 - pos) / speed | Stack after | Action |
+|-----------|---------------------------|-------------|--------|
+| 9 | 3 / 1 = 3.0 | [3.0] | push |
+| 7 | 5 / 1 = 5.0 | [3.0, 5.0] | 5.0 > 3.0, new fleet |
+| 3 | 9 / 3 = 3.0 | [3.0, 5.0] | 3.0 <= 5.0, joins fleet |
+| 1 | 11 / 2 = 5.5 | [3.0, 5.0, 5.5] | 5.5 > 5.0, new fleet |
+
+**Q3.** Returns 1, 2, 3, 4 (FIFO order). `pour()` moves **4** elements in total (3 on the first pop, 1 on the last).
+
+| Operation | s1 | s2 | Return |
+|-----------|----|----|--------|
+| push(1) | [1] | [] | - |
+| push(2) | [1, 2] | [] | - |
+| push(3) | [1, 2, 3] | [] | - |
+| pop() | [] | [3, 2] | 1 (poured 3 items, popped 1) |
+| push(4) | [4] | [3, 2] | - |
+| pop() | [4] | [3] | 2 (s2 not empty, no pour) |
+| pop() | [4] | [] | 3 |
+| pop() | [] | [] | 4 (poured 1 item, popped 4) |
+
+**Q4.** Answer **12** (height 4 spanning indices 2–4).
+
+| i | Popped idx (h) | Width | Area |
+|---|----------------|-------|------|
+| 1 | 0 (6) | stack empty → 1 | 6 |
+| 3 | 2 (5) | 3 - 1 - 1 = 1 | 5 |
+| 5 | 4 (5) | 5 - 3 - 1 = 1 | 5 |
+| 5 | 3 (4) | 5 - 1 - 1 = 3 | **12** |
+| 5 | 1 (2) | stack empty → 5 | 10 |
+| 7 | 6 (6) | 7 - 5 - 1 = 1 | 6 |
+| 7 | 5 (1) | stack empty → 7 | 7 |
+
+**Q5.**
+- (a) "Next strictly greater" → **Monotonic Stack** (decreasing, indices), exactly Daily Temperatures.
+- (b) Fixed-size window max → **Monotonic Deque** (decreasing, indices), $O(1)$ amortized per reading.
+- (c) Nested open/close matching → **Brackets Matching** with a plain **Stack** of tag names.
+
+**E1 — reference solution.** Each pair stores `(value, max at the moment of push)`.
+
+```cpp
+class MaxStack {
+    vector<pair<int, int>> st;                 // (value, max so far)
+public:
+    void push(int val) {
+        int curMax = st.empty() ? val : max(val, st.back().second);
+        st.push_back({val, curMax});
+    }
+    void pop()    { st.pop_back(); }
+    int top()     { return st.back().first; }
+    int getMax()  { return st.back().second; }
+};
+```
+All operations $O(1)$; space $O(n)$.
+
+**E2 — reference solution.** After pushing `x` to the back, rotate the older `size - 1` elements behind it, so `x` is at the front.
+
+```cpp
+class MyStack {
+    queue<int> q;
+public:
+    void push(int x) {
+        q.push(x);
+        for (int i = 0; i + 1 < (int)q.size(); i++) {   // rotate older items behind x
+            q.push(q.front());
+            q.pop();
+        }
+    }
+    int pop()    { int v = q.front(); q.pop(); return v; }
+    int top()    { return q.front(); }
+    bool empty() { return q.empty(); }
+};
+// push(1): [1]; push(2): [2, 1]; push(3): [3, 2, 1]  (front -> back)
+```
+`push` is $O(n)$, `pop`/`top` are $O(1)$. Unlike Problem 7, this cost is not amortized away.
+
+**E3 — reference solution.** The stack holds survivors. Only a left-mover (`a < 0`) meeting a right-mover on top (`st.back() > 0`) can collide, so keep resolving while that holds.
+
+```cpp
+vector<int> asteroidCollision(const vector<int>& asteroids) {
+    vector<int> st;
+    for (int a : asteroids) {
+        bool alive = true;
+        while (alive && a < 0 && !st.empty() && st.back() > 0) {
+            if (st.back() < -a) { st.pop_back(); }                       // top explodes
+            else if (st.back() == -a) { st.pop_back(); alive = false; }  // both explode
+            else { alive = false; }                                      // a explodes
+        }
+        if (alive) st.push_back(a);
+    }
+    return st;
+}
+// [10, 2, -5]: [10] -> [10, 2] -> -5 destroys 2, then 10 destroys -5 -> [10]
+```
+Time $O(n)$ (each asteroid pushed and popped at most once), space $O(n)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

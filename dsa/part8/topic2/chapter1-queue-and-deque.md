@@ -387,6 +387,168 @@ if (i >= k - 1) {
 
 ---
 
+## Practice & Self-Check
+
+Draw the container front→back at every step, as in the dry-run table of Section 3 and the walkthrough of Section 8.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Queue sequence.** Starting from an empty `queue<int> q`, run:
+`push(7) -> push(3) -> pop() -> push(9) -> front() -> push(1) -> pop() -> pop()`.
+What values do `pop()`/`front()` return, and what is the final queue (front→back)?
+
+**Q2. Both ends of a deque.** Starting from an empty `deque<int> dq`, run:
+`push_back(5) -> push_front(2) -> push_back(8) -> push_front(1) -> pop_back()`.
+What is `dq` now, and what is `dq[1]`? Then after one `pop_front()`, what is `dq.front()`?
+
+**Q3. BFS order.** Run the chapter's `bfs` on this tree. Give the queue contents after each node is processed and the printed output.
+
+```
+        8
+       / \
+      3   10
+     / \    \
+    1   6    14
+```
+
+**Q4. Sliding Window Maximum on a new input.** Run the Golden Template `maxSlidingWindow` on `[4, 2, 12, 3, 8, 1, 7]` with `k = 3`. Give the deque (indices) at the end of each iteration and the result. At which `i` does the **front-eviction** step (step 3) actually remove something?
+
+**Q5. Mistake 3 in action.** If the `if (i >= k - 1)` guard is deleted from the template, what does the same call from Q4 return?
+
+### Coding Exercises
+
+**E1 (Easy). First Negative in Every Window.** For each window of size `k`, return its first (leftmost) negative number, or `0` if it has none.
+
+```cpp
+vector<int> firstNegative(const vector<int>& nums, int k);
+// [12, -1, -7, 8, -15, 30, 16, 28], k = 3 -> [-1, -1, -7, -15, -15, 0]
+// [5, 6, 7], k = 2                        -> [0, 0]
+```
+
+**E2 (Easy–Medium). Sliding Window Minimum.** Adapt the Golden Template to return the minimum of each window.
+
+```cpp
+vector<int> minSlidingWindow(const vector<int>& nums, int k);
+// [1, 3, -1, -3, 5, 3, 6, 7], k = 3 -> [-1, -3, -3, -3, 3, 3]
+```
+
+**E3 (Medium). Longest Subarray with Bounded Spread.** Return the length of the longest contiguous subarray in which `max - min <= limit`.
+
+```cpp
+int longestSubarray(const vector<int>& nums, int limit);
+// [8, 2, 4, 7], limit = 4         -> 2   ([2, 4] or [4, 7])
+// [10, 1, 2, 4, 7, 2], limit = 5  -> 4   ([2, 4, 7, 2])
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns: `pop()` → 7, `front()` → 3, `pop()` → 3, `pop()` → 9. Final queue `[1]`.
+
+| Operation | Queue (front→back) | Return |
+|-----------|-------------------|--------|
+| push(7) | [7] | - |
+| push(3) | [7, 3] | - |
+| pop() | [3] | 7 |
+| push(9) | [3, 9] | - |
+| front() | [3, 9] | 3 |
+| push(1) | [3, 9, 1] | - |
+| pop() | [9, 1] | 3 |
+| pop() | [1] | 9 |
+
+**Q2.** After the five operations `dq = [1, 2, 5]` and `dq[1] = 2`. After `pop_front()`, `dq = [2, 5]` and `dq.front() = 2`.
+
+| Operation | Deque (front→back) |
+|-----------|-------------------|
+| push_back(5) | [5] |
+| push_front(2) | [2, 5] |
+| push_back(8) | [2, 5, 8] |
+| push_front(1) | [1, 2, 5, 8] |
+| pop_back() | [1, 2, 5] |
+
+**Q3.** Output `8 3 10 1 6 14`.
+
+| Process | Queue after pushing children |
+|---------|------------------------------|
+| start | [8] |
+| 8 | [3, 10] |
+| 3 | [10, 1, 6] |
+| 10 | [1, 6, 14] |
+| 1 | [6, 14] |
+| 6 | [14] |
+| 14 | [] |
+
+**Q4.** Result `[12, 12, 12, 8, 8]`. Front-eviction removes something only at **i = 5** (index 2, value 12, falls out since $2 < 5 - 3 + 1 = 3$).
+
+| i | Value | Back pops | Deque after | Window max |
+|---|-------|-----------|-------------|------------|
+| 0 | 4 | — | [0] | (not recorded) |
+| 1 | 2 | — | [0, 1] | (not recorded) |
+| 2 | 12 | 1, 0 | [2] | 12 |
+| 3 | 3 | — | [2, 3] | 12 |
+| 4 | 8 | 3 | [2, 4] | 12 |
+| 5 | 1 | — (then front 2 evicted) | [4, 5] | 8 |
+| 6 | 7 | 5 | [4, 6] | 8 |
+
+**Q5.** `[4, 4, 12, 12, 12, 8, 8]` — two extra "garbage" entries at i = 0 and i = 1, where the front of the deque is index 0 (value 4) for a window that is not full yet.
+
+**E1 — reference solution.** A queue of indices of negatives only; the front is the leftmost negative still inside the window.
+
+```cpp
+vector<int> firstNegative(const vector<int>& nums, int k) {
+    vector<int> result;
+    deque<int> dq;                                   // indices of negatives
+    for (int i = 0; i < (int)nums.size(); i++) {
+        if (nums[i] < 0) dq.push_back(i);
+        if (!dq.empty() && dq.front() < i - k + 1) dq.pop_front();
+        if (i >= k - 1) result.push_back(dq.empty() ? 0 : nums[dq.front()]);
+    }
+    return result;
+}
+```
+Time $O(n)$, space $O(k)$. A plain `queue<int>` also works, since only the back is pushed and only the front is popped.
+
+**E2 — reference solution.** Flip the comparison so the deque is **increasing**; the front is the minimum.
+
+```cpp
+vector<int> minSlidingWindow(const vector<int>& nums, int k) {
+    vector<int> result;
+    deque<int> dq;                                   // increasing values
+    for (int i = 0; i < (int)nums.size(); i++) {
+        while (!dq.empty() && nums[dq.back()] > nums[i]) dq.pop_back();
+        dq.push_back(i);
+        if (dq.front() < i - k + 1) dq.pop_front();
+        if (i >= k - 1) result.push_back(nums[dq.front()]);
+    }
+    return result;
+}
+```
+Time $O(n)$ amortized (each index pushed and popped at most once), space $O(k)$.
+
+**E3 — reference solution.** A variable-size window with **two** monotonic deques: decreasing for the max, increasing for the min. Shrink from the left while the spread is too large.
+
+```cpp
+int longestSubarray(const vector<int>& nums, int limit) {
+    deque<int> maxDq, minDq;
+    int left = 0, best = 0;
+    for (int right = 0; right < (int)nums.size(); right++) {
+        while (!maxDq.empty() && nums[maxDq.back()] < nums[right]) maxDq.pop_back();
+        while (!minDq.empty() && nums[minDq.back()] > nums[right]) minDq.pop_back();
+        maxDq.push_back(right);
+        minDq.push_back(right);
+        while (nums[maxDq.front()] - nums[minDq.front()] > limit) {
+            left++;                                  // shrink the window
+            if (maxDq.front() < left) maxDq.pop_front();
+            if (minDq.front() < left) minDq.pop_front();
+        }
+        best = max(best, right - left + 1);
+    }
+    return best;
+}
+```
+Time $O(n)$ (each pointer only moves right, each index enters/leaves each deque once), space $O(n)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
