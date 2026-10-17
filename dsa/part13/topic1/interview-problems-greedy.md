@@ -625,6 +625,171 @@ while (!count.empty()) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run Problem 1's `canJump` on `nums = [3, 2, 1, 0, 4]`. Fill in the backward table (`i`, `nums[i]`, `i + nums[i]`, `>= goal?`, `goal`). What is returned?
+
+**Q2.** Run Problem 2's `jump` on `nums = [2, 3, 0, 1, 4]`. For each `i` give `farthest`, whether `i == currentEnd`, and the new `jumps` / `currentEnd`. What is returned, and at which `i` does the `break` fire?
+
+**Q3.** Run Problem 3's `canCompleteCircuit` with
+
+```cpp
+vector<int> gas  = {5, 1, 2, 3, 4};
+vector<int> cost = {4, 4, 1, 5, 1};
+```
+
+Fill in `diff`, `totalTank`, `currentTank` and `start` for every `i`. What is returned? Then verify by simulating the full lap from that station.
+
+**Q4.** Both Problem 4 (`eraseOverlapIntervals`) and Problem 5 (`findMinArrowShots`) sort by end and look almost identical. Run **both** on the same input `[[1,2], [2,3], [3,4], [4,5]]`. What does each return, and which single character in the comparison causes the difference?
+
+**Q5.** Run Problem 6's `partitionLabels` on `s = "abacdcef"`. List the `last` map, then trace `end` and every partition close. What vector is returned?
+
+### Coding Exercises
+
+**E1 (Easy).** Assign Cookies. Child `i` is content if given a cookie of size `>= g[i]`; each child gets at most one cookie. Return the maximum number of content children.
+
+```cpp
+int findContentChildren(vector<int>& g, vector<int>& s);
+// g = [1,2,3], s = [1,1]   -> 1
+// g = [1,2],   s = [1,2,3] -> 2
+```
+
+**E2 (Easy–Medium).** Lemonade Change. Lemonade costs 5 dollars. Customers pay with bills of 5, 10 or 20 dollars in the given order; you start with no change. Return `true` if you can give every customer correct change.
+
+```cpp
+bool lemonadeChange(vector<int>& bills);
+// [5,5,5,10,20]  -> true
+// [5,5,10,10,20] -> false
+```
+
+**E3 (Medium).** Boats to Save People. Each boat carries at most two people and at most `limit` weight (every `people[i] <= limit`). Return the minimum number of boats.
+
+```cpp
+int numRescueBoats(vector<int>& people, int limit);
+// people = [3,2,2,1], limit = 3 -> 3
+// people = [3,5,3,4], limit = 5 -> 4
+```
+
+#### Dry-Run: Answers
+
+**Q1 — returns `false`.** `goal` starts at 4 and is never pulled back, because index 3 holds a `0` that nobody can jump over.
+
+| i | nums[i] | i + nums[i] | >= goal (4)? | goal |
+|---|---|---|---|---|
+| 3 | 0 | 3 | NO | 4 |
+| 2 | 1 | 3 | NO | 4 |
+| 1 | 2 | 3 | NO | 4 |
+| 0 | 3 | 3 | NO | 4 |
+
+`goal == 0` is false.
+
+**Q2 — returns `2`; the `break` fires at `i = 2`.** The loop runs for `i < 4`.
+
+| i | nums[i] | i + nums[i] | farthest | i == currentEnd? | jumps | currentEnd |
+|---|---|---|---|---|---|---|
+| 0 | 2 | 2 | 2 | 0 == 0 YES | 1 | 2 |
+| 1 | 3 | 4 | 4 | 1 == 2 NO | 1 | 2 |
+| 2 | 0 | 2 | 4 | 2 == 2 YES | 2 | 4 → `4 >= 4`, break |
+
+The zero at index 2 does not matter: the window `[1, 2]` already contains index 1, which reaches 4.
+
+**Q3 — returns `4`.** `diff = [1, -3, 1, -2, 3]`, total = 0, so a solution exists.
+
+| i | diff | totalTank | currentTank (after add) | < 0? | start |
+|---|---|---|---|---|---|
+| 0 | 1 | 1 | 1 | NO | 0 |
+| 1 | -3 | -2 | -2 | YES → reset 0 | 2 |
+| 2 | 1 | -1 | 1 | NO | 2 |
+| 3 | -2 | -3 | -1 | YES → reset 0 | 4 |
+| 4 | 3 | 0 | 3 | NO | 4 |
+
+Lap check from station 4: tank $0+4-1=3$ → station 0: $3+5-4=4$ → station 1: $4+1-4=1$ → station 2: $1+2-1=2$ → station 3: $2+3-5=0$ → back at 4. The tank never goes negative.
+
+**Q4 — `eraseOverlapIntervals` returns `0`; `findMinArrowShots` returns `2`.** The sorted order is the input order.
+
+| i | interval | Problem 4: `start >= end`? | count | end | Problem 5: `start > end`? | arrows | end |
+|---|---|---|---|---|---|---|---|
+| 0 | [1,2] | pick first | 1 | 2 | first arrow | 1 | 2 |
+| 1 | [2,3] | 2 >= 2 YES | 2 | 3 | 2 > 2 NO (burst) | 1 | 2 |
+| 2 | [3,4] | 3 >= 3 YES | 3 | 4 | 3 > 2 YES | 2 | 4 |
+| 3 | [4,5] | 4 >= 4 YES | 4 | 5 | 4 > 4 NO (burst) | 2 | 4 |
+
+Problem 4 returns `4 - 4 = 0`. The difference is `>=` vs `>`: touching meetings do **not** overlap, but an arrow at $x=2$ **does** burst a balloon that starts at 2.
+
+**Q5 — returns `[3, 3, 1, 1]`.** `last = {a:2, b:1, c:5, d:4, e:6, f:7}`.
+
+| i | char | last[char] | end | i == end? | action |
+|---|---|---|---|---|---|
+| 0 | a | 2 | 2 | NO | — |
+| 1 | b | 1 | 2 | NO | — |
+| 2 | a | 2 | 2 | YES | push 2-0+1 = 3, start = 3 |
+| 3 | c | 5 | 5 | NO | — |
+| 4 | d | 4 | 5 | NO | — |
+| 5 | c | 5 | 5 | YES | push 5-3+1 = 3, start = 6 |
+| 6 | e | 6 | 6 | YES | push 1, start = 7 |
+| 7 | f | 7 | 7 | YES | push 1, start = 8 |
+
+Parts: `"aba" | "cdc" | "e" | "f"`.
+
+**E1 — reference solution.** Sort both; give the smallest cookie that works to the least greedy child (two pointers).
+
+```cpp
+int findContentChildren(vector<int>& g, vector<int>& s) {
+    sort(g.begin(), g.end());
+    sort(s.begin(), s.end());
+    size_t child = 0;
+    for (size_t c = 0; c < s.size() && child < g.size(); c++) {
+        if (s[c] >= g[child]) child++;   // cookie c satisfies this child
+    }                                     // otherwise cookie c is too small for everyone left
+    return (int)child;
+}
+```
+
+Time $O(N \log N + M \log M)$. Exchange argument: using a bigger cookie than necessary never helps, so the smallest sufficient cookie is a safe choice.
+
+**E2 — reference solution.** Only 5s and 10s are useful as change. For a 20, prefer giving `10 + 5` over `5 + 5 + 5`, because 5s are more flexible.
+
+```cpp
+bool lemonadeChange(vector<int>& bills) {
+    int five = 0, ten = 0;
+    for (int b : bills) {
+        if (b == 5) five++;
+        else if (b == 10) {
+            if (five == 0) return false;
+            five--; ten++;
+        } else {                             // b == 20, need 15 back
+            if (ten > 0 && five > 0) { ten--; five--; }
+            else if (five >= 3) five -= 3;
+            else return false;
+        }
+    }
+    return true;
+}
+```
+
+Time $O(N)$, space $O(1)$. Trace `[5,5,10,10,20]`: five=1, five=2, (five=1, ten=1), (five=0, ten=2), then 20 needs a 5 and there is none → `false`.
+
+**E3 — reference solution.** Sort, then pair the heaviest remaining person with the lightest if they fit; the heaviest always takes a boat.
+
+```cpp
+int numRescueBoats(vector<int>& people, int limit) {
+    sort(people.begin(), people.end());
+    int lo = 0, hi = (int)people.size() - 1, boats = 0;
+    while (lo <= hi) {
+        if (people[lo] + people[hi] <= limit) lo++;  // lightest rides along
+        hi--;                                        // heaviest always leaves
+        boats++;
+    }
+    return boats;
+}
+```
+
+Time $O(N \log N)$. Trace `[1,2,2,3]`, limit 3: `1+3 > 3` → boat {3}; `1+2 <= 3` → boat {1,2}; `lo = hi` on the other 2 → boat {2}. Total `3`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
