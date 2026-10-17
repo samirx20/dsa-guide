@@ -526,6 +526,208 @@ vector<int> shortestPath(vector<vector<int>>& adj, int start, int end) {
 
 ---
 
+## Practice & Self-Check
+
+Questions Q1–Q3 use this tree (call it **Tree B**):
+
+```text
+          1
+        /   \
+       2     3
+      /     / \
+     4     5   6
+      \
+       7
+```
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run the chapter's `levelOrder` on Tree B. Fill in the dry-run table (Iter, `levelSize`, Nodes Processed, Children Added, Result So Far). Also: what is the largest the queue ever gets during `basicBFS`?
+
+**Q2.** On Tree B, what do `rightSideView`, `zigzagLevelOrder`, and `averageOfLevels` return?
+
+**Q3.** A classic bug: someone deletes the `levelSize` snapshot and writes the inner loop as
+
+```cpp
+for (int i = 0; i < q.size(); i++) {   // q.size() re-evaluated every iteration!
+    TreeNode* curr = q.front();
+    q.pop();
+    currentLevelVals.push_back(curr->val);
+    if (curr->left != nullptr) q.push(curr->left);
+    if (curr->right != nullptr) q.push(curr->right);
+}
+```
+
+What does this broken `levelOrder` return on Tree B?
+
+**Q4.** Graph BFS. Using the chapter's `bfs` and `shortestPath` on this adjacency list:
+
+```cpp
+// adj[0] = [1, 3]
+// adj[1] = [0, 2]
+// adj[2] = [1, 4]
+// adj[3] = [0, 4]
+// adj[4] = [2, 3]
+```
+
+(a) What does `bfs(adj, 0)` print? (b) What is the `parent` array when node 4 is first discovered, and what does `shortestPath(adj, 0, 4)` return?
+
+**Q5.** For a *perfect* binary tree with $N = 15$ nodes (4 full levels), what is the maximum queue size during `levelOrder`, and how does it relate to $N$?
+
+### Coding Exercises
+
+**E1 (Easy).** Minimum depth: the number of nodes on the shortest path from the root to a **leaf**. Use BFS and stop at the first leaf you pop.
+
+```cpp
+int minDepth(TreeNode* root);
+// Tree B                               -> 3   (leaf 5 at level 3; node 4 is NOT a leaf)
+// [3, 9, 20, null, null, 15, 7]        -> 2   (leaf 9)
+```
+
+**E2 (Easy–Medium).** Return the largest value in each level.
+
+```cpp
+vector<int> largestValues(TreeNode* root);
+// [3, 9, 20, null, null, 15, 7] -> [3, 20, 15]
+// Tree B                        -> [1, 3, 6, 7]
+```
+
+**E3 (Medium).** Shortest path in a grid. `grid[r][c] == 0` is open, `1` is a wall. Moving up/down/left/right costs 1. Return the minimum number of moves from `(0,0)` to `(rows-1, cols-1)`, or `-1` if unreachable (or if either corner is a wall).
+
+```cpp
+int shortestGridPath(vector<vector<int>>& grid);
+// [[0,0,0],
+//  [1,1,0],
+//  [0,0,0]]   -> 4   ((0,0)->(0,1)->(0,2)->(1,2)->(2,2))
+// [[0,1],
+//  [1,0]]     -> -1
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Result `[[1],[2,3],[4,5,6],[7]]`.
+
+| Iter | levelSize | Nodes Processed | Children Added | Result So Far |
+|------|-----------|-----------------|----------------|---------------|
+| 1 | 1 | [1] | 2,3 | [[1]] |
+| 2 | 2 | [2,3] | 4,5,6 | [[1],[2,3]] |
+| 3 | 3 | [4,5,6] | 7 | [[1],[2,3],[4,5,6]] |
+| 4 | 1 | [7] | none | [[1],[2,3],[4,5,6],[7]] |
+
+Queue in `basicBFS`: `[1] → [2,3] → [3,4] → [4,5,6] → [5,6,7] → [6,7] → [7] → []`. Maximum size is **3**.
+
+**Q2.**
+- `rightSideView` → **`[1, 3, 6, 7]`** (last node of each level; 7 is visible even though it hangs off the left side, because nothing else is on level 3).
+- `zigzagLevelOrder` → **`[[1],[3,2],[4,5,6],[7]]`** (levels 1 and 3 are written right-to-left; level 3 has one node so it looks unchanged).
+- `averageOfLevels` → **`[1.0, 2.5, 5.0, 7.0]`** ($\frac{2+3}{2}=2.5$, $\frac{4+5+6}{3}=5$).
+
+**Q3.** **`[[1,2],[3,4,5],[6],[7]]`** — levels get mixed because the loop bound grows as children are pushed.
+
+| Outer pass | Queue at start | Pops (and queue size checked after each) | Level recorded |
+|------------|----------------|-------------------------------------------|----------------|
+| 1 | [1] | pop 1 → [2,3] (i=1 < 2), pop 2 → [3,4] (i=2 < 2 fails) | [1,2] |
+| 2 | [3,4] | pop 3 → [4,5,6], pop 4 → [5,6,7], pop 5 → [6,7] (i=3 < 2 fails) | [3,4,5] |
+| 3 | [6,7] | pop 6 → [7] (i=1 < 1 fails) | [6] |
+| 4 | [7] | pop 7 → [] | [7] |
+
+**Q4.** (a) **`0 1 3 2 4`**.
+
+| Pop | Newly visited & pushed | Queue after |
+|-----|------------------------|-------------|
+| 0 | 1, 3 | [1,3] |
+| 1 | 2 | [3,2] |
+| 3 | 4 | [2,4] |
+| 2 | none (1, 4 visited) | [4] |
+| 4 | none | [] |
+
+(b) `parent = [-1, 0, 1, 0, 3]` (node 4 is discovered from 3, which is popped before 2). `shortestPath` walks `4 → 3 → 0`, reverses, and returns **`[0, 3, 4]`** — 2 edges, the shortest.
+
+**Q5.** **8**, which is $\frac{N+1}{2}$. While level 2 (4 nodes) is being processed, after popping $k$ of them the queue holds $(4-k) + 2k = 4 + k$ nodes; at $k = 4$ it is the whole bottom level, 8 nodes. That is why BFS space is $O(W) = O(N)$ for a balanced tree.
+
+**E1 — reference solution**
+
+```cpp
+int minDepth(TreeNode* root) {
+    if (root == nullptr) return 0;
+    queue<TreeNode*> q;
+    q.push(root);
+    int depth = 0;
+    while (!q.empty()) {
+        int levelSize = q.size();
+        depth++;
+        for (int i = 0; i < levelSize; i++) {
+            TreeNode* curr = q.front();
+            q.pop();
+            if (curr->left == nullptr && curr->right == nullptr) return depth; // first leaf
+            if (curr->left != nullptr) q.push(curr->left);
+            if (curr->right != nullptr) q.push(curr->right);
+        }
+    }
+    return depth;
+}
+```
+
+BFS reaches levels in order, so the first leaf found is the shallowest. Time $O(N)$ worst case, but it can stop early; space $O(W)$.
+
+**E2 — reference solution**
+
+```cpp
+vector<int> largestValues(TreeNode* root) {
+    vector<int> result;
+    if (root == nullptr) return result;
+    queue<TreeNode*> q;
+    q.push(root);
+    while (!q.empty()) {
+        int levelSize = q.size();
+        int best = INT_MIN;
+        for (int i = 0; i < levelSize; i++) {
+            TreeNode* curr = q.front();
+            q.pop();
+            best = max(best, curr->val);
+            if (curr->left != nullptr) q.push(curr->left);
+            if (curr->right != nullptr) q.push(curr->right);
+        }
+        result.push_back(best);
+    }
+    return result;
+}
+```
+
+Same template as `averageOfLevels`, with `max` instead of a sum. Time $O(N)$, space $O(W)$.
+
+**E3 — reference solution**
+
+```cpp
+int shortestGridPath(vector<vector<int>>& grid) {
+    int R = grid.size(), C = grid[0].size();
+    if (grid[0][0] == 1 || grid[R - 1][C - 1] == 1) return -1;
+
+    vector<vector<int>> dist(R, vector<int>(C, -1));
+    queue<pair<int, int>> q;
+    q.push({0, 0});
+    dist[0][0] = 0;
+    int dr[4] = {-1, 1, 0, 0}, dc[4] = {0, 0, -1, 1};
+
+    while (!q.empty()) {
+        auto [r, c] = q.front();
+        q.pop();
+        if (r == R - 1 && c == C - 1) return dist[r][c];
+        for (int k = 0; k < 4; k++) {
+            int nr = r + dr[k], nc = c + dc[k];
+            if (nr < 0 || nr >= R || nc < 0 || nc >= C) continue;
+            if (grid[nr][nc] == 1 || dist[nr][nc] != -1) continue;
+            dist[nr][nc] = dist[r][c] + 1;   // mark visited when pushed
+            q.push({nr, nc});
+        }
+    }
+    return -1;
+}
+```
+
+Each cell is a graph node with up to 4 neighbors; BFS gives shortest distances in an unweighted graph. Time and space $O(R \cdot C)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

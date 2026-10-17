@@ -543,6 +543,174 @@ public:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Construct from Preorder.** Run Problem 7's `bstFromPreorder` on `[10, 5, 1, 7, 40, 50]`. Draw the resulting tree (call it **Tree P**). Which value is being examined when the first `build` call returns `nullptr` because of the bounds, and what are those bounds?
+
+**Q2. Greater Sum Tree.** Run Problem 6's `bstToGst` on Tree P. Give the new value of every node, in the order the nodes are visited.
+
+**Q3. Kth Smallest.** Run Problem 2's iterative `kthSmallest(root, 3)` on Tree P. What is returned, and what does the stack contain (bottom → top) at the moment it returns?
+
+**Q4. Validate edge cases.** (a) What does Problem 1's `isValidBST` return for a root `5` whose left child is also `5`? Which comparison decides it? (b) Suppose someone "simplifies" the code to `isValid(root, INT_MIN, INT_MAX)` with `int` parameters. What does it return for a single-node tree whose value is `2147483647`, and why is that wrong?
+
+**Q5. LCA.** Using Problem 3's tree (`6, 2, 8, 0, 4, 7, 9, 3, 5`), what does `lowestCommonAncestor` return for `(0, 5)`, `(7, 9)`, and `(3, 4)`? For each, list the nodes `curr` visits.
+
+### Coding Exercises
+
+**E1 (Easy).** Return the minimum difference between the values of any two nodes in a BST. Hint: in sorted order, the closest pair is always adjacent.
+
+```cpp
+int minDiffInBST(TreeNode* root);
+// Tree P (inorder 1,5,7,10,40,50)  -> 2   (7 - 5)
+// [4, 2, 6, 1, 3]                  -> 1
+```
+
+**E2 (Easy–Medium).** Trim a BST so that every remaining value lies in `[low, high]`, keeping the relative structure of the survivors. Return the new root.
+
+```cpp
+TreeNode* trimBST(TreeNode* root, int low, int high);
+// Tree P, [5, 40]  -> preorder [10, 5, 7, 40]
+// [1, 0, 2], [1, 2] -> preorder [1, 2]   (1 with right child 2)
+```
+
+**E3 (Medium).** Two Sum in a BST: return `true` if two *different* nodes sum to `k`. Use the Golden Secret plus the two-pointer technique.
+
+```cpp
+bool findTarget(TreeNode* root, int k);
+// Tree P, k = 17 -> true   (7 + 10)
+// Tree P, k = 46 -> false
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Tree P:
+
+```text
+        10
+       /  \
+      5    40
+     / \     \
+    1   7     50
+```
+
+The first bounds rejection happens inside node 1's left call: `build` looks at **`7` with bounds `(INT_MIN, 1)`** — 7 > 1, so it returns `nullptr` without advancing `index`.
+
+| Call (value examined, min, max) | Outcome | index after |
+|---------------------------------|---------|-------------|
+| (10, INT_MIN, INT_MAX) | create 10 | 1 |
+| (5, INT_MIN, 10) | create 5 | 2 |
+| (1, INT_MIN, 5) | create 1 | 3 |
+| (7, INT_MIN, 1) | 7 > 1 → null | 3 |
+| (7, 1, 5) | 7 > 5 → null | 3 |
+| (7, 5, 10) | create 7 (right of 5) | 4 |
+| (40, 5, 7), (40, 7, 10) | null, null | 4 |
+| (40, 10, INT_MAX) | create 40 (right of 10) | 5 |
+| (50, 10, 40) | 50 > 40 → null (40 has no left) | 5 |
+| (50, 40, INT_MAX) | create 50 | 6 |
+
+**Q2.** Reverse inorder visits `50, 40, 10, 7, 5, 1`.
+
+| Visit | sum before | sum after = new value |
+|-------|------------|-----------------------|
+| 50 | 0 | 50 |
+| 40 | 50 | 90 |
+| 10 | 90 | 100 |
+| 7 | 100 | 107 |
+| 5 | 107 | 112 |
+| 1 | 112 | 113 |
+
+```text
+        100
+       /   \
+     112    90
+     /  \     \
+   113  107    50
+```
+
+**Q3.** Returns **7**; stack at return is **`[10]`**.
+
+| Step | Action | Stack | count |
+|------|--------|-------|-------|
+| 1 | Push 10, 5, 1 going left | [10,5,1] | 0 |
+| 2 | Pop 1, curr = null | [10,5] | 1 |
+| 3 | Pop 5, curr = 7 | [10] | 2 |
+| 4 | Push 7 | [10,7] | 2 |
+| 5 | Pop 7 → count == 3, return 7 | [10] | 3 |
+
+**Q4.** (a) **`false`**. The left 5 is checked with bounds `(LONG_MIN, 5)`; `root->val >= maxVal` is `5 >= 5`, so it fails. Strict inequalities mean duplicates are rejected, matching "strictly less / strictly greater". (b) It returns **`false`**: `2147483647 >= INT_MAX` is true, so a perfectly valid one-node tree is rejected. That is exactly why the chapter widens the bounds to `long long` with `LONG_MIN` / `LONG_MAX`.
+
+**Q5.**
+- `(0, 5)` → **2**. Visits 6 (both < 6, go left), 2 (0 < 2 < 5, split).
+- `(7, 9)` → **8**. Visits 6 (both > 6, go right), 8 (7 < 8 < 9, split).
+- `(3, 4)` → **4**. Visits 6 (left), 2 (both > 2, right), 4 (3 < 4 but 4 is not > 4, so neither "both" branch fires; return 4). A node can be its own ancestor.
+
+**E1 — reference solution**
+
+```cpp
+class Solution {
+    int prev = -1;              // value of previously visited node (-1 = none yet)
+    int best = INT_MAX;
+    void inorder(TreeNode* node) {
+        if (node == nullptr) return;
+        inorder(node->left);
+        if (prev != -1) best = min(best, node->val - prev);
+        prev = node->val;
+        inorder(node->right);
+    }
+public:
+    int minDiffInBST(TreeNode* root) {
+        inorder(root);
+        return best;
+    }
+};
+```
+
+Inorder is sorted, so only adjacent pairs need checking (this sentinel assumes non-negative values, as in the LeetCode version). Time $O(N)$, space $O(H)$.
+
+**E2 — reference solution**
+
+```cpp
+TreeNode* trimBST(TreeNode* root, int low, int high) {
+    if (root == nullptr) return nullptr;
+    if (root->val < low)  return trimBST(root->right, low, high); // root and its left side too small
+    if (root->val > high) return trimBST(root->left, low, high);  // root and its right side too big
+    root->left  = trimBST(root->left, low, high);
+    root->right = trimBST(root->right, low, high);
+    return root;
+}
+```
+
+Same "return the replacement to the parent" style as `deleteNode`. On Tree P with `[5, 40]`: 10 stays; 5 stays and its left 1 is trimmed; 40 stays and its right 50 is trimmed. Time $O(N)$, space $O(H)$.
+
+**E3 — reference solution**
+
+```cpp
+void inorder(TreeNode* node, vector<int>& vals) {
+    if (node == nullptr) return;
+    inorder(node->left, vals);
+    vals.push_back(node->val);
+    inorder(node->right, vals);
+}
+
+bool findTarget(TreeNode* root, int k) {
+    vector<int> vals;
+    inorder(root, vals);                        // sorted
+    int lo = 0, hi = (int)vals.size() - 1;
+    while (lo < hi) {                           // lo < hi => two different nodes
+        int s = vals[lo] + vals[hi];
+        if (s == k) return true;
+        if (s < k) lo++; else hi--;
+    }
+    return false;
+}
+```
+
+For `k = 17` on `[1,5,7,10,40,50]`: 51 → hi--, 41 → hi--, 11 → lo++, 15 → lo++, 17 → true. Time $O(N)$, space $O(N)$ (two stack-based iterators would bring it to $O(H)$).
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

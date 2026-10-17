@@ -561,6 +561,195 @@ string longestWord(vector<string>& words) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Wildcard search cost.** With Problem 2's `WordDictionary` holding `"bad", "dad", "mad", "pad", "bat"`, what do `search(".at")` and `search("..e")` return? Counting the initial `dfs(word, 0, root)`, how many `dfs` calls does each one make?
+
+**Q2. Replace Words, shortest root wins.** Run Problem 4's `replaceWords` with `dictionary = ["a", "aa", "aaa"]` and `sentence = "aadsfasf absbs bbab cadsfafs"`. What is returned? For the first word, at which character does the loop `break`, and why?
+
+**Q3. Map Sum overwrite.** Using Problem 5's `MapSum`: `insert("apple", 3)`, `insert("app", 2)`, then `sum("ap")`. Next `insert("apple", 7)` (same key again), then `sum("ap")`, `sum("apple")`, and `sum("b")`. Give all four sums.
+
+**Q4. Longest Word, checked against the code.** Run Problem 6's `longestWord` on the walkthrough's second example, `["a", "banana", "app", "appl", "apply", "application"]`. What does the code *actually* return, and why? Then run it on `["a", "ap", "app", "appl", "apple", "apply"]`: which of the two length-5 words wins, and which line decides the tie?
+
+**Q5. Word Search II on a small board.** Run Problem 3's `findWords` on
+
+```text
+a b
+c d
+```
+
+with `words = ["ab", "abdc", "acb", "dca"]`. What is `result`, in order? Which starting cell finds each word, and why is `"acb"` missing?
+
+### Coding Exercises
+
+**E1 (Easy).** Change Replace Words so each word is replaced by its **longest** root instead of the shortest.
+
+```cpp
+string replaceWordsLongest(vector<string>& dictionary, string sentence);
+// dictionary = ["cat", "catt", "bat"], sentence = "the cattle was battered"
+//   -> "the catt was bat"
+// dictionary = ["a", "aa", "aaa"], sentence = "aadsfasf"
+//   -> "aa"
+```
+
+**E2 (Easy–Medium).** Extend Problem 2: instead of `true`/`false`, return **how many** stored words match a pattern with `'.'` wildcards (same length, every non-dot letter equal).
+
+```cpp
+int countMatches(TrieNode* root, const string& pattern);
+// words: bad, dad, mad, pad, bat
+// ".ad" -> 4,  "ba." -> 2,  "..." -> 5,  "b" -> 0
+```
+
+**E3 (Medium).** Rewrite Map Sum so that `sum(prefix)` is $O(L)$ instead of a DFS over the whole subtree. Each node stores the total of all values passing through it; handle re-inserting an existing key correctly.
+
+```cpp
+class MapSum {
+public:
+    void insert(const string& key, int val);
+    int sum(const string& prefix);
+};
+// insert("apple", 3); sum("ap") -> 3
+// insert("app", 2);   sum("ap") -> 5
+// insert("apple", 7); sum("ap") -> 9, sum("apple") -> 7
+```
+
+#### Dry-Run: Answers
+
+**Q1.** `search(".at")` → **true** in **2** calls; `search("..e")` → **false** in **9** calls.
+
+- `".at"`: `dfs(0, root)` sees `'.'` and tries root's children in index order `b, d, m, p`. The first, `dfs(1, b)`, walks `'a'` then `'t'` (b → a has children `d` and `t`), lands on the end of `"bat"` with `isEnd = true`, and returns true right away. Total: 1 + 1 = 2.
+- `"..e"`: `dfs(0, root)` branches into `dfs(1, b)`, `dfs(1, d)`, `dfs(1, m)`, `dfs(1, p)` (4 calls). Each sees `'.'` and branches into its only child `a` → `dfs(2, a)` (4 more calls). Each `a` node has no `'e'` child → false. Total: 1 + 4 + 4 = **9**.
+
+**Q2.** Returns **`"a a bbab cadsfafs"`**.
+
+| Word | Walk | Why it stops | Output |
+|------|------|--------------|--------|
+| aadsfasf | step to `a` (prefix "a"); next char `'a'` | `curr->isEnd` is true **before** stepping | "a" |
+| absbs | step to `a`; next char `'b'` | no `'b'` child (and `isEnd` true) | "a" |
+| bbab | at root, `'b'` | no `'b'` child; root not an end | "bbab" |
+| cadsfafs | at root, `'c'` | no `'c'` child | "cadsfafs" |
+
+For the first word the loop breaks on its **second** character: the node for `"a"` is already a root, so the `|| curr->isEnd` check fires before `"aa"` or `"aaa"` can be reached. Checking `isEnd` before stepping is exactly what makes the shortest root win.
+
+**Q3.** **5, 9, 7, 0.**
+
+| Operation | Stored values | sum |
+|-----------|---------------|-----|
+| insert apple=3, app=2; `sum("ap")` | app 2, apple 3 | 2 + 3 = 5 |
+| insert apple=7; `sum("ap")` | app 2, apple 7 (`value` overwritten, not added) | 2 + 7 = 9 |
+| `sum("apple")` | — | 7 |
+| `sum("b")` | — | no `'b'` child → 0 |
+
+**Q4.** It returns **`"a"`**, not `"apply"`. The DFS only steps into children with `isEnd = true`. From the root it takes `a` (a word) and sets `result = "a"`; the next node, for `"ap"`, has `isEnd = false` because `"ap"` is not in the list, so the whole `ap...` branch is never entered. `b` is not a word on its own, so `"banana"` is skipped too. The chain must be unbroken from length 1, and here it breaks at length 2.
+
+For `["a","ap","app","appl","apple","apply"]` the result is **`"apple"`**. Under `appl`, children are scanned in index order, so `e` (4) is tried before `y` (24). `"apple"` sets `result` first; then for `"apply"` the check `path.length() > result.length()` is `5 > 5` = false, so the earlier, lexicographically smaller word stays. The strict `>` decides the tie.
+
+**Q5.** **`["ab", "abdc", "dca"]`**.
+
+| Word | Start cell | Path |
+|------|------------|------|
+| "ab" | (0,0) `a` | a → b (right) |
+| "abdc" | (0,0) `a` | a → b → d (down) → c (left) |
+| "dca" | (1,1) `d` | d → c (left) → a (up) |
+
+`"acb"` is missing because `c` at (1,0) and `b` at (0,1) are diagonal, not up/down/left/right neighbours, so the trie path `a → c` dead-ends. Both `"ab"` and `"abdc"` come from the same DFS that starts at (0,0): `"ab"` is recorded on the way down, and the DFS keeps going.
+
+**E1 — reference solution**
+
+```cpp
+string replaceWordsLongest(vector<string>& dictionary, string sentence) {
+    TrieNode* root = new TrieNode();
+    for (string& w : dictionary) {
+        TrieNode* curr = root;
+        for (char c : w) {
+            if (!curr->children[c - 'a']) curr->children[c - 'a'] = new TrieNode();
+            curr = curr->children[c - 'a'];
+        }
+        curr->isEnd = true;
+    }
+
+    istringstream iss(sentence);
+    string word, result;
+    while (iss >> word) {
+        TrieNode* curr = root;
+        int best = 0;                                   // length of longest root seen
+        for (int i = 0; i < (int)word.size(); i++) {
+            curr = curr->children[word[i] - 'a'];
+            if (curr == nullptr) break;
+            if (curr->isEnd) best = i + 1;              // keep walking, don't stop
+        }
+        result += (best > 0 ? word.substr(0, best) : word) + " ";
+    }
+    if (!result.empty()) result.pop_back();
+    return result;
+}
+```
+
+The only change from Problem 4 is to keep walking past the first `isEnd` and remember the last one seen. For `"cattle"`: ends at `cat` (3) and `catt` (4), then `l` breaks → `"catt"`. Time $O(S + R)$ as before.
+
+**E2 — reference solution**
+
+```cpp
+int countMatches(TrieNode* node, const string& p, int i) {
+    if (i == (int)p.size()) return node->isEnd ? 1 : 0;
+    if (p[i] == '.') {
+        int total = 0;
+        for (int j = 0; j < 26; j++) {
+            if (node->children[j]) total += countMatches(node->children[j], p, i + 1);
+        }
+        return total;                       // no early return: we need every match
+    }
+    TrieNode* next = node->children[p[i] - 'a'];
+    return next ? countMatches(next, p, i + 1) : 0;
+}
+
+int countMatches(TrieNode* root, const string& pattern) {
+    return countMatches(root, pattern, 0);
+}
+```
+
+Same branching as Problem 2's `dfs`, but it sums results instead of returning on the first `true`. `"b"` gives 0 because the `b` node has `isEnd = false`. Worst case $O(26^L)$ for all-dot patterns, bounded by the number of trie nodes.
+
+**E3 — reference solution**
+
+```cpp
+class MapSum {
+    struct Node {
+        Node* children[26] = {};
+        int score = 0;                    // sum of values of all keys through this node
+    };
+    Node* root = new Node();
+    unordered_map<string, int> vals;      // current value of each key
+public:
+    void insert(const string& key, int val) {
+        int delta = val - (vals.count(key) ? vals[key] : 0);
+        vals[key] = val;
+        Node* curr = root;
+        for (char c : key) {
+            int i = c - 'a';
+            if (!curr->children[i]) curr->children[i] = new Node();
+            curr = curr->children[i];
+            curr->score += delta;         // apply only the change
+        }
+    }
+    int sum(const string& prefix) {
+        Node* curr = root;
+        for (char c : prefix) {
+            int i = c - 'a';
+            if (!curr->children[i]) return 0;
+            curr = curr->children[i];
+        }
+        return curr->score;
+    }
+};
+```
+
+Re-inserting `"apple"` with 7 adds `delta = 7 - 3 = 4` along `a, p, p, l, e`, so the `"ap"` node goes from 5 to 9 and the `e` node from 3 to 7. Both operations are $O(L)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

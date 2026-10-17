@@ -458,6 +458,171 @@ void heapSort(vector<int>& nums) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Index arithmetic.** A heap is stored in an array of size $n = 12$. (a) What are the left and right child indices of index 5, and do both exist? (b) What is the parent of index 11? (c) At which index does `buildMaxHeap` start its loop, and how many leaves does the tree have?
+
+**Q2. Heapify-up with a tie.** Starting from the chapter's post-insert heap `[10, 9, 7, 8, 6, 3, 4, 5]`, push `9` (append, then call `heapifyUp`). Fill in the dry-run table (Index, Parent Index, `heap[index]`, `heap[parent]`, Swap?) and give the final array.
+
+**Q3. Extract twice.** The chapter extracted 10 from `[10, 9, 7, 8, 6, 3, 4, 5]` and got `[9, 8, 7, 5, 6, 3, 4]`. Call `extractMax` once more on that result. What value is returned, which swaps happen, and what is the final array?
+
+**Q4. Build a heap.** Run `buildMaxHeap` on `[3, 9, 2, 1, 4, 5]`. For each `i` the loop visits, say what `heapifyDown` swaps, and give the final array. How many swaps in total?
+
+**Q5. Two-Heap median.** Apply the chapter's two-heap rule (push to Max-Heap, move Max-Heap's top to Min-Heap, then move back if the Min-Heap is bigger) to the stream `[5, 15, 1, 3]`. Show both heaps and the median after each number.
+
+### Coding Exercises
+
+**E1 (Easy).** Check whether an array is a valid max-heap using only the index formulas.
+
+```cpp
+bool isMaxHeap(const vector<int>& a);
+// [9, 8, 7, 5, 6, 3, 4]   -> true
+// [9, 8, 7, 5, 10]        -> false  (index 4 holds 10, its parent index 1 holds 8)
+```
+
+**E2 (Easy–Medium).** The chapter's `heapSort` calls `make_heap` on the shrinking prefix every iteration. Write an in-place heap sort that instead builds the heap once and then repeatedly swaps the root to the end and sifts down **within the shrinking size**. Then state the complexity of the chapter's version.
+
+```cpp
+void heapSort(vector<int>& nums);
+// [4, 1, 3, 2, 16]            -> [1, 2, 3, 4, 16]
+// [3, 9, 2, 1, 4, 5]          -> [1, 2, 3, 4, 5, 9]
+```
+
+**E3 (Medium).** Implement a min-heap from scratch on a `vector<int>` (no `priority_queue`, no `<algorithm>` heap functions).
+
+```cpp
+class MinHeap {
+public:
+    void push(int x);
+    void pop();          // removes the minimum
+    int top() const;     // returns the minimum
+    int size() const;
+};
+// push 5, 1, 10, 3 -> top() == 1
+// pop()            -> top() == 3
+// pop()            -> top() == 5, size() == 2
+```
+
+#### Dry-Run: Answers
+
+**Q1.** (a) Left = $2 \cdot 5 + 1 = 11$ (exists), right = $2 \cdot 5 + 2 = 12$ (does **not** exist, since valid indices are 0–11). (b) Parent of 11 = $(11-1)/2 = 5$. (c) The loop starts at $n/2 - 1 = 5$; indices 6–11 are leaves, so there are **6 leaves** (always $n - \lfloor n/2 \rfloor$).
+
+**Q2.** Final array **`[10, 9, 7, 9, 6, 3, 4, 5, 8]`** — only one swap.
+
+| Step | Index | Parent Index | heap[index] | heap[parent] | Swap? | Array State |
+|------|-------|--------------|-------------|--------------|-------|-------------|
+| 1 | 8 | 3 | 9 | 8 | Yes | [10,9,7,9,6,3,4,5,8] |
+| 2 | 3 | 1 | 9 | 9 | No (`9 > 9` is false) | break |
+
+The strict `>` means equal keys stop sifting, which still satisfies Parent ≥ Children.
+
+**Q3.** Returns **9**; final array **`[8, 6, 7, 5, 4, 3]`**.
+
+| Step | Index | Children (values) | Largest Child | Swap? | Array State |
+|------|-------|-------------------|---------------|-------|-------------|
+| 0 | — | move last (4) to root | — | — | [4,8,7,5,6,3] |
+| 1 | 0 | 8, 7 | 8 (index 1) | Yes | [8,4,7,5,6,3] |
+| 2 | 1 | 5, 6 | 6 (index 4) | Yes | [8,6,7,5,4,3] |
+| 3 | 4 | none (9 ≥ n = 6) | — | No | Done |
+
+**Q4.** $n = 6$, loop runs `i = 2, 1, 0`. Final array **`[9, 4, 5, 1, 3, 2]`**, **3 swaps**.
+
+| i | Value | Children (values) | Action | Array after |
+|---|-------|-------------------|--------|-------------|
+| 2 | 2 | index 5 (5) | swap with 5 | [3,9,5,1,4,2] |
+| 1 | 9 | 1, 4 | none | [3,9,5,1,4,2] |
+| 0 | 3 | 9, 5 | swap with 9 → now at index 1 | [9,3,5,1,4,2] |
+| 0 (cont.) | 3 | 1, 4 | swap with 4 → now at index 4, a leaf | [9,4,5,1,3,2] |
+
+**Q5.** Medians: **5, 10, 5, 4**.
+
+| After | Max-Heap (small half) | Min-Heap (large half) | Median |
+|-------|-----------------------|-----------------------|--------|
+| 5 | [5] | [] | 5 |
+| 15 | [5] | [15] | (5 + 15) / 2 = 10 |
+| 1 | [5, 1] | [15] | 5 |
+| 3 | [3, 1] | [5, 15] | (3 + 5) / 2 = 4 |
+
+Detail for 3: push 3 → Max `[5,3,1]`; move 5 → Min `[5,15]`; Max `[3,1]` has size 2 = Min's size 2, so nothing moves back. Check: sorted `[1,3,5,15]` has median $\frac{3+5}{2} = 4$.
+
+**E1 — reference solution**
+
+```cpp
+bool isMaxHeap(const vector<int>& a) {
+    for (int i = 1; i < (int)a.size(); i++) {
+        if (a[(i - 1) / 2] < a[i]) return false;   // parent smaller than child
+    }
+    return true;
+}
+```
+
+Every non-root index has exactly one parent, so checking each child once covers every edge. Time $O(N)$, space $O(1)$.
+
+**E2 — reference solution**
+
+```cpp
+void siftDown(vector<int>& a, int index, int n) {     // only look at a[0..n-1]
+    while (true) {
+        int largest = index, l = 2 * index + 1, r = 2 * index + 2;
+        if (l < n && a[l] > a[largest]) largest = l;
+        if (r < n && a[r] > a[largest]) largest = r;
+        if (largest == index) break;
+        swap(a[index], a[largest]);
+        index = largest;
+    }
+}
+
+void heapSort(vector<int>& nums) {
+    int n = nums.size();
+    for (int i = n / 2 - 1; i >= 0; i--) siftDown(nums, i, n);  // build: O(N)
+    for (int end = n - 1; end > 0; end--) {
+        swap(nums[0], nums[end]);       // current max goes to its final slot
+        siftDown(nums, 0, end);         // restore heap on the first `end` items
+    }
+}
+```
+
+Time $O(N \log N)$, space $O(1)$. The chapter's loop calls `make_heap` on $i$ elements for $i = N-1, \dots, 1$, and each call is $O(i)$, so it totals $O(N^2)$. It gives the right answer but is slower than heap sort should be. (`std::pop_heap(nums.begin(), nums.begin() + i + 1)` is the $O(\log N)$ library replacement.)
+
+**E3 — reference solution**
+
+```cpp
+class MinHeap {
+    vector<int> h;
+public:
+    void push(int x) {
+        h.push_back(x);
+        int i = h.size() - 1;
+        while (i > 0) {                               // heapify-up, comparisons flipped
+            int p = (i - 1) / 2;
+            if (h[i] < h[p]) { swap(h[i], h[p]); i = p; }
+            else break;
+        }
+    }
+    void pop() {
+        h[0] = h.back();
+        h.pop_back();
+        int i = 0, n = h.size();
+        while (true) {                                // heapify-down toward the SMALLER child
+            int smallest = i, l = 2 * i + 1, r = 2 * i + 2;
+            if (l < n && h[l] < h[smallest]) smallest = l;
+            if (r < n && h[r] < h[smallest]) smallest = r;
+            if (smallest == i) break;
+            swap(h[i], h[smallest]);
+            i = smallest;
+        }
+    }
+    int top() const { return h[0]; }
+    int size() const { return h.size(); }
+};
+```
+
+Trace: pushes give `[5]`, `[1,5]`, `[1,5,10]`, `[1,3,10,5]`. `pop()` moves 5 to the root → `[5,3,10]` → swap with 3 → `[3,5,10]`. `pop()` moves 10 to the root → `[10,5]` → swap → `[5,10]`. `push`/`pop` are $O(\log N)$, `top` is $O(1)$. (`pop`/`top` assume the heap is non-empty.)
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

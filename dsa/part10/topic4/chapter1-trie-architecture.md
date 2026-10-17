@@ -362,6 +362,188 @@ Where L = word length, M = number of matches
 
 ---
 
+## Practice & Self-Check
+
+All questions start from an empty `Trie` into which these words are inserted, in this order: `"car"`, `"cart"`, `"care"`, `"cat"`, `"dog"`.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Insert.** For each `insert` call, how many new `TrieNode`s are created? How many nodes does the trie have in total (excluding the root), and how many have `isEnd = true`? What is `index` for the character `'t'`?
+
+**Q2. Search vs prefix.** Predict the result of each call: `search("ca")`, `startsWith("ca")`, `search("cart")`, `search("carts")`, `startsWith("do")`, `search("do")`, `startsWith("cab")`. For each `false`, say whether it is because the path broke or because `isEnd` was false.
+
+**Q3. Collect words.** Walk to the node for prefix `"ca"`, then call the chapter's `findAllWords(node, "ca", result)`. What is `result`, in order? Why does it come out in that order?
+
+**Q4. Delete.** Call `deleteWord(root, "cart", 0)`, then `deleteWord(root, "car", 0)`. For each call, how many nodes are actually freed, and what does the top-level call return? Afterward, what do `search("car")` and `startsWith("car")` return?
+
+**Q5. Memory.** On a typical 64-bit system a pointer is 8 bytes. Roughly how many bytes is one `TrieNode` (26 pointers + a `bool`, with alignment padding)? Roughly how much memory does the whole trie above use, including the root, compared with the 17 characters of the 5 words?
+
+### Coding Exercises
+
+**E1 (Easy).** Add a `passCount` field to each node (how many inserted words pass through it) and implement `countPrefix`.
+
+```cpp
+class CountingTrie {
+public:
+    void insert(const string& word);
+    int countPrefix(const string& prefix);   // number of inserted words with this prefix
+};
+// after inserting car, cart, care, cat, dog:
+// countPrefix("ca") -> 4, countPrefix("car") -> 3, countPrefix("d") -> 1, countPrefix("x") -> 0
+```
+
+**E2 (Easy–Medium).** Longest common prefix of a list of words using a trie: insert all words, then walk down from the root while the current node has **exactly one** child **and** no word ends there.
+
+```cpp
+string longestCommonPrefix(vector<string>& strs);
+// ["flower", "flow", "flight"] -> "fl"
+// ["car", "cart", "care"]      -> "car"
+```
+
+**E3 (Medium).** Autocomplete: return at most `k` words that start with `prefix`, in lexicographic order, stopping the DFS as soon as `k` words are found.
+
+```cpp
+vector<string> suggest(TrieNode* root, const string& prefix, int k);
+// (trie above) suggest(root, "ca", 2) -> ["car", "care"]
+// (trie above) suggest(root, "d", 3)  -> ["dog"]
+// (trie above) suggest(root, "z", 3)  -> []
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Total **9** nodes (plus the root), **5** with `isEnd = true`. `'t' - 'a'` = **19**.
+
+| Insert | Path walked | New nodes | Running total |
+|--------|-------------|-----------|---------------|
+| "car" | c, a, r all created | 3 | 3 |
+| "cart" | c, a, r exist; create t | 1 | 4 |
+| "care" | c, a, r exist; create e | 1 | 5 |
+| "cat" | c, a exist; create t (sibling of r) | 1 | 6 |
+| "dog" | d, o, g all created | 3 | 9 |
+
+**Q2.**
+
+| Call | Result | Reason |
+|------|--------|--------|
+| `search("ca")` | false | path exists, but `isEnd` at `a` is false |
+| `startsWith("ca")` | true | path exists |
+| `search("cart")` | true | path exists, `isEnd` true |
+| `search("carts")` | false | path breaks: `t` has no `'s'` child |
+| `startsWith("do")` | true | path exists |
+| `search("do")` | false | `isEnd` at `o` is false |
+| `startsWith("cab")` | false | path breaks: `a` has no `'b'` child |
+
+**Q3.** **`["car", "care", "cart", "cat"]`**. At `a`, children are scanned `i = 0..25`, so `r` (17) is visited before `t` (19). At `r`, `isEnd` is true, so `"car"` is pushed *before* its children are explored (preorder), then `e` (4) gives `"care"` before `t` (19) gives `"cart"`. The result is always in lexicographic order.
+
+**Q4.**
+- `deleteWord(root, "cart", 0)`: at depth 4 (node `t`), `isEnd` becomes false and `isEmpty(t)` is true → returns true. At node `r`, `shouldDelete` is true, so `t` is **freed**; then it returns `!r->isEnd && isEmpty(r)` = `!true && ...` = false. Everything above returns false. **1 node freed**, top-level returns **false**.
+- `deleteWord(root, "car", 0)`: at depth 3 (node `r`), `isEnd` becomes false, but `isEmpty(r)` is false (it still has child `e` for `"care"`) → returns false. **0 nodes freed**, only the flag changes; top-level returns **false**.
+- Afterward `search("car")` → **false**, `startsWith("car")` → **true** (`"care"` still uses the path).
+
+Note the top-level return value means "the node passed in can be deleted", not "the word was found".
+
+**Q5.** $26 \times 8 = 208$ bytes of pointers, plus a 1-byte `bool`, padded to a multiple of 8 → typically **216 bytes per node**. The trie has $9 + 1 = 10$ nodes → about **2,160 bytes**, versus 17 characters for the raw words. This is the "Trie trades Space for Time" point from Section 3: prefix sharing helps, but the 26-pointer array per node dominates for small dictionaries.
+
+**E1 — reference solution**
+
+```cpp
+class CountingTrie {
+    struct Node {
+        Node* children[26] = {};
+        int passCount = 0;
+        bool isEnd = false;
+    };
+    Node* root = new Node();
+public:
+    void insert(const string& word) {
+        Node* curr = root;
+        for (char c : word) {
+            int idx = c - 'a';
+            if (!curr->children[idx]) curr->children[idx] = new Node();
+            curr = curr->children[idx];
+            curr->passCount++;            // one more word goes through this node
+        }
+        curr->isEnd = true;
+    }
+    int countPrefix(const string& prefix) {
+        Node* curr = root;
+        for (char c : prefix) {
+            int idx = c - 'a';
+            if (!curr->children[idx]) return 0;
+            curr = curr->children[idx];
+        }
+        return curr->passCount;
+    }
+};
+```
+
+Both operations are $O(L)$. For `"ca"`: node `a` was passed by car, cart, care, cat → 4. (This version assumes each word is inserted once; re-inserting a duplicate would count it twice.)
+
+**E2 — reference solution**
+
+```cpp
+string longestCommonPrefix(vector<string>& strs) {
+    TrieNode* root = new TrieNode();
+    for (const string& w : strs) {
+        TrieNode* curr = root;
+        for (char c : w) {
+            int idx = c - 'a';
+            if (!curr->children[idx]) curr->children[idx] = new TrieNode();
+            curr = curr->children[idx];
+        }
+        curr->isEnd = true;
+    }
+
+    string prefix;
+    TrieNode* curr = root;
+    while (!curr->isEnd) {
+        int only = -1, count = 0;
+        for (int i = 0; i < 26; i++) {
+            if (curr->children[i]) { only = i; count++; }
+        }
+        if (count != 1) break;               // words branch here (or nothing below)
+        prefix += (char)('a' + only);
+        curr = curr->children[only];
+    }
+    return prefix;
+}
+```
+
+For `["flower","flow","flight"]`: `f` → `l` → the second `l` node has two children (`o`, `i`), so stop at `"fl"`. For `["car","cart","care"]`: stop at `r` because `isEnd` is true. Time $O(S \cdot 26)$ in the worst case, where $S$ is the total number of characters.
+
+**E3 — reference solution**
+
+```cpp
+void collect(TrieNode* node, string& word, int k, vector<string>& out) {
+    if ((int)out.size() == k) return;                 // early stop
+    if (node->isEnd) out.push_back(word);
+    for (int i = 0; i < 26 && (int)out.size() < k; i++) {
+        if (node->children[i]) {
+            word.push_back('a' + i);
+            collect(node->children[i], word, k, out);
+            word.pop_back();                          // backtrack
+        }
+    }
+}
+
+vector<string> suggest(TrieNode* root, const string& prefix, int k) {
+    vector<string> out;
+    TrieNode* curr = root;
+    for (char c : prefix) {
+        int idx = c - 'a';
+        if (!curr->children[idx]) return out;         // no word has this prefix
+        curr = curr->children[idx];
+    }
+    string word = prefix;
+    collect(curr, word, k, out);
+    return out;
+}
+```
+
+Same preorder as `findAllWords`, so the order is lexicographic, but it reuses one `string` (push/pop) instead of copying `prefix + c` at every level and stops after `k` results. Time $O(L + \text{nodes visited})$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

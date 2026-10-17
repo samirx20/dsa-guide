@@ -436,6 +436,167 @@ Where H = height of tree:
 
 ---
 
+## Practice & Self-Check
+
+All questions below use this tree (call it **Tree T**). It is a different tree from the chapter's `1..6` example, so you have to actually trace.
+
+```text
+        8
+       / \
+      3   10
+     / \    \
+    1   6    14
+       / \   /
+      4   7 13
+```
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Write the output of the chapter's recursive `preorder`, `inorder`, and `postorder` functions on Tree T.
+
+**Q2.** Run the chapter's iterative `inorderTraversal` on Tree T. (a) What is the maximum number of nodes in `st` at any moment? (b) What does the stack contain (bottom → top) immediately after node `6` is popped? (c) What is `curr` right after `6` is processed and step 4 runs?
+
+**Q3.** Run the chapter's iterative `preorderTraversal` on Tree T. (a) What is the stack (bottom → top) right after node `3` is popped and its children are pushed? (b) Now suppose someone swaps the two push lines so `left` is pushed before `right`. What does the function output on Tree T, and what familiar sequence do you get if you reverse that output?
+
+**Q4.** Run `morrisInorder` on Tree T. How many temporary threads (`pred->right = curr`) are created, and which `pred → curr` pairs are they?
+
+**Q5.** Tree T has $N = 9$ nodes and height $H = 4$ (counting nodes on the longest root-to-leaf path). If you instead inserted the values `1, 2, 3, 4, 5, 6, 7, 8, 9` so that every node only has a right child, what would the maximum recursion depth of `inorder` become, and what is the space complexity in Big-O?
+
+### Coding Exercises
+
+**E1 (Easy).** Count the leaves of a binary tree (nodes with no children).
+
+```cpp
+int countLeaves(TreeNode* root);
+// Tree T                      -> 4   (leaves 1, 4, 7, 13)
+// Chapter tree 1,2,3,4,5,6    -> 3   (leaves 4, 5, 6)
+```
+
+**E2 (Easy–Medium).** Write an iterative **postorder** traversal using one `std::stack` and no recursion. Hint: look at your answer to Q3(b).
+
+```cpp
+vector<int> postorderIterative(TreeNode* root);
+// Chapter tree -> [4, 5, 2, 6, 3, 1]
+// Tree T       -> [1, 4, 7, 6, 3, 13, 14, 10, 8]
+```
+
+**E3 (Medium).** Rebuild a tree from its preorder and inorder sequences (all values distinct).
+
+```cpp
+TreeNode* buildTree(vector<int>& preorder, vector<int>& inorder);
+// preorder = [1,2,4,5,3,6], inorder = [4,2,5,1,3,6]
+//   -> the chapter's tree (its postorder is 4 5 2 6 3 1)
+// preorder = [8,3,1,6,4,7,10,14,13], inorder = [1,3,4,6,7,8,10,13,14]
+//   -> Tree T
+```
+
+#### Dry-Run: Answers
+
+**Q1.**
+- Preorder: `8 3 1 6 4 7 10 14 13`
+- Inorder: `1 3 4 6 7 8 10 13 14` (sorted, because Tree T happens to be a BST)
+- Postorder: `1 4 7 6 3 13 14 10 8`
+
+**Q2.** (a) **3**. (b) **`[8]`**. (c) **`curr = 7`**.
+
+| Step | Action | Stack (bottom → top) | Output |
+|------|--------|----------------------|--------|
+| 1 | Push 8, 3, 1 going left | [8,3,1] | [] |
+| 2 | Pop 1, curr = null | [8,3] | [1] |
+| 3 | Pop 3, curr = 6 | [8] | [1,3] |
+| 4 | Push 6, 4 going left | [8,6,4] | [1,3] |
+| 5 | Pop 4, curr = null | [8,6] | [1,3,4] |
+| 6 | Pop 6, curr = 7 | [8] | [1,3,4,6] |
+| 7 | Push 7; pop 7, curr = null | [8] | [1,3,4,6,7] |
+| 8 | Pop 8, curr = 10; push 10; pop 10, curr = 14 | [] | [...,8,10] |
+| 9 | Push 14, 13; pop 13; pop 14 | [] | [...,13,14] |
+
+The stack reaches size 3 twice (`[8,3,1]` and `[8,6,4]`), which equals the number of left-going steps on the longest left chain from a pushed node.
+
+**Q3.** (a) **`[10, 6, 1]`**. Pop 8 pushes 10 then 3 → `[10,3]`; pop 3 pushes 6 then 1 → `[10,6,1]`.
+
+(b) Output **`8 10 14 13 3 6 7 4 1`** (Node → Right → Left). Reversed it is **`1 4 7 6 3 13 14 10 8`**, which is exactly the postorder from Q1.
+
+| Pop | Pushed (left first, then right) | Stack after | Output |
+|-----|----------------------------------|-------------|--------|
+| 8 | 3, 10 | [3,10] | 8 |
+| 10 | 14 | [3,14] | 8 10 |
+| 14 | 13 | [3,13] | 8 10 14 |
+| 13 | none | [3] | 8 10 14 13 |
+| 3 | 1, 6 | [1,6] | ... 3 |
+| 6 | 4, 7 | [1,4,7] | ... 3 6 |
+| 7, 4, 1 | none | [] | ... 7 4 1 |
+
+**Q4.** **4 threads** — one for every node that has a left child (8, 3, 6, 14). The predecessor is the rightmost node of that left subtree:
+- `7 → 8` (left subtree of 8 is 3 → 6 → 7, rightmost is 7)
+- `1 → 3`
+- `4 → 6`
+- `13 → 14`
+
+Each thread is created once (first visit of `curr`) and removed once (second visit, when `pred->right == curr`), so the tree is restored by the end.
+
+**Q5.** A right-skewed tree of 9 nodes has height 9, so the recursion depth reaches **9 frames** (plus the null-child calls that return immediately). Space is $O(H) = O(N)$ in this worst case, versus $O(\log N)$ for a balanced tree.
+
+**E1 — reference solution**
+
+```cpp
+int countLeaves(TreeNode* root) {
+    if (root == nullptr) return 0;
+    if (root->left == nullptr && root->right == nullptr) return 1;
+    return countLeaves(root->left) + countLeaves(root->right);
+}
+```
+
+Postorder-style combination of children's answers. Time $O(N)$, space $O(H)$.
+
+**E2 — reference solution**
+
+```cpp
+vector<int> postorderIterative(TreeNode* root) {
+    vector<int> result;
+    if (root == nullptr) return result;
+
+    stack<TreeNode*> st;
+    st.push(root);
+    while (!st.empty()) {
+        TreeNode* node = st.top();
+        st.pop();
+        result.push_back(node->val);               // Node -> Right -> Left
+        if (node->left != nullptr)  st.push(node->left);
+        if (node->right != nullptr) st.push(node->right);
+    }
+    reverse(result.begin(), result.end());         // Left -> Right -> Node
+    return result;
+}
+```
+
+Reversing a Node → Right → Left traversal gives Left → Right → Node. Time $O(N)$, space $O(N)$ for the output plus $O(H)$-ish stack.
+
+**E3 — reference solution**
+
+```cpp
+TreeNode* build(vector<int>& pre, int& p, int lo, int hi,
+                unordered_map<int, int>& pos) {
+    if (lo > hi) return nullptr;                   // empty inorder range
+    TreeNode* node = new TreeNode(pre[p++]);       // next preorder value is the root
+    int m = pos[node->val];                        // split point in inorder
+    node->left  = build(pre, p, lo, m - 1, pos);   // left part first (preorder order)
+    node->right = build(pre, p, m + 1, hi, pos);
+    return node;
+}
+
+TreeNode* buildTree(vector<int>& preorder, vector<int>& inorder) {
+    unordered_map<int, int> pos;
+    for (int i = 0; i < (int)inorder.size(); i++) pos[inorder[i]] = i;
+    int p = 0;
+    return build(preorder, p, 0, (int)inorder.size() - 1, pos);
+}
+```
+
+Preorder tells you the root; inorder tells you which values go left vs right of it. The hash map makes each split $O(1)$, so time is $O(N)$ and space is $O(N)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

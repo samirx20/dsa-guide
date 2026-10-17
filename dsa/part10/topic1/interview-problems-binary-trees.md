@@ -525,6 +525,195 @@ private:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Max Path Sum on a new tree.** Run the chapter's `dfs` from Problem 8 on this tree (with `globalMax` reset to `INT_MIN`). What is the final `globalMax`, which path achieves it, and what does `dfs` return at the root?
+
+```text
+        -3
+       /  \
+      4    5
+     / \    \
+   -2   6   -1
+```
+
+**Q2. Count Good Nodes.** Run `goodNodes` on the tree below. How many good nodes are there? Then: if the condition `node->val >= maxSoFar` were changed to `node->val > maxSoFar`, what would the count become?
+
+```text
+        2
+       / \
+      2   1
+     /   / \
+    3   1   4
+```
+
+**Q3. Path Sum trace.** Use the Problem 5 tree (`5, 4, 8, 11, 13, 4, 7, 2, 1`) with `targetSum = 26`. Does `hasPathSum` return `true` or `false`? In what order are the *leaf* checks performed before the answer is known, and is `hasPathSum(1, ...)` ever called?
+
+**Q4. Spot the bug in Serialize.** Look carefully at the Problem 9 `serialize`: it returns `to_string(root->val) + "," + serialize(root->left) + "," + serialize(root->right)`, and the null case returns `"N,"`. What string does it *actually* produce for a single-node tree `7`? What happens when that string is passed to `deserialize`, and what is the one-line fix?
+
+**Q5. Symmetric Tree.** Does `isSymmetric` return `true` for the tree below? Name the first `isMirror` call that returns `false`, if any.
+
+```text
+      1
+     / \
+    2   2
+     \   \
+      3   3
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Return the sum of all **left leaves** (leaf nodes that are the left child of their parent).
+
+```cpp
+int sumOfLeftLeaves(TreeNode* root);
+// [3, 9, 20, null, null, 15, 7]      -> 24  (9 + 15)
+// Problem 5 tree (5,4,8,11,...)      -> 20  (7 + 13)
+```
+
+**E2 (Easy–Medium).** Diameter of a binary tree: the number of **edges** on the longest path between any two nodes. Use the Max Path Sum idea: update a global answer with the "split" path, return the "straight" path.
+
+```cpp
+int diameterOfBinaryTree(TreeNode* root);
+// [1, 2, 3, 4, 5]               -> 3   (4 -> 2 -> 1 -> 3)
+// Problem 8 tree (-10,9,20,15,7) -> 3   (9 -> -10 -> 20 -> 15)
+```
+
+**E3 (Medium).** Path Sum II: return **every** root-to-leaf path whose values sum to `targetSum`.
+
+```cpp
+vector<vector<int>> pathSum(TreeNode* root, int targetSum);
+// Problem 5 tree, target 22 -> [[5, 4, 11, 2]]
+// Problem 5 tree, target 26 -> [[5, 8, 13]]
+// Problem 5 tree, target 5  -> []      (5 alone is not a leaf)
+```
+
+#### Dry-Run: Answers
+
+**Q1.** `globalMax = 12`, path **`6 → 4 → -3 → 5`**; `dfs(root)` returns **7**.
+
+| Node | leftMax | rightMax | Split = val + L + R | globalMax after | Returns val + max(L,R) |
+|------|---------|----------|---------------------|-----------------|------------------------|
+| -2 | 0 | 0 | -2 | -2 | -2 |
+| 6 | 0 | 0 | 6 | 6 | 6 |
+| 4 | max(-2,0)=0 | 6 | 10 | 10 | 10 |
+| -1 | 0 | 0 | -1 | 10 | -1 |
+| 5 | 0 | max(-1,0)=0 | 5 | 10 | 5 |
+| -3 | 10 | 5 | 12 | **12** | -3 + 10 = 7 |
+
+The negative children `-2` and `-1` are clamped to 0, so they are never part of the best path.
+
+**Q2.** **4** good nodes; with `>` it becomes **3**.
+
+| Node (path) | maxSoFar on entry | `>=` good? | `>` good? |
+|-------------|-------------------|------------|-----------|
+| 2 (root) | `INT_MIN` | Yes | Yes |
+| 2 (left child) | 2 | Yes (2 ≥ 2) | **No** (2 > 2 false) |
+| 3 (under left 2) | 2 | Yes | Yes |
+| 1 (right child) | 2 | No | No |
+| 1 (left of 1) | 2 | No | No |
+| 4 (right of 1) | 2 | Yes | Yes |
+
+The problem says "no node with a *greater* value", so ties count as good; `>=` is correct.
+
+**Q3.** **`true`**, via `5 → 8 → 13` ($5 + 8 + 13 = 26$).
+
+| Call | Remaining target passed in | Result |
+|------|----------------------------|--------|
+| hasPathSum(5, 26) | — | recurse with 21 |
+| hasPathSum(4, 21) | 21 | recurse with 17 |
+| hasPathSum(11, 17) | 17 | recurse with 6 |
+| hasPathSum(7, 6) leaf | 6 − 7 = −1 | false |
+| hasPathSum(2, 6) leaf | 6 − 2 = 4 | false |
+| hasPathSum(null, 17) (4's right) | — | false |
+| hasPathSum(8, 21) | 21 | recurse with 13 |
+| hasPathSum(13, 13) leaf | 13 − 13 = 0 | **true** |
+
+Leaf checks happen in the order **7, 2, 13**. Because `||` short-circuits, `hasPathSum(4, 8)` on 8's right child is never made, so `hasPathSum(1, ...)` is **never called**.
+
+**Q4.** It produces **`"7,N,,N,"`** — note the empty field between the two `N`s. `serialize(7)` = `"7,"` + `"N,"` + `","` + `"N,"`. Splitting on commas gives tokens `"7"`, `"N"`, `""`, `"N"`. `buildTree` makes node 7, reads `"N"` for its left child, then reads `""` for its right child, which is not `"N"`, so it calls `stoi("")` and throws `std::invalid_argument`. Fix: drop the extra separators, because every recursive result already ends with a comma:
+
+```cpp
+return to_string(root->val) + "," + serialize(root->left) + serialize(root->right);
+```
+
+With the fix, single node 7 gives `"7,N,N,"`, and the Problem 9 tree gives `"1,2,N,N,3,4,N,N,5,N,N,"` (the dry-run table's string plus a trailing comma, which `getline` ignores).
+
+**Q5.** **`false`**. `isSymmetric` calls `isMirror(2L, 2R)`: values match, so it calls `isMirror(2L->left, 2R->right)` = `isMirror(null, 3)`. Exactly one side is null, so that call returns **false** and `&&` short-circuits. (For a mirror, the right 2's 3 would have to be on its *left*.)
+
+**E1 — reference solution**
+
+```cpp
+int sumOfLeftLeaves(TreeNode* root) {
+    if (root == nullptr) return 0;
+    int sum = 0;
+    TreeNode* L = root->left;
+    if (L != nullptr && L->left == nullptr && L->right == nullptr) {
+        sum += L->val;                     // left child is a leaf
+    } else {
+        sum += sumOfLeftLeaves(L);         // otherwise look deeper on the left
+    }
+    sum += sumOfLeftLeaves(root->right);
+    return sum;
+}
+```
+
+The parent decides whether its left child counts, because a leaf cannot know which side it is on. Time $O(N)$, space $O(H)$.
+
+**E2 — reference solution**
+
+```cpp
+class Solution {
+    int best = 0;
+    int height(TreeNode* node) {              // nodes on longest downward path
+        if (node == nullptr) return 0;
+        int L = height(node->left);
+        int R = height(node->right);
+        best = max(best, L + R);              // split path through node, in edges
+        return 1 + max(L, R);                 // straight path to the parent
+    }
+public:
+    int diameterOfBinaryTree(TreeNode* root) {
+        height(root);
+        return best;
+    }
+};
+```
+
+Same "update global with split, return straight" shape as Max Path Sum, with every node worth 1 and no negatives. Time $O(N)$, space $O(H)$.
+
+**E3 — reference solution**
+
+```cpp
+class Solution {
+    vector<vector<int>> result;
+    vector<int> path;
+    void dfs(TreeNode* node, int remaining) {
+        if (node == nullptr) return;
+        path.push_back(node->val);                       // choose
+        remaining -= node->val;
+        if (node->left == nullptr && node->right == nullptr && remaining == 0) {
+            result.push_back(path);
+        } else {
+            dfs(node->left, remaining);
+            dfs(node->right, remaining);
+        }
+        path.pop_back();                                 // un-choose (backtrack)
+    }
+public:
+    vector<vector<int>> pathSum(TreeNode* root, int targetSum) {
+        dfs(root, targetSum);
+        return result;
+    }
+};
+```
+
+Path Sum's "subtract as you go" plus a shared `path` vector that is pushed on entry and popped on exit. Time $O(N \cdot H)$ in the worst case (copying each matching path), space $O(H)$ besides the output.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

@@ -435,6 +435,168 @@ TreeNode* lcaBST(TreeNode* root, TreeNode* p, TreeNode* q) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Build by insertion.** Starting from an empty tree, call the chapter's `insertIntoBST` with `50, 30, 70, 20, 40, 60, 80, 35, 45` in that order. Draw the result (call it **Tree S**). How many existing nodes does the insertion of `45` compare against before it finds its `nullptr` spot, and what is the height of Tree S (in nodes)?
+
+**Q2. Search miss.** Run `searchBST(root, 42)` on Tree S. List every node visited and say what is returned.
+
+**Q3. Delete with two children, twice.** On Tree S, call `deleteNode(root, 30)`, then on the resulting tree call `deleteNode(root, 50)`. For each call, name the inorder successor that is copied up, and draw the final tree.
+
+**Q4. Validate.** Run the chapter's `validate(root, LONG_MIN, LONG_MAX)` on the tree below. Every parent/child pair looks correct locally. Is it a valid BST? If not, which node fails and what `(min, max)` bounds is it checked against?
+
+```text
+      10
+     /  \
+    5    15
+        /  \
+       6    20
+```
+
+**Q5. Order statistics and LCA.** On Tree S: (a) what does the chapter's `kthSmallest(root, k)` return for `k = 4`, and in which node does `--k` hit 0? (b) What does `lcaBST` return for the pairs `(35, 45)`, `(20, 45)`, and `(45, 60)`?
+
+### Coding Exercises
+
+**E1 (Easy).** Sum all values in `[low, high]`. Use the BST property to skip whole subtrees that cannot contain answers.
+
+```cpp
+int rangeSumBST(TreeNode* root, int low, int high);
+// Tree S, [35, 60]                 -> 230  (35 + 40 + 45 + 50 + 60)
+// Chapter tree (8,3,10,...), [4,10] -> 35   (4 + 6 + 7 + 8 + 10)
+```
+
+**E2 (Easy–Medium).** The chapter showed that inserting sorted data gives a skewed tree. Build a **height-balanced** BST from a sorted array instead (use `mid = lo + (hi - lo) / 2`).
+
+```cpp
+TreeNode* sortedArrayToBST(vector<int>& nums);
+// [1, 2, 3, 4, 5]       -> preorder [3, 1, 2, 4, 5], height 3 (not 5!)
+// [-10, -3, 0, 5, 9]    -> preorder [0, -10, -3, 5, 9]
+```
+
+**E3 (Medium).** Find the inorder successor of node `p` (the smallest value greater than `p->val`) in $O(H)$ time and $O(1)$ extra space, with no parent pointers and without building the inorder array.
+
+```cpp
+TreeNode* inorderSuccessor(TreeNode* root, TreeNode* p);
+// Tree S, p = 45 -> 50
+// Tree S, p = 30 -> 35
+// Tree S, p = 80 -> nullptr
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Tree S:
+
+```text
+          50
+        /    \
+      30      70
+     /  \    /  \
+    20  40  60  80
+        / \
+       35  45
+```
+
+Inserting `45` compares against **3** nodes: 50 (45 < 50, go left), 30 (45 > 30, go right), 40 (45 > 40, go right → `nullptr`, create). Height is **4** nodes (`50 → 30 → 40 → 35`). Inorder is `20 30 35 40 45 50 60 70 80`.
+
+**Q2.** Visits **50 → 30 → 40 → 45**, then returns **`nullptr`**.
+
+| Step | Node | Compare | Move |
+|------|------|---------|------|
+| 1 | 50 | 42 < 50 | left |
+| 2 | 30 | 42 > 30 | right |
+| 3 | 40 | 42 > 40 | right |
+| 4 | 45 | 42 < 45 | left → `nullptr`, not found |
+
+**Q3.**
+- `deleteNode(root, 30)`: 30 has two children. Successor = `findMin(40-subtree)` = **35**. Copy 35 into the node, then delete the original 35 from the right subtree (it is a leaf → returns `nullptr`).
+- `deleteNode(root, 50)`: 50 has two children. Successor = `findMin(70-subtree)` = **60**. Copy 60 into the root, then delete leaf 60 from the right subtree.
+
+```text
+After deleting 30:          After deleting 50:
+          50                        60
+        /    \                    /    \
+      35      70                35      70
+     /  \    /  \              /  \       \
+    20  40  60  80            20  40       80
+          \                         \
+          45                        45
+```
+
+**Q4.** **Not valid.** Node `6` fails.
+
+| Node | Bounds checked | Result |
+|------|----------------|--------|
+| 10 | (LONG_MIN, LONG_MAX) | ok |
+| 5 | (LONG_MIN, 10) | ok |
+| 15 | (10, LONG_MAX) | ok |
+| 6 | **(10, 15)** | 6 ≤ 10 → **false** |
+
+6 is a correct left child of 15, but it sits in 10's right subtree, so it must be greater than 10. Bounds passed down catch this; a parent/child-only check does not. (The parameters are `long` so that a node holding `INT_MIN` or `INT_MAX` is not wrongly rejected by the initial bounds.)
+
+**Q5.** (a) Returns **40**. The inorder visit order is 20, 30, 35, 40, …; `--k` takes `k` from 4 → 3 (at 20) → 2 (at 30) → 1 (at 35) → **0 at node 40**, which is returned and passed straight up via `if (left != -1) return left;`.
+
+(b)
+- `(35, 45)` → **40** (at 50 both go left, at 30 both go right, at 40 they split).
+- `(20, 45)` → **30** (at 50 both left; at 30, 20 < 30 < 45 → split).
+- `(45, 60)` → **50** (split immediately at the root).
+
+**E1 — reference solution**
+
+```cpp
+int rangeSumBST(TreeNode* root, int low, int high) {
+    if (root == nullptr) return 0;
+    if (root->val < low)  return rangeSumBST(root->right, low, high); // whole left side too small
+    if (root->val > high) return rangeSumBST(root->left, low, high);  // whole right side too big
+    return root->val
+         + rangeSumBST(root->left, low, high)
+         + rangeSumBST(root->right, low, high);
+}
+```
+
+Prunes subtrees exactly like `searchBST`. Time $O(H + K)$ where $K$ is the number of nodes in range (worst case $O(N)$), space $O(H)$.
+
+**E2 — reference solution**
+
+```cpp
+TreeNode* build(vector<int>& nums, int lo, int hi) {
+    if (lo > hi) return nullptr;
+    int mid = lo + (hi - lo) / 2;
+    TreeNode* node = new TreeNode(nums[mid]);   // middle value becomes the root
+    node->left  = build(nums, lo, mid - 1);
+    node->right = build(nums, mid + 1, hi);
+    return node;
+}
+
+TreeNode* sortedArrayToBST(vector<int>& nums) {
+    return build(nums, 0, (int)nums.size() - 1);
+}
+```
+
+Each root splits the remaining values in half, so the height is $\lceil \log_2(N+1) \rceil$; the inorder is still the sorted input. Time $O(N)$, space $O(\log N)$ recursion.
+
+**E3 — reference solution**
+
+```cpp
+TreeNode* inorderSuccessor(TreeNode* root, TreeNode* p) {
+    TreeNode* succ = nullptr;
+    while (root != nullptr) {
+        if (p->val < root->val) {
+            succ = root;          // root is a candidate; try to find a smaller one
+            root = root->left;
+        } else {
+            root = root->right;   // root <= p, the successor must be to the right
+        }
+    }
+    return succ;
+}
+```
+
+Trace for `p = 30`: at 50 → `succ = 50`, go left; at 30 → not smaller, go right; at 40 → `succ = 40`, go left; at 35 → `succ = 35`, go left → `nullptr`. Returns 35. Time $O(H)$, space $O(1)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

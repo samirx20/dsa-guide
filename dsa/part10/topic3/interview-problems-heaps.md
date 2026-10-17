@@ -517,6 +517,171 @@ int nthUglyNumber(int n) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Last Stone Weight.** Run Problem 1's `lastStoneWeight` on `[3, 7, 2, 9, 4]`. Fill in the dry-run table (Round, Heap State, y, x, diff, Action) and give the result.
+
+**Q2. Kth Largest with duplicates.** Run Problem 2's `findKthLargest` on `nums = [3, 2, 3, 1, 2, 4, 5, 5, 6]` with `k = 4`. What is in the min-heap after every number, and what is returned?
+
+**Q3. Task Scheduler, traced against the code.** Run Problem 4's `leastInterval` on `tasks = [A, A, A, B, C]`, `n = 2`. Pay attention to the order inside the loop: the code pops from the heap **first**, and only **then** checks whether the queue's front cooldown expired at this `time`. Give `time`, the task run (or idle), the queue and the heap at the end of each iteration, and the returned value.
+
+**Q4. Merge K Sorted Lists.** Run Problem 6's `mergeKLists` on `List 0: 2 → 5`, `List 1: 1 → 3 → 8`, `List 2: 4`. List each extracted `(val, idx)` pair and the heap contents after the refill. What is the largest the heap ever gets?
+
+**Q5. Ugly Number II, continued.** The chapter stops at `i = 9` with `i2 = 6, i3 = 4, i5 = 2`. Continue the trace for `i = 10, 11, 12`. What does `nthUglyNumber(13)` return?
+
+### Coding Exercises
+
+**E1 (Easy).** Kth Largest Element in a **Stream**: keep a min-heap of size `k` across calls.
+
+```cpp
+class KthLargest {
+public:
+    KthLargest(int k, vector<int>& nums);
+    int add(int val);   // adds val, returns current kth largest
+};
+// k = 3, nums = [4, 5, 8, 2]
+// add(3) -> 4, add(5) -> 5, add(10) -> 5, add(9) -> 8, add(4) -> 8
+```
+
+**E2 (Easy–Medium).** Connecting two sticks of lengths `a` and `b` costs `a + b` and produces one stick of length `a + b`. Return the minimum total cost to connect all sticks into one.
+
+```cpp
+int connectSticks(vector<int>& sticks);
+// [2, 4, 3]     -> 14   (2+3 = 5, then 5+4 = 9; 5 + 9 = 14)
+// [1, 8, 3, 5]  -> 30   (1+3 = 4, 4+5 = 9, 9+8 = 17; 4 + 9 + 17 = 30)
+```
+
+**E3 (Medium).** Kth smallest element in an $n \times n$ matrix whose rows and columns are each sorted ascending. Use the K-way merge idea from Problem 6 (each row is a sorted list).
+
+```cpp
+int kthSmallest(vector<vector<int>>& matrix, int k);
+// [[1, 5, 9], [10, 11, 13], [12, 13, 15]], k = 8 -> 13
+// [[-5]], k = 1                                  -> -5
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **1**.
+
+| Round | Heap State | y | x | diff | Action |
+|-------|------------|---|---|------|--------|
+| 1 | [9,7,4,3,2] | 9 | 7 | 2 | Push 2 |
+| 2 | [4,3,2,2] | 4 | 3 | 1 | Push 1 |
+| 3 | [2,2,1] | 2 | 2 | 0 | Don't push |
+| 4 | [1] | - | - | - | Return 1 |
+
+**Q2.** Returns **4**. (Sorted descending the array is `6, 5, 5, 4, ...`, so the 4th largest is 4; duplicates count separately.)
+
+| Num | Heap after push (sorted view) | Size > 4? | Popped | Heap after |
+|-----|-------------------------------|-----------|--------|------------|
+| 3 | [3] | No | - | [3] |
+| 2 | [2,3] | No | - | [2,3] |
+| 3 | [2,3,3] | No | - | [2,3,3] |
+| 1 | [1,2,3,3] | No | - | [1,2,3,3] |
+| 2 | [1,2,2,3,3] | Yes | 1 | [2,2,3,3] |
+| 4 | [2,2,3,3,4] | Yes | 2 | [2,3,3,4] |
+| 5 | [2,3,3,4,5] | Yes | 2 | [3,3,4,5] |
+| 5 | [3,3,4,5,5] | Yes | 3 | [3,4,5,5] |
+| 6 | [3,4,5,5,6] | Yes | 3 | [4,5,5,6] |
+
+**Q3.** Returns **7** (schedule `A B C A idle idle A`). Counts: A = 3, B = 1, C = 1, so the heap starts as `[3, 1, 1]`.
+
+| time | Popped & run | Pushed to queue | Queue front expires now? | Queue after | Heap after |
+|------|--------------|-----------------|--------------------------|-------------|------------|
+| 1 | A (3 → 2) | (2, 3) | no | [(2,3)] | [1,1] |
+| 2 | B (1 → 0) | - | no | [(2,3)] | [1] |
+| 3 | C (1 → 0) | - | yes, (2,3) → heap | [] | [2] |
+| 4 | A (2 → 1) | (1, 6) | no | [(1,6)] | [] |
+| 5 | idle | - | no | [(1,6)] | [] |
+| 6 | idle | - | yes, (1,6) → heap | [] | [1] |
+| 7 | A (1 → 0) | - | no | [] | [] |
+
+Note that a count pushed back at time 3 or 6 runs at the *next* step, which is exactly the cooldown: A runs at 1, 4, 7 (gap of $n = 2$ between runs). Check with the formula $\max(N, (f_{\max} - 1)(n + 1) + \#\text{tasks with } f_{\max}) = \max(5, 2 \cdot 3 + 1) = 7$. By the same rules, the walkthrough's `[A,A,A,B,B,B]`, `n = 2` example returns **8** when the code is run step by step (`A B idle A B idle A B`), matching the formula $2 \cdot 3 + 2 = 8$.
+
+**Q4.** Output `1 → 2 → 3 → 4 → 5 → 8`. The heap never holds more than **3** entries ($K$).
+
+| Extract | Refill from list | Heap after (sorted view) |
+|---------|------------------|--------------------------|
+| initial | - | [(1,1), (2,0), (4,2)] |
+| (1,1) | 3 from list 1 | [(2,0), (3,1), (4,2)] |
+| (2,0) | 5 from list 0 | [(3,1), (4,2), (5,0)] |
+| (3,1) | 8 from list 1 | [(4,2), (5,0), (8,1)] |
+| (4,2) | list 2 empty | [(5,0), (8,1)] |
+| (5,0) | list 0 empty | [(8,1)] |
+| (8,1) | list 1 empty | [] |
+
+**Q5.** Returns **18**. So far `ugly = [1, 2, 3, 4, 5, 6, 8, 9, 10, 12]`.
+
+| i | next2 = ugly[i2]·2 | next3 = ugly[i3]·3 | next5 = ugly[i5]·5 | ugly[i] | Pointers moved |
+|---|--------------------|--------------------|--------------------|---------|----------------|
+| 10 | ugly[6]·2 = 16 | ugly[4]·3 = 15 | ugly[2]·5 = 15 | 15 | i3 → 5, i5 → 3 |
+| 11 | ugly[6]·2 = 16 | ugly[5]·3 = 18 | ugly[3]·5 = 20 | 16 | i2 → 7 |
+| 12 | ugly[7]·2 = 18 | ugly[5]·3 = 18 | ugly[3]·5 = 20 | 18 | i2 → 8, i3 → 6 |
+
+Both `if` statements fire on ties (15 at `i = 10`, 18 at `i = 12`), which is what prevents duplicates.
+
+**E1 — reference solution**
+
+```cpp
+class KthLargest {
+    priority_queue<int, vector<int>, greater<int>> minHeap;
+    int k;
+public:
+    KthLargest(int k, vector<int>& nums) : k(k) {
+        for (int x : nums) add(x);
+    }
+    int add(int val) {
+        minHeap.push(val);
+        if ((int)minHeap.size() > k) minHeap.pop();   // drop the smallest
+        return minHeap.top();
+    }
+};
+```
+
+Problem 2's loop body, kept alive between calls. Each `add` is $O(\log k)$, space $O(k)$. (Assumes at least `k` values exist by the time `add` returns, as the problem guarantees.)
+
+**E2 — reference solution**
+
+```cpp
+int connectSticks(vector<int>& sticks) {
+    priority_queue<int, vector<int>, greater<int>> minHeap(sticks.begin(), sticks.end());
+    int cost = 0;
+    while (minHeap.size() > 1) {
+        int a = minHeap.top(); minHeap.pop();
+        int b = minHeap.top(); minHeap.pop();
+        cost += a + b;
+        minHeap.push(a + b);         // the merged stick can be merged again
+    }
+    return cost;
+}
+```
+
+The mirror image of Last Stone Weight: always combine the two *smallest*, because every stick's length is paid again each time its group is merged (Huffman-style greedy). Time $O(N \log N)$, space $O(N)$.
+
+**E3 — reference solution**
+
+```cpp
+int kthSmallest(vector<vector<int>>& matrix, int k) {
+    int n = matrix.size();
+    // {value, row, col}
+    priority_queue<tuple<int, int, int>, vector<tuple<int, int, int>>, greater<>> minHeap;
+    for (int r = 0; r < n; r++) minHeap.push({matrix[r][0], r, 0});   // head of each row
+
+    for (int i = 0; i < k - 1; i++) {          // discard the k-1 smallest
+        auto [val, r, c] = minHeap.top();
+        minHeap.pop();
+        if (c + 1 < n) minHeap.push({matrix[r][c + 1], r, c + 1});
+    }
+    return get<0>(minHeap.top());
+}
+```
+
+For the example, the 7 discarded values are `1, 5, 9, 10, 11, 12, 13`, leaving the other `13` on top. Time $O(n + k \log n)$, space $O(n)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
