@@ -411,6 +411,199 @@ MISTAKE 4: "O(N) + O(N) = O(N²)"
 
 ---
 
+## Practice & Self-Check
+
+For every snippet, do two things: count the exact number of iterations for a small input, then turn that count into Big O by keeping the fastest-growing term and dropping constants.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Count the log loops exactly.** How many times does each loop body run?
+
+```cpp
+// (a) Doubling, like Section 5, but with n = 100
+int i = 1, countA = 0;
+while (i < 100) { countA++; i = i * 2; }
+
+// (b) Halving
+int n = 100, countB = 0;
+while (n > 1) { n = n / 2; countB++; }   // integer division
+```
+
+**Q2. Three nested loops, $N = 6$.** How many times does the inner body run in each case, and what is the Big O?
+
+```cpp
+// (a)
+for (int i = 0; i < N; i++)
+    for (int j = i + 1; j < N; j++) work();
+// (b)
+for (int i = 0; i < N; i++)
+    for (int j = 0; j < i; j++) work();
+// (c)
+for (int i = 0; i < N; i++)
+    for (int j = 0; j < 5; j++) work();
+```
+
+**Q3. Name the complexity.** Give the tightest Big O for each, and say why.
+
+```cpp
+// (a)
+for (int i = 0; i < N; i++)
+    for (int j = 1; j < N; j *= 2) work();
+
+// (b) s is a std::set<int>
+for (int i = 0; i < N; i++) s.insert(arr[i]);
+
+// (c) A has N elements, B has M elements
+for (int x : A)
+    for (int y : B) work();
+
+// (d) the inner loop shrinks
+for (int i = N; i > 0; i /= 2)
+    for (int j = 0; j < i; j++) work();
+```
+
+For (d), also give the exact count when $N = 16$.
+
+**Q4. Count recursive calls.** (a) Using the chapter's `fib`, the call count for `fib(5)` is 15. How many calls does `fib(6)` make? (b) How many calls does `factorial(7)` make? (c) For the function below, what does `f(64)` return, how many calls are made, and what is its time complexity?
+
+```cpp
+int f(int n) {
+    if (n <= 1) return 1;
+    return f(n / 2) + 1;
+}
+```
+
+**Q5. Read `badCode` very carefully.** Look again at the loop condition in Section 6's `badCode` with `arr = {1, 2, 3}`. Track `i` and `arr.size()` at the start of each iteration. How many iterations does the loop actually run?
+
+### Coding Exercises
+
+**E1 (Easy). From $O(N^2)$ to $O(N)$.** This brute-force version is $O(N^2)$:
+
+```cpp
+bool hasDuplicateSlow(const vector<int>& a) {
+    for (int i = 0; i < (int)a.size(); i++)
+        for (int j = i + 1; j < (int)a.size(); j++)
+            if (a[i] == a[j]) return true;
+    return false;
+}
+```
+
+Write `bool hasDuplicate(const vector<int>& a)` in $O(N)$ average time, and state its time and space complexity.
+- `{3, 1, 4, 1, 5}` returns `true`; `{2, 7, 1}` returns `false`
+
+**E2 (Easy–Medium). Count pairs with a target sum.** Write `long long countPairs(const vector<int>& a, int target)` that counts index pairs $i < j$ with $a[i] + a[j] = target$, in $O(N)$ average time (the double loop would be $O(N^2)$).
+- `{1, 5, 7, -1, 5}`, `target = 6` returns `3` (pairs `1+5`, `1+5`, `7+(-1)`)
+- `{2, 2, 2}`, `target = 4` returns `3`
+
+**E3 (Medium). Many range-sum queries.** Given an array of size $N$ and $Q$ queries `(l, r)` (inclusive), answering each query with its own loop costs $O(N \cdot Q)$. Write `vector<long long> rangeSums(const vector<int>& a, const vector<pair<int,int>>& queries)` in $O(N + Q)$ total.
+- `a = {2, 4, 1, 3, 5}`, queries `{(0, 2), (1, 4), (3, 3)}` returns `{7, 13, 3}`
+
+#### Dry-Run: Answers
+
+**Q1.** (a) `countA = 7`. (b) `countB = 6`.
+
+| (a) `i` before | 1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 |
+|----------------|---|---|---|---|----|----|----|-----|
+| `i < 100`? | yes | yes | yes | yes | yes | yes | yes | **no** |
+
+| (b) `n` before | 100 | 50 | 25 | 12 | 6 | 3 | 1 |
+|----------------|-----|----|----|----|---|---|---|
+| `n > 1`? | yes | yes | yes | yes | yes | yes | **no** |
+
+Both are about $\log_2 100 \approx 6.64$, i.e. $O(\log N)$. Doubling runs $\lceil \log_2 100 \rceil = 7$ times; halving with integer division runs $\lfloor \log_2 100 \rfloor = 6$ times.
+
+**Q2.** (a) **15**, (b) **15**, (c) **30**. Big O: $O(N^2)$, $O(N^2)$, $O(N)$.
+- (a) $5 + 4 + 3 + 2 + 1 + 0 = 15 = \frac{N(N-1)}{2}$.
+- (b) $0 + 1 + 2 + 3 + 4 + 5 = 15 = \frac{N(N-1)}{2}$ — the same count, just in reverse order.
+- (c) $6 \times 5 = 30 = 5N$. The inner loop is a constant, so this is $O(N)$ (Mistake 2).
+
+**Q3.**
+- (a) $O(N \log N)$: the outer loop runs $N$ times and the inner doubling loop runs about $\log_2 N$ times.
+- (b) $O(N \log N)$: $N$ inserts into a balanced tree at $O(\log N)$ each (Mistake 3 — count the STL cost).
+- (c) $O(N \cdot M)$: nested over two **independent** inputs, so you multiply and cannot write $O(N^2)$.
+- (d) $O(N)$: the work is $N + \frac{N}{2} + \frac{N}{4} + \dots + 1 < 2N$. For $N = 16$: $16 + 8 + 4 + 2 + 1 = 31$. A halving loop with a nested loop is **not** automatically $O(N \log N)$ — sum the actual inner counts.
+
+**Q4.** (a) **25** calls. (b) **7** calls. (c) Returns **7** with **7** calls; $O(\log N)$.
+- (a) Let $C(n)$ be the number of calls: $C(0) = C(1) = 1$ and $C(n) = 1 + C(n-1) + C(n-2)$. So $C(2) = 3$, $C(3) = 5$, $C(4) = 9$, $C(5) = 15$ (matches the chapter), $C(6) = 1 + 15 + 9 = 25$. Each step multiplies by about 1.6, which is exponential growth.
+- (b) `factorial(7)`, `(6)`, ..., `(1)`: one call per value from 7 down to 1, so 7 calls, $O(N)$.
+- (c) Calls on 64, 32, 16, 8, 4, 2, 1 (7 calls). `f(1)` returns 1 and each of the 6 calls above it adds 1, so $1 + 6 = 7$. The argument halves each time: $O(\log N)$.
+
+**Q5.** It **never terminates** (until memory runs out).
+
+| Iteration | `i` at check | `arr.size()` at check | `i < size`? | After insert |
+|-----------|--------------|-----------------------|-------------|--------------|
+| 1 | 0 | 3 | yes | size 4 |
+| 2 | 1 | 4 | yes | size 5 |
+| 3 | 2 | 5 | yes | size 6 |
+| $k$ | $k - 1$ | $k + 2$ | yes | size $k + 3$ |
+
+Each iteration increases `i` by 1 **and** `arr.size()` by 1, so the gap of 3 never closes. The $O(N^2)$ analysis describes the shifting cost of $N$ front-inserts; to actually perform exactly $N$ of them, save `int n = arr.size();` before the loop and loop to `n`. (Better still, avoid front-inserts entirely.)
+
+**E1 — reference solution**
+
+```cpp
+#include <unordered_set>
+#include <vector>
+using namespace std;
+
+bool hasDuplicate(const vector<int>& a) {
+    unordered_set<int> seen;
+    for (int x : a) {
+        if (seen.count(x)) return true;
+        seen.insert(x);
+    }
+    return false;
+}
+```
+
+$O(N)$ average time, $O(N)$ extra space. One loop of $N$ iterations, each doing $O(1)$-average hash work. We traded memory for time; sorting a copy and checking neighbors would be $O(N \log N)$ time instead.
+
+**E2 — reference solution**
+
+```cpp
+#include <unordered_map>
+#include <vector>
+using namespace std;
+
+long long countPairs(const vector<int>& a, int target) {
+    unordered_map<int, long long> freq;   // value -> how many times seen so far
+    long long pairs = 0;
+    for (int x : a) {
+        auto it = freq.find(target - x);
+        if (it != freq.end()) pairs += it->second;  // pair x with every earlier match
+        freq[x]++;
+    }
+    return pairs;
+}
+```
+
+$O(N)$ average time, $O(N)$ space. Trace on `{1, 5, 7, -1, 5}`, target 6: at `5` (index 1) one earlier `1` gives `pairs = 1`; at `-1` one earlier `7` gives 2; at the second `5` one earlier `1` gives 3. For `{2, 2, 2}`: $0 + 1 + 2 = 3$. Counting with `freq` (not just a set) is what makes duplicates correct.
+
+**E3 — reference solution**
+
+```cpp
+#include <utility>
+#include <vector>
+using namespace std;
+
+vector<long long> rangeSums(const vector<int>& a, const vector<pair<int,int>>& queries) {
+    int n = a.size();
+    vector<long long> prefix(n + 1, 0);           // prefix[i] = a[0] + ... + a[i-1]
+    for (int i = 0; i < n; i++) prefix[i + 1] = prefix[i] + a[i];   // O(N) once
+
+    vector<long long> result;
+    result.reserve(queries.size());
+    for (const auto& [l, r] : queries) {
+        result.push_back(prefix[r + 1] - prefix[l]);   // O(1) per query
+    }
+    return result;
+}
+```
+
+$O(N + Q)$ time, $O(N)$ extra space. `prefix = {0, 2, 6, 7, 10, 15}`. Query `(0, 2)`: $7 - 0 = 7$. Query `(1, 4)`: $15 - 2 = 13$. Query `(3, 3)`: $10 - 7 = 3$. Paying $O(N)$ once lets every query be $O(1)$ instead of $O(N)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

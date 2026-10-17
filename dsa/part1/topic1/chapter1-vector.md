@@ -373,6 +373,175 @@ vector<int> v;
 
 ---
 
+## Practice & Self-Check
+
+Trace each question on paper by redrawing the vector's boxes after every line. Then check yourself against the answers at the end.
+
+### Predict the Output / Trace by Hand
+
+**Q1. A sequence of edits.** What are the contents, `front()`, `back()` and `size()` at the end? How many existing elements had to shift during the `insert`, and how many during the `erase`?
+
+```cpp
+vector<int> v = {4, 8, 15};
+v.push_back(16);
+v.push_back(23);
+v.pop_back();
+v.insert(v.begin() + 1, 42);
+v.erase(v.begin() + 3);
+```
+
+**Q2. Erase-remove on new data.** What does `nums` hold afterwards, and what is `nums.size()`?
+
+```cpp
+vector<int> nums = {5, 1, 5, 5, 2, 5};
+nums.erase(remove(nums.begin(), nums.end(), 5), nums.end());
+```
+
+**Q3. Copy vs. reference in range-for.** What is printed?
+
+```cpp
+vector<int> nums = {1, 2, 3};
+for (int x : nums)  x *= 10;
+for (int& x : nums) x += 1;
+for (const int& x : nums) cout << x << " ";
+```
+
+**Q4. 2D vectors are vectors of independent rows.** What do the four values print?
+
+```cpp
+vector<vector<int>> grid(2, vector<int>(3, 7));
+grid[1][0] = 0;
+grid[0].push_back(9);
+
+int total = 0;
+for (const auto& row : grid)
+    for (int x : row) total += x;
+
+cout << grid.size() << " " << grid[0].size() << " "
+     << grid[1].size() << " " << total << "\n";
+```
+
+**Q5. Counting reallocations.** Assume the pure doubling policy from Section 3 (capacity goes $1 \to 2 \to 4 \to 8 \to \dots$) and **no** `reserve`. You `push_back` 10 elements into an empty vector. After the very first allocation, how many times does the vector grow, how many element copies happen in total, and what is the final `capacity()`?
+
+### Coding Exercises
+
+**E1 (Easy). Transpose a grid.** Write `vector<vector<int>> transpose(const vector<vector<int>>& g)` for a non-empty rectangular grid with $R$ rows and $C$ columns. The result has $C$ rows and $R$ columns, with `result[j][i] == g[i][j]`.
+- `{{1, 2, 3}, {4, 5, 6}}` returns `{{1, 4}, {2, 5}, {3, 6}}`
+- `{{7}}` returns `{{7}}`
+
+**E2 (Easy–Medium). De-duplicate a sorted vector in place.** Write `int dedupSorted(vector<int>& v)` that removes repeated values from a **sorted** vector in $O(N)$ time and $O(1)$ extra space (no `erase` inside a loop), shrinks it with `resize`, and returns the new size.
+- `{1, 1, 2, 3, 3, 3, 4}` becomes `{1, 2, 3, 4}`, returns `4`
+- `{}` stays `{}`, returns `0`
+
+**E3 (Medium). Rotate right by k.** Write `vector<int> rotateRight(const vector<int>& v, int k)` that returns a new vector where every element moved `k` positions to the right, wrapping around the end. `k` can be larger than `v.size()`.
+- `{1, 2, 3, 4, 5}`, `k = 2` returns `{4, 5, 1, 2, 3}`
+- `{1, 2, 3, 4, 5}`, `k = 7` returns `{4, 5, 1, 2, 3}`
+
+#### Dry-Run: Answers
+
+**Q1.** Final `v = {4, 42, 8, 16}`, `front() == 4`, `back() == 16`, `size() == 4`. The `insert` shifted **3** elements; the `erase` shifted **1**.
+
+| Line | `v` after | Elements shifted |
+|------|-----------|------------------|
+| start | `{4, 8, 15}` | — |
+| `push_back(16)` | `{4, 8, 15, 16}` | 0 |
+| `push_back(23)` | `{4, 8, 15, 16, 23}` | 0 |
+| `pop_back()` | `{4, 8, 15, 16}` | 0 |
+| `insert(begin()+1, 42)` | `{4, 42, 8, 15, 16}` | 3 (`8, 15, 16` move right) |
+| `erase(begin()+3)` | `{4, 42, 8, 16}` | 1 (`16` moves left) |
+
+`v.begin() + 3` is evaluated **after** the insert, so it points at `15` (index 3 of `{4, 42, 8, 15, 16}`).
+
+**Q2.** `nums == {1, 2}`, `nums.size() == 2`. `remove` walks left to right and copies every kept element (`1`, then `2`) to the front, returning an iterator to index 2. The tail after that iterator holds leftover values whose contents you must not rely on; `erase` chops it off.
+
+**Q3.** Prints `2 3 4`. The first loop multiplies **copies** (`x` is a fresh `int` each iteration), so `nums` is unchanged. The second loop binds `x` to each real element and adds 1: `{2, 3, 4}`.
+
+**Q4.** Prints `2 4 3 44`.
+
+| Row | Contents | Size | Sum |
+|-----|----------|------|-----|
+| `grid[0]` | `{7, 7, 7, 9}` | 4 | 30 |
+| `grid[1]` | `{0, 7, 7}` | 3 | 14 |
+
+`grid.size()` counts rows (2). Each row is its own vector, so `push_back` on row 0 does not change row 1. Total $= 30 + 14 = 44$.
+
+**Q5.** **4** growths, **15** copies, final capacity **16**.
+
+| Push # | size before | capacity before | Grows to | Copies |
+|--------|-------------|-----------------|----------|--------|
+| 1 | 0 | 0 | 1 (first allocation) | 0 |
+| 2 | 1 | 1 | 2 | 1 |
+| 3 | 2 | 2 | 4 | 2 |
+| 5 | 4 | 4 | 8 | 4 |
+| 9 | 8 | 8 | 16 | 8 |
+
+Copies $= 1 + 2 + 4 + 8 = 15 < 2 \times 10$. That bound ($< 2N$ copies for $N$ pushes) is exactly why `push_back` is $O(1)$ amortized. With `reserve(10)` first, there would be 0 copies.
+
+**E1 — reference solution**
+
+```cpp
+#include <vector>
+using namespace std;
+
+vector<vector<int>> transpose(const vector<vector<int>>& g) {
+    int R = g.size();
+    int C = g[0].size();
+    vector<vector<int>> result(C, vector<int>(R));
+    for (int i = 0; i < R; i++) {
+        for (int j = 0; j < C; j++) {
+            result[j][i] = g[i][j];
+        }
+    }
+    return result;
+}
+```
+
+$O(R \times C)$ time and space. Pre-sizing with `vector<vector<int>>(C, vector<int>(R))` avoids any `push_back` reallocations.
+
+**E2 — reference solution**
+
+```cpp
+#include <vector>
+using namespace std;
+
+int dedupSorted(vector<int>& v) {
+    if (v.empty()) return 0;
+    int write = 1;                       // v[0] is always kept
+    for (int read = 1; read < (int)v.size(); read++) {
+        if (v[read] != v[write - 1]) {   // new value: keep it
+            v[write] = v[read];
+            write++;
+        }
+    }
+    v.resize(write);                     // chop the tail in one O(N) step
+    return write;
+}
+```
+
+$O(N)$ time, $O(1)$ extra space. Calling `erase` on each duplicate would shift the tail every time and cost $O(N^2)$ in the worst case. Trace on `{1, 1, 2, 3, 3, 3, 4}`: kept values are written to indices 1, 2, 3 as `2, 3, 4`, so `write` ends at 4.
+
+**E3 — reference solution**
+
+```cpp
+#include <vector>
+using namespace std;
+
+vector<int> rotateRight(const vector<int>& v, int k) {
+    int n = v.size();
+    if (n == 0) return {};
+    k %= n;                               // k = 7, n = 5  ->  k = 2
+    vector<int> result(n);
+    for (int i = 0; i < n; i++) {
+        result[(i + k) % n] = v[i];
+    }
+    return result;
+}
+```
+
+$O(N)$ time, $O(N)$ extra space. Trace for `k = 2`: `1` goes to index 2, `2` to 3, `3` to 4, `4` to $(3 + 2) \bmod 5 = 0$, `5` to $(4 + 2) \bmod 5 = 1$, giving `{4, 5, 1, 2, 3}`. Inserting at the front `k` times would cost $O(N \times k)$ instead.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

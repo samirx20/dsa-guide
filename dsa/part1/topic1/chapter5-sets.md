@@ -486,6 +486,158 @@ Decision Tree:
 
 ---
 
+## Practice & Self-Check
+
+Keep two habits while tracing: (1) an `insert` of an existing value changes nothing and returns `false` in `.second`; (2) a `set` is always sorted, so you can write its contents as a sorted list at every step.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Order-preserving dedup on new data.** Run Method 2 from Section 6 on `nums = {5, 2, 5, 8, 2, 2, 9}`. What is `result`, and how many `insert` calls returned `false`?
+
+**Q2. Building an ordered `set`.** What does this print?
+
+```cpp
+set<int> s = {7, 3, 9, 3, 1, 7};
+cout << s.size() << " " << *s.begin() << " " << *s.rbegin() << " "
+     << *s.lower_bound(4) << " " << *s.upper_bound(7) << " "
+     << (s.upper_bound(9) == s.end()) << " " << *s.lower_bound(0) << "\n";
+```
+
+**Q3. Set algorithms on sorted vectors.** With `a = {1, 3, 5, 7, 9}` and `b = {3, 4, 5, 10}`, what do `set_intersection(a, b)`, `set_union(a, b)`, `set_difference(a, b)` and `set_difference(b, a)` produce?
+
+**Q4. Re-trace `twoSumSet`.** Run `twoSumSet` from Section 9 on `nums = {4, 6, 1, 5}`, `target = 11`. Show `complement`, `seen.count(complement)`, and `seen` at each step. What is returned?
+
+**Q5. Sorted strings are case-sensitive.** What does this print, and what is `w.size()`?
+
+```cpp
+set<string> w = {"pear", "Apple", "fig", "apple"};
+for (const string& x : w) cout << x << " ";
+```
+
+### Coding Exercises
+
+**E1 (Easy). Contains duplicate.** Write `bool containsDuplicate(const vector<int>& nums)` that stops as soon as a repeat is found, using the return value of `insert`.
+- `{1, 2, 3, 1}` returns `true`
+- `{1, 2, 3}` returns `false`
+
+**E2 (Easy–Medium). Common values in order.** Write `vector<int> commonInOrder(const vector<int>& a, const vector<int>& b)` that returns each value appearing in **both** vectors exactly once, in the order of its **first appearance in `a`**. Target $O(N + M)$ average time.
+- `a = {4, 9, 5, 9}`, `b = {9, 4, 9, 8, 4}` returns `{4, 9}`
+- `a = {1, 2}`, `b = {3}` returns `{}`
+
+**E3 (Medium). Closest value in a `set`.** Write `int closestValue(const set<int>& s, int target)` for a non-empty set. Return the element with the smallest $|x - \text{target}|$; on a tie, return the smaller element. Use `lower_bound` so it runs in $O(\log N)$.
+- `s = {10, 20, 30, 40}`: target `26` returns `30`, target `25` returns `20` (tie), target `5` returns `10`, target `99` returns `40`
+
+#### Dry-Run: Answers
+
+**Q1.** `result = {5, 2, 8, 9}`; **3** inserts returned `false`.
+
+| `num` | `insert(num).second` | `seen` after | `result` after |
+|-------|----------------------|--------------|----------------|
+| 5 | `true` | `{5}` | `{5}` |
+| 2 | `true` | `{5, 2}` | `{5, 2}` |
+| 5 | `false` | unchanged | unchanged |
+| 8 | `true` | `{5, 2, 8}` | `{5, 2, 8}` |
+| 2 | `false` | unchanged | unchanged |
+| 2 | `false` | unchanged | unchanged |
+| 9 | `true` | `{5, 2, 8, 9}` | `{5, 2, 8, 9}` |
+
+**Q2.** Prints `4 1 9 7 9 1 1`. The duplicates collapse, giving the sorted set `{1, 3, 7, 9}`.
+
+| Expr | Meaning | Value |
+|------|---------|-------|
+| `size()` | unique elements | 4 |
+| `*begin()` | smallest | 1 |
+| `*rbegin()` | largest | 9 |
+| `*lower_bound(4)` | first $\ge 4$ | 7 |
+| `*upper_bound(7)` | first $> 7$ | 9 |
+| `upper_bound(9) == end()` | nothing $> 9$ | `1` (true) |
+| `*lower_bound(0)` | first $\ge 0$ | 1 |
+
+**Q3.**
+
+| Operation | Result |
+|-----------|--------|
+| `set_intersection(a, b)` | `{3, 5}` |
+| `set_union(a, b)` | `{1, 3, 4, 5, 7, 9, 10}` |
+| `set_difference(a, b)` | `{1, 7, 9}` |
+| `set_difference(b, a)` | `{4, 10}` |
+
+Difference is **not** symmetric: $a \setminus b$ keeps what only `a` has, $b \setminus a$ keeps what only `b` has.
+
+**Q4.** Returns `{6, 5}`.
+
+| `num` | `complement` | `seen.count(complement)` | `seen` after |
+|-------|--------------|--------------------------|--------------|
+| 4 | 7 | 0 | `{4}` |
+| 6 | 5 | 0 | `{4, 6}` |
+| 1 | 10 | 0 | `{4, 6, 1}` |
+| 5 | 6 | **1** | (returns before inserting 5) |
+
+The pair is returned as `{complement, num}`, so the earlier value (6) comes first.
+
+**Q5.** Prints `Apple apple fig pear`; `w.size() == 4`. Strings compare by character codes, and `'A'` (65) is less than every lowercase letter, so `"Apple"` comes first. `"Apple"` and `"apple"` are different strings, so both are kept.
+
+**E1 — reference solution**
+
+```cpp
+#include <unordered_set>
+#include <vector>
+using namespace std;
+
+bool containsDuplicate(const vector<int>& nums) {
+    unordered_set<int> seen;
+    for (int x : nums) {
+        if (!seen.insert(x).second) return true;  // insert failed: seen before
+    }
+    return false;
+}
+```
+
+$O(N)$ average time, $O(N)$ space. One `insert` does both the lookup and the add.
+
+**E2 — reference solution**
+
+```cpp
+#include <unordered_set>
+#include <vector>
+using namespace std;
+
+vector<int> commonInOrder(const vector<int>& a, const vector<int>& b) {
+    unordered_set<int> inB(b.begin(), b.end());   // O(M) build
+    unordered_set<int> added;
+    vector<int> result;
+    for (int x : a) {
+        if (inB.count(x) && added.insert(x).second) {
+            result.push_back(x);
+        }
+    }
+    return result;
+}
+```
+
+$O(N + M)$ average time. The `added` set prevents the second `9` in `a` from being output twice. Trace: `4` is in `b` and new (add), `9` is in `b` and new (add), `5` is not in `b`, `9` is already added.
+
+**E3 — reference solution**
+
+```cpp
+#include <iterator>
+#include <set>
+using namespace std;
+
+int closestValue(const set<int>& s, int target) {
+    auto it = s.lower_bound(target);          // first element >= target
+    if (it == s.end()) return *prev(it);      // everything is smaller
+    if (it == s.begin()) return *it;          // everything is >= target
+    int hi = *it;
+    int lo = *prev(it);                       // largest element < target
+    return (target - lo <= hi - target) ? lo : hi;  // <= breaks ties toward lo
+}
+```
+
+$O(\log N)$. The answer is always one of the two neighbors around `target`. For 25: `lo = 20`, `hi = 30`, distances $5$ and $5$ tie, so 20. For 26: distances $6$ and $4$, so 30. For 5: `lower_bound` is `begin()`, so 10. For 99: `lower_bound` is `end()`, so 40.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

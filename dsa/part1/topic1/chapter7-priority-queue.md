@@ -458,6 +458,179 @@ Interview Trigger Words → Use priority_queue:
 
 ---
 
+## Practice & Self-Check
+
+For heap questions, draw the array **and** the tree side by side, and use the Section 1 formulas: parent of $i$ is $\lfloor (i-1)/2 \rfloor$, children are $2i+1$ and $2i+2$.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Read a heap array.** Consider the array `{90, 70, 80, 20, 60, 75, 10}`.
+(a) What are the parent index and value of index 5? (b) What are the children (indices and values) of index 1? (c) Is it a valid max-heap?
+(d) Now take `{50, 30, 40, 35, 20}`. Which index breaks the max-heap property, and why?
+
+**Q2. Bubble up, bubble down.** Using textbook sift-up on `push` and sift-down on `pop` (move the last element to the root, then swap it with its **larger** child while it is smaller), trace a max-heap through
+
+```cpp
+priority_queue<int> pq;
+pq.push(15);
+pq.push(40);
+pq.push(25);
+pq.push(50);
+pq.pop();
+```
+
+Give the array after each line, and `top()` at the end.
+
+**Q3. Min-heap of pairs with ties.** In what order are the pairs popped?
+
+```cpp
+priority_queue<pair<int,int>, vector<pair<int,int>>, greater<pair<int,int>>> pq;
+pq.push({4, 2});
+pq.push({1, 9});
+pq.push({4, 1});
+pq.push({1, 3});
+while (!pq.empty()) { cout << pq.top().first << "," << pq.top().second << " "; pq.pop(); }
+```
+
+**Q4. Kth largest with duplicates.** Run `findKthLargest` from Section 9 on `nums = {7, 2, 9, 4, 9, 1}` with `k = 2`. Show the heap contents (sorted, for readability) after each step. What is returned?
+
+**Q5. Which way does the comparator point?** Using `Task` and `CompareTaskMin` from Section 5, what is printed?
+
+```cpp
+priority_queue<Task, vector<Task>, CompareTaskMin> pq;
+pq.push({"Low", 1});
+pq.push({"High", 10});
+pq.push({"Medium", 5});
+while (!pq.empty()) { cout << pq.top().name << " "; pq.pop(); }
+```
+
+### Coding Exercises
+
+**E1 (Easy). Last stone weight.** Each turn, take the two heaviest stones `y >= x`. If `y == x` both are destroyed; otherwise a stone of weight `y - x` goes back. Write `int lastStoneWeight(const vector<int>& stones)` that returns the weight of the last stone, or `0` if none remain.
+- `{2, 7, 4, 1, 8, 1}` returns `1`
+- `{3, 3}` returns `0`
+
+**E2 (Easy–Medium). K smallest, sorted.** Write `vector<int> kSmallest(const vector<int>& nums, int k)` using a **max-heap of size k** (the mirror image of Section 8's "Top K"). Return the result in ascending order.
+- `{7, 10, 4, 3, 20, 15}`, `k = 3` returns `{3, 4, 7}`
+
+**E3 (Medium). Merge K sorted lists.** Write `vector<int> mergeKSorted(const vector<vector<int>>& lists)` using a min-heap of `tuple<int,int,int>` holding `(value, listIndex, elementIndex)`. Target $O(N \log K)$ for $N$ total elements across $K$ lists.
+- `{{1, 4, 5}, {1, 3, 4}, {2, 6}}` returns `{1, 1, 2, 3, 4, 4, 5, 6}`
+
+#### Dry-Run: Answers
+
+**Q1.**
+- (a) Parent of 5 is $\lfloor (5-1)/2 \rfloor = 2$, value `80`.
+- (b) Children of 1 are $2(1)+1 = 3$ and $2(1)+2 = 4$, values `20` and `60`.
+- (c) **Yes.** Check every parent: `90` ≥ `70`, `80`; `70` ≥ `20`, `60`; `80` ≥ `75`, `10`.
+- (d) **Index 3** (value `35`). Its parent is $\lfloor (3-1)/2 \rfloor = 1$ (value `30`), and a child must not be larger than its parent in a max-heap.
+
+**Q2.** Final array `[40, 15, 25]`, `top() == 40`.
+
+| Line | Array before fix | Fix | Array after |
+|------|------------------|-----|-------------|
+| `push(15)` | `[15]` | — | `[15]` |
+| `push(40)` | `[15, 40]` | 40 > parent 15: swap | `[40, 15]` |
+| `push(25)` | `[40, 15, 25]` | 25 < parent 40: stop | `[40, 15, 25]` |
+| `push(50)` | `[40, 15, 25, 50]` | 50 > parent 15 (idx 1): swap; 50 > parent 40 (idx 0): swap | `[50, 40, 25, 15]` |
+| `pop()` | `[15, 40, 25]` (last moved to root) | larger child is 40: swap; index 1 has no children: stop | `[40, 15, 25]` |
+
+Each push or pop moves along at most one root-to-leaf path, which is why both are $O(\log N)$.
+
+**Q3.** Prints `1,3 1,9 4,1 4,2`. With `greater<pair<int,int>>`, the smallest pair is on top. Pairs compare by `.first`, then by `.second` on a tie: `{1,3} < {1,9} < {4,1} < {4,2}`.
+
+**Q4.** Returns `9`.
+
+| `num` | After `push` | `size() > 2`? | After pop | `top()` |
+|-------|--------------|---------------|-----------|---------|
+| 7 | `{7}` | no | `{7}` | 7 |
+| 2 | `{2, 7}` | no | `{2, 7}` | 2 |
+| 9 | `{2, 7, 9}` | yes, pop 2 | `{7, 9}` | 7 |
+| 4 | `{4, 7, 9}` | yes, pop 4 | `{7, 9}` | 7 |
+| 9 | `{7, 9, 9}` | yes, pop 7 | `{9, 9}` | 9 |
+| 1 | `{1, 9, 9}` | yes, pop 1 | `{9, 9}` | 9 |
+
+Duplicates count separately: sorted descending the array is `9, 9, 7, 4, 2, 1`, so the 2nd largest **element** is `9`.
+
+**Q5.** Prints `Low Medium High`. `CompareTaskMin` returns `true` when `a.priority > b.priority`, meaning "`a` goes below `b`". Larger priorities sink, so this is a **min**-heap: priorities come out as 1, 5, 10.
+
+**E1 — reference solution**
+
+```cpp
+#include <queue>
+#include <vector>
+using namespace std;
+
+int lastStoneWeight(const vector<int>& stones) {
+    priority_queue<int> pq(stones.begin(), stones.end());  // max-heap
+    while (pq.size() > 1) {
+        int y = pq.top(); pq.pop();   // heaviest
+        int x = pq.top(); pq.pop();   // second heaviest
+        if (y != x) pq.push(y - x);
+    }
+    return pq.empty() ? 0 : pq.top();
+}
+```
+
+$O(N \log N)$ time. Trace on `{2, 7, 4, 1, 8, 1}`: smash 8 and 7 → push 1; smash 4 and 2 → push 2; smash 2 and 1 → push 1; smash 1 and 1 → nothing; one stone of weight `1` remains.
+
+**E2 — reference solution**
+
+```cpp
+#include <queue>
+#include <vector>
+using namespace std;
+
+vector<int> kSmallest(const vector<int>& nums, int k) {
+    priority_queue<int> maxHeap;                 // largest of the kept k on top
+    for (int x : nums) {
+        maxHeap.push(x);
+        if ((int)maxHeap.size() > k) maxHeap.pop();  // evict the largest
+    }
+    vector<int> result(maxHeap.size());
+    for (int i = (int)result.size() - 1; i >= 0; i--) {  // pops come out largest-first
+        result[i] = maxHeap.top();
+        maxHeap.pop();
+    }
+    return result;
+}
+```
+
+$O(N \log k)$ time, $O(k)$ space. The kept set evolves `{7}` → `{7, 10}` → `{4, 7, 10}` → `{3, 4, 7}` (10 evicted) → `{3, 4, 7}` (20 evicted) → `{3, 4, 7}` (15 evicted). Filling from the back turns the largest-first pops into ascending order.
+
+**E3 — reference solution**
+
+```cpp
+#include <functional>
+#include <queue>
+#include <tuple>
+#include <vector>
+using namespace std;
+
+vector<int> mergeKSorted(const vector<vector<int>>& lists) {
+    using T = tuple<int,int,int>;                       // (value, listIndex, elementIndex)
+    priority_queue<T, vector<T>, greater<T>> pq;        // min-heap
+
+    for (int i = 0; i < (int)lists.size(); i++) {
+        if (!lists[i].empty()) pq.push({lists[i][0], i, 0});
+    }
+
+    vector<int> result;
+    while (!pq.empty()) {
+        auto [val, li, idx] = pq.top();
+        pq.pop();
+        result.push_back(val);
+        if (idx + 1 < (int)lists[li].size()) {
+            pq.push({lists[li][idx + 1], li, idx + 1});  // next element of the same list
+        }
+    }
+    return result;
+}
+```
+
+$O(N \log K)$ time, $O(K)$ heap space: the heap never holds more than one element per list. The first pops are `(1, 0, 0)` then `(1, 1, 0)` (equal values, so the tie is broken by list index), then `(2, 2, 0)`, and so on.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

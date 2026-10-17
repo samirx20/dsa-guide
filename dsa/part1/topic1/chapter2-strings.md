@@ -413,6 +413,181 @@ for (char c : s) {
 
 ---
 
+## Practice & Self-Check
+
+Write the index under every character before you start (`s = "mississippi"` → `0123456789…`). Almost every string bug is an off-by-one in that row of numbers.
+
+### Predict the Output / Trace by Hand
+
+**Q1. `substr` on the chapter's word.** With `string s = "algorithm";`, what does each call return?
+
+```cpp
+s.substr(3, 4);
+s.substr(6);
+s.substr(8, 5);   // asks for more characters than remain
+```
+
+**Q2. `find` with a start position.** With `string m = "mississippi";`, what does each expression evaluate to?
+
+```cpp
+m.find("ss");
+m.find("ss", 3);
+m.find('p');
+m.find('i', 5);
+m.find("xyz") == string::npos;
+```
+
+**Q3. Lexicographic surprises.** What does this print (`1` = true, `0` = false)?
+
+```cpp
+cout << (string("apple") < string("apricot"))
+     << (string("Zebra") < string("apple"))
+     << (string("abc")   < string("ab"))
+     << (string("10")    < string("9"))
+     << (stoi("10")      < stoi("9")) << "\n";
+```
+
+**Q4. Converting back and forth.** What is printed?
+
+```cpp
+string a = to_string(12) + to_string(34);
+int b = stoi(a) + 1;
+cout << a << " " << b << " " << a.size() << "\n";
+```
+
+**Q5. Frequency array.** Run the chapter's Pattern 5 (`freq[c - 'a']++`) on `"banana"` instead of `"hello"`. Which indices of `freq` are non-zero, and what are their values?
+
+### Coding Exercises
+
+**E1 (Easy). Palindrome without a copy.** The chapter's Pattern 2 builds a reversed copy ($O(N)$ extra space). Write `bool isPalindrome(const string& s)` using two indices moving toward each other, with $O(1)$ extra space.
+- `"racecar"` returns `true`
+- `"abca"` returns `false`
+
+**E2 (Easy–Medium). Split into a vector.** Turn Pattern 4 into a reusable function `vector<string> split(const string& s, char delim)`.
+- `split("red,green,,blue", ',')` returns `{"red", "green", "", "blue"}`
+- `split("a,b,", ',')` returns `{"a", "b"}` (no empty token after a trailing delimiter, because `getline` stops at end of input)
+
+**E3 (Medium). Run-length encoding.** Write `string compress(const string& s)` that replaces every run of equal characters with the character followed by the run length. Build the result with `+=` (not `+` in a loop).
+- `"aaabccdddd"` returns `"a3b1c2d4"`
+- `"z"` returns `"z1"`; `""` returns `""`
+
+#### Dry-Run: Answers
+
+**Q1.** `"orit"`, `"thm"`, `"m"`.
+
+```text
+s = a l g o r i t h m
+    0 1 2 3 4 5 6 7 8
+```
+
+- `substr(3, 4)`: indices 3, 4, 5, 6 give `o r i t`.
+- `substr(6)`: index 6 to the end gives `t h m`.
+- `substr(8, 5)`: only 1 character remains from index 8, so the length is clamped and you get `"m"` (no error). Only a **start** index past `size()` throws.
+
+**Q2.** `2`, `5`, `8`, `7`, `true` (prints as `1`).
+
+```text
+m = m i s s i s s i p p i
+    0 1 2 3 4 5 6 7 8 9 10
+```
+
+| Call | Scan starts at | First match | Result |
+|------|----------------|-------------|--------|
+| `find("ss")` | 0 | `s s` at 2–3 | `2` |
+| `find("ss", 3)` | 3 | index 3 is `s` but 4 is `i`; `s s` at 5–6 | `5` |
+| `find('p')` | 0 | index 8 | `8` |
+| `find('i', 5)` | 5 | index 7 | `7` |
+| `find("xyz")` | 0 | none | `npos` |
+
+**Q3.** Prints `11010`.
+
+| Comparison | First differing chars | Result |
+|------------|-----------------------|--------|
+| `"apple" < "apricot"` | `'p'` (112) vs `'r'` (114) at index 2 | `1` |
+| `"Zebra" < "apple"` | `'Z'` (90) vs `'a'` (97) — uppercase letters sort **before** lowercase | `1` |
+| `"abc" < "ab"` | `"ab"` is a prefix, longer string is greater | `0` |
+| `"10" < "9"` | `'1'` (49) vs `'9'` (57) — compared as text, not numbers | `1` |
+| `10 < 9` | integers after `stoi` | `0` |
+
+**Q4.** Prints `1234 1235 4`. `to_string(12) + to_string(34)` concatenates text `"12" + "34" = "1234"` (it does not add 46). `stoi("1234") + 1 = 1235`. The string has 4 characters.
+
+**Q5.** `freq[0] = 3` (`'a'`), `freq[1] = 1` (`'b'`), `freq[13] = 2` (`'n'`); every other entry is 0.
+
+| char | `c - 'a'` | running count |
+|------|-----------|---------------|
+| `b` | $98 - 97 = 1$ | `freq[1] = 1` |
+| `a` | 0 | `freq[0] = 1` |
+| `n` | $110 - 97 = 13$ | `freq[13] = 1` |
+| `a` | 0 | `freq[0] = 2` |
+| `n` | 13 | `freq[13] = 2` |
+| `a` | 0 | `freq[0] = 3` |
+
+**E1 — reference solution**
+
+```cpp
+#include <string>
+using namespace std;
+
+bool isPalindrome(const string& s) {
+    int left = 0;
+    int right = (int)s.size() - 1;   // cast first: safe even when s is empty
+    while (left < right) {
+        if (s[left] != s[right]) return false;
+        left++;
+        right--;
+    }
+    return true;
+}
+```
+
+$O(N)$ time, $O(1)$ space. On `"abca"`: compare `a`/`a` (match), then `b`/`c` (mismatch) and return `false`.
+
+**E2 — reference solution**
+
+```cpp
+#include <sstream>
+#include <string>
+#include <vector>
+using namespace std;
+
+vector<string> split(const string& s, char delim) {
+    vector<string> tokens;
+    stringstream ss(s);
+    string token;
+    while (getline(ss, token, delim)) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+```
+
+$O(N)$ time and space. Between the two adjacent commas in `"red,green,,blue"`, `getline` reads zero characters and returns `""`, which is why the empty token appears.
+
+**E3 — reference solution**
+
+```cpp
+#include <string>
+using namespace std;
+
+string compress(const string& s) {
+    string out;
+    int n = s.size();
+    int i = 0;
+    while (i < n) {
+        int j = i;
+        while (j < n && s[j] == s[i]) j++;   // j stops at the end of the run
+        out += s[i];
+        out += to_string(j - i);
+        i = j;                                // jump to the next run
+    }
+    return out;
+}
+```
+
+$O(N)$ time: each character is visited once by `j`, and `+=` appends in amortized $O(1)$ per character. Trace on `"aaabccdddd"`: runs are `a`×3 (indices 0–2), `b`×1 (3), `c`×2 (4–5), `d`×4 (6–9), giving `"a3b1c2d4"`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

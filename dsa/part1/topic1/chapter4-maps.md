@@ -328,6 +328,166 @@ cout << m.count("z"); // 0 (false)
 
 ---
 
+## Practice & Self-Check
+
+For each question, keep a running picture of the map's contents as `{key: value, ...}` and update it after every line — especially lines that only *look* like reads.
+
+### Predict the Output / Trace by Hand
+
+**Q1. The `[]` gotcha, `insert`, and `erase`.** What is printed?
+
+```cpp
+unordered_map<string, int> scores = {{"Ann", 90}};
+
+if (scores["Bo"] == 100) { /* never true */ }
+scores.insert({"Ann", 50});
+scores["Cy"]++;
+size_t removed = scores.erase("Zed");
+
+cout << scores.size() << " " << scores["Ann"] << " "
+     << scores.count("Bo") << " " << scores["Cy"] << " " << removed << "\n";
+```
+
+**Q2. Re-trace Two-Sum.** Run the Section 8 loop on `nums = {3, 2, 4}`, `target = 6`. Fill in `complement`, whether it was found, and `seen` after each step. Then answer: on `nums = {3, 3}`, `target = 6`, what is printed, and why does it matter that `seen[nums[i]] = i` comes **after** the check?
+
+**Q3. Most frequent, with a tie.** Run the "Find the most frequent element" loop from Section 7 on `nums = {4, 4, 1, 1, 9}`, but with `count` declared as a `map<int, int>` instead of an `unordered_map`. What are `mostFrequent` and `maxCount`? What would change with `unordered_map`?
+
+**Q4. Ordered-map bounds.** With
+
+```cpp
+map<int, string> m = {{10, "a"}, {20, "b"}, {30, "c"}};
+```
+
+what are `m.lower_bound(20)->first`, `m.upper_bound(20)->first`, `m.lower_bound(25)->first`, `m.lower_bound(5)->first`, and is `m.upper_bound(30) == m.end()`?
+
+**Q5. Reading `insert`'s return value.** What is printed?
+
+```cpp
+unordered_map<string, int> ages;
+auto r1 = ages.insert({"Bob", 25});
+auto r2 = ages.insert({"Bob", 99});
+cout << r1.second << " " << r2.second << " " << r2.first->second << "\n";
+```
+
+### Coding Exercises
+
+**E1 (Easy). Anagram check.** Write `bool isAnagram(const string& a, const string& b)` using one `unordered_map<char, int>`: count up for `a`, count down for `b`.
+- `("listen", "silent")` returns `true`
+- `("rat", "car")` returns `false`
+
+**E2 (Easy–Medium). First unique character.** Write `int firstUniqueChar(const string& s)` that returns the index of the first character that appears exactly once, or `-1`.
+- `"leetcode"` returns `0`
+- `"loveleetcode"` returns `2`
+- `"aabb"` returns `-1`
+
+**E3 (Medium). Group anagrams.** Write `vector<vector<string>> groupAnagrams(const vector<string>& words)`. Words that are anagrams of each other go in the same group. Use a `map<string, vector<string>>` keyed by the word's sorted letters, so groups come out in sorted-key order and words keep their input order inside each group.
+- `{"eat", "tea", "tan", "ate", "nat", "bat"}` returns `{{"bat"}, {"eat", "tea", "ate"}, {"tan", "nat"}}`
+
+#### Dry-Run: Answers
+
+**Q1.** Prints `3 90 1 1 0`.
+
+| Line | Map after | Note |
+|------|-----------|------|
+| start | `{Ann: 90}` | |
+| `scores["Bo"] == 100` | `{Ann: 90, Bo: 0}` | `[]` silently inserted `Bo` |
+| `insert({"Ann", 50})` | unchanged | key exists, so `insert` does nothing |
+| `scores["Cy"]++` | `{Ann: 90, Bo: 0, Cy: 1}` | created as 0, then incremented |
+| `erase("Zed")` | unchanged | returns 0 (nothing removed) |
+
+`count("Bo")` is 1 because of the accidental insert in line 2.
+
+**Q2.** Prints `Found: 1 and 2` for `{3, 2, 4}`.
+
+| `i` | `nums[i]` | `complement` | In `seen`? | `seen` after |
+|-----|-----------|--------------|------------|--------------|
+| 0 | 3 | 3 | no | `{3:0}` |
+| 1 | 2 | 4 | no | `{3:0, 2:1}` |
+| 2 | 4 | 2 | **yes** (index 1) | `{3:0, 2:1, 4:2}` |
+
+At `i = 0`, the complement of 3 is 3 itself, but `seen` is still empty, so we never pair an element with itself. For `{3, 3}`: `i = 0` finds nothing and stores `seen[3] = 0`; `i = 1` finds complement 3 at index 0 and prints `Found: 0 and 1`. If we inserted **before** checking, `i = 0` would find its own index and wrongly print `Found: 0 and 0`.
+
+**Q3.** `mostFrequent = 1`, `maxCount = 2`. A `map` iterates keys in sorted order: `1` (count 2), `4` (count 2), `9` (count 1). Key `1` sets `maxCount = 2` first; key `4` ties but `cnt > maxCount` is strict, so it does not replace it. With `unordered_map` the iteration order is unspecified, so the answer could be `1` **or** `4` (`maxCount` is 2 either way).
+
+**Q4.** `20`, `30`, `30`, `10`, and `true`.
+
+| Call | Meaning | Result |
+|------|---------|--------|
+| `lower_bound(20)` | first key $\ge 20$ | `20` |
+| `upper_bound(20)` | first key $> 20$ | `30` |
+| `lower_bound(25)` | first key $\ge 25$ | `30` |
+| `lower_bound(5)` | first key $\ge 5$ | `10` |
+| `upper_bound(30)` | first key $> 30$ | none, so `end()` |
+
+**Q5.** Prints `1 0 25`. `insert` returns `pair<iterator, bool>`. The first call adds `Bob` (`true`). The second finds `Bob` already present, so it inserts nothing (`false`), and its iterator points at the existing entry, whose value is still `25`.
+
+**E1 — reference solution**
+
+```cpp
+#include <string>
+#include <unordered_map>
+using namespace std;
+
+bool isAnagram(const string& a, const string& b) {
+    if (a.size() != b.size()) return false;
+    unordered_map<char, int> count;
+    for (char c : a) count[c]++;
+    for (char c : b) {
+        if (--count[c] < 0) return false;  // b uses c more often than a
+    }
+    return true;
+}
+```
+
+$O(N)$ time, $O(K)$ space for $K$ distinct characters. Because the lengths are equal and no count ever went negative, every count ends at exactly 0. For `("rat", "car")`, `c` drops to $-1$, so we return `false`.
+
+**E2 — reference solution**
+
+```cpp
+#include <string>
+#include <unordered_map>
+using namespace std;
+
+int firstUniqueChar(const string& s) {
+    unordered_map<char, int> freq;
+    for (char c : s) freq[c]++;              // pass 1: count
+    for (int i = 0; i < (int)s.size(); i++) {
+        if (freq[s[i]] == 1) return i;        // pass 2: first with count 1
+    }
+    return -1;
+}
+```
+
+$O(N)$ time. The second pass walks the **string**, not the map, because the map has no order. Using `[]` in pass 2 is fine here since every `s[i]` is already a key. For `"loveleetcode"`, `l` and `o` appear twice, and `v` (index 2) appears once.
+
+**E3 — reference solution**
+
+```cpp
+#include <algorithm>
+#include <map>
+#include <string>
+#include <vector>
+using namespace std;
+
+vector<vector<string>> groupAnagrams(const vector<string>& words) {
+    map<string, vector<string>> groups;
+    for (const string& w : words) {
+        string key = w;
+        sort(key.begin(), key.end());      // "tea" -> "aet"
+        groups[key].push_back(w);          // [] creating a missing key is exactly what we want here
+    }
+    vector<vector<string>> result;
+    for (const auto& [key, group] : groups) {
+        result.push_back(group);
+    }
+    return result;
+}
+```
+
+$O(N \cdot L \log L)$ for sorting the keys plus $O(N \log N)$ for the `map` operations, with $N$ words of length up to $L$. Keys: `eat`/`tea`/`ate` give `"aet"`, `tan`/`nat` give `"ant"`, `bat` gives `"abt"`. Sorted key order is `"abt" < "aet" < "ant"`, which gives the expected output.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

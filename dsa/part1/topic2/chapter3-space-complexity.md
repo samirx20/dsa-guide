@@ -429,6 +429,169 @@ Do not wait for the interviewer to ask. Proving you understand the price tag of 
 
 ---
 
+## Practice & Self-Check
+
+For each question, list what the algorithm allocates **beyond its input**: new containers, copies, and stack frames that are alive at the same time. Then keep only the largest term.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Maximum stack depth.** For each call, how many stack frames are alive at the deepest point, what is returned, and what is the auxiliary space complexity?
+
+```cpp
+// (a)
+int sumTo(int n) {
+    if (n == 0) return 0;
+    return n + sumTo(n - 1);
+}
+// call: sumTo(4)
+
+// (b)
+long long fastPow(long long x, int n) {
+    if (n == 0) return 1;
+    long long half = fastPow(x, n / 2);
+    return (n % 2 == 0) ? half * half : half * half * x;
+}
+// call: fastPow(2, 16)
+```
+
+**Q2. Name the auxiliary space.** Give the auxiliary space of each snippet ($N$ = input size).
+
+```cpp
+// (a) two pointers swapping toward the middle of arr
+int l = 0, r = arr.size() - 1;
+while (l < r) swap(arr[l++], arr[r--]);
+
+// (b) s has length N
+string doubled = s + s;
+
+// (c) a table for two strings of lengths N and M
+vector<vector<int>> dp(N + 1, vector<int>(M + 1, 0));
+
+// (d) called once
+int countEven(vector<int> v) { /* reads v only */ }
+
+// (e) digits holds N values, each between 0 and 9
+unordered_set<int> distinct(digits.begin(), digits.end());
+```
+
+**Q3. Frames in tree recursion.** Count **every** call, including the `treeSum(nullptr)` calls. (a) For the 5-node tree drawn in Section 4, what is the maximum number of `treeSum` frames alive at once, and along which path? (b) For a 5-node skewed tree (each node only has a left child: `1 -> 2 -> 3 -> 4 -> 5`)?
+
+**Q4. Will the grid fit?** Using 4 bytes per `int` and 8 bytes per `long long` (ignoring the small per-row overhead), how much memory does each table need?
+(a) `vector<vector<int>> grid(2000, vector<int>(2000));`
+(b) `vector<vector<long long>> dp(3000, vector<long long>(3000));`
+
+**Q5. The hidden string copies.** Using Mistake 5's idea: `int countA(string s)` takes its argument **by value**. A loop calls it 1,000 times on the same string of length 10,000. How many characters are copied in total? How many if the parameter is `const string&`?
+
+### Coding Exercises
+
+**E1 (Easy). Move zeros in $O(1)$ auxiliary space.** Write `void moveZeroes(vector<int>& a)` that moves all zeros to the end while keeping the order of the non-zero values. Do not create a second array.
+- `{0, 1, 0, 3, 12}` becomes `{1, 3, 12, 0, 0}`
+- `{0, 0}` stays `{0, 0}`
+
+**E2 (Easy–Medium). Fibonacci in $O(1)$ space.** A DP table `vector<long long> f(n + 1)` takes $O(N)$ space, but each value only needs the previous two. Write `long long fib(int n)` with $O(N)$ time and $O(1)$ auxiliary space ($F_0 = 0$, $F_1 = 1$).
+- `fib(10)` returns `55`
+- `fib(50)` returns `12586269025`
+
+**E3 (Medium). Grid paths with one row of memory.** Count the paths from the top-left to the bottom-right of an $R \times C$ grid moving only right or down. A full table is $O(R \cdot C)$ space; write `long long uniquePaths(int R, int C)` using only $O(C)$ auxiliary space.
+- `uniquePaths(3, 7)` returns `28`
+- `uniquePaths(3, 3)` returns `6`
+
+#### Dry-Run: Answers
+
+**Q1.** (a) **5** frames, returns `10`, $O(N)$ space. (b) **6** frames, returns `65536`, $O(\log N)$ space.
+
+| (a) Frame | `n` | Returns |
+|-----------|-----|---------|
+| 1 | 4 | $4 + 6 = 10$ |
+| 2 | 3 | $3 + 3 = 6$ |
+| 3 | 2 | $2 + 1 = 3$ |
+| 4 | 1 | $1 + 0 = 1$ |
+| 5 | 0 | `0` (base case) |
+
+| (b) Frame | `n` | `half` | Returns |
+|-----------|-----|--------|---------|
+| 1 | 16 | 256 | $256^2 = 65536$ |
+| 2 | 8 | 16 | $16^2 = 256$ |
+| 3 | 4 | 4 | $4^2 = 16$ |
+| 4 | 2 | 2 | $2^2 = 4$ |
+| 5 | 1 | 1 | $1 \cdot 1 \cdot 2 = 2$ |
+| 6 | 0 | — | `1` (base case) |
+
+`sumTo` peels off 1 per call, so depth is $N + 1$; `fastPow` halves `n` each call, so depth is about $\log_2 N + 2$.
+
+**Q2.**
+
+| Snippet | Auxiliary space | Why |
+|---------|-----------------|-----|
+| (a) | $O(1)$ | two indices; swaps happen inside the input |
+| (b) | $O(N)$ | a new string of $2N$ characters |
+| (c) | $O(N \cdot M)$ | $(N+1)(M+1)$ cells (Mistake 3) |
+| (d) | $O(N)$ | pass-by-value copies the whole vector |
+| (e) | $O(1)$ | at most 10 distinct keys, no matter how large $N$ is |
+
+(e) is the subtle one: a hash set's size is the number of **distinct** values, which here is capped at 10.
+
+**Q3.** (a) **4** frames: `treeSum(1) -> treeSum(2) -> treeSum(4) -> treeSum(nullptr)` (the path through 5 is equally deep). (b) **6** frames: the five nodes plus one `treeSum(nullptr)` below node 5. Height 3 versus height 5 for the same 5 nodes — this is the balanced $O(\log N)$ versus skewed $O(N)$ difference from Section 4.
+
+**Q4.** (a) $2000 \times 2000 = 4{,}000{,}000$ ints $\times$ 4 bytes $= 16{,}000{,}000$ bytes $\approx$ **16 MB**. (b) $3000 \times 3000 = 9{,}000{,}000$ values $\times$ 8 bytes $= 72{,}000{,}000$ bytes $\approx$ **72 MB**. Both are $O(N^2)$; (b) could exceed a typical 64 MB judge limit even though the code looks harmless.
+
+**Q5.** By value: $1{,}000 \times 10{,}000 = 10{,}000{,}000$ characters copied (and $O(L)$ auxiliary space per call). By `const string&`: **0** characters — only a reference is passed.
+
+**E1 — reference solution**
+
+```cpp
+#include <vector>
+using namespace std;
+
+void moveZeroes(vector<int>& a) {
+    int write = 0;                        // next slot for a non-zero
+    for (int x : a) {
+        if (x != 0) a[write++] = x;       // compact non-zeros to the front
+    }
+    while (write < (int)a.size()) a[write++] = 0;   // fill the tail
+}
+```
+
+$O(N)$ time, $O(1)$ auxiliary space (one index). `write` never passes the reading position, so we never overwrite a value we still need. On `{0, 1, 0, 3, 12}`: the non-zeros `1, 3, 12` land in indices 0–2, then indices 3–4 become `0`.
+
+**E2 — reference solution**
+
+```cpp
+long long fib(int n) {
+    if (n <= 1) return n;
+    long long prev = 0, curr = 1;   // F(0), F(1)
+    for (int i = 2; i <= n; i++) {
+        long long next = prev + curr;
+        prev = curr;
+        curr = next;
+    }
+    return curr;
+}
+```
+
+$O(N)$ time, $O(1)$ auxiliary space: three variables instead of an $N$-entry table, and no recursion stack (the naive recursive version is $O(2^N)$ time **and** $O(N)$ stack space). `long long` is needed: $F_{50} = 12{,}586{,}269{,}025$ does not fit in an `int`.
+
+**E3 — reference solution**
+
+```cpp
+#include <vector>
+using namespace std;
+
+long long uniquePaths(int R, int C) {
+    vector<long long> dp(C, 1);          // row 0: one way to reach each cell
+    for (int r = 1; r < R; r++) {
+        for (int c = 1; c < C; c++) {
+            dp[c] += dp[c - 1];          // from above (old dp[c]) + from the left (new dp[c-1])
+        }
+    }
+    return dp[C - 1];
+}
+```
+
+$O(R \cdot C)$ time, $O(C)$ auxiliary space. Each row only depends on the row above it, so one row is overwritten in place. For $3 \times 3$: row 0 is `{1, 1, 1}`, row 1 is `{1, 2, 3}`, row 2 is `{1, 3, 6}`, so the answer is `6`. For $3 \times 7$: row 2 is `{1, 3, 6, 10, 15, 21, 28}`, so `28`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

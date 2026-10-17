@@ -423,6 +423,154 @@ Always `#include <algorithm>` at the top of your interview file. It gives you fr
 
 ---
 
+## Practice & Self-Check
+
+Before each answer, ask two questions: "Does this algorithm need sorted input?" and "Does it return a **value** or an **iterator**?"
+
+### Predict the Output / Trace by Hand
+
+**Q1. Sorting by length with ties.** Using the length comparator from Section 2 on
+
+```cpp
+vector<string> words = {"fig", "banana", "kiwi", "apple", "pie"};
+```
+
+(a) With `stable_sort`, what is the exact result? (b) With plain `sort`, which part of the result is **not** guaranteed?
+
+**Q2. Multi-criteria sort.** Apply the Method 3 comparator (score descending, then name ascending) to
+
+```cpp
+vector<pair<int, string>> students = {{70, "Dan"}, {85, "Eve"}, {70, "Ann"}, {85, "Bob"}};
+```
+
+What is the sorted order?
+
+**Q3. Trace `binary_search`.** Using the same `low` / `high` / `mid` steps as Section 5, search for `45` in `{10, 20, 30, 40, 50, 60, 70}`. List every step, the result, and how many elements were compared.
+
+**Q4. `accumulate`'s hidden type.** What does this print?
+
+```cpp
+vector<double> v = {1.5, 2.5, 3.0};
+cout << accumulate(v.begin(), v.end(), 0) << " "
+     << accumulate(v.begin(), v.end(), 0.0) << "\n";
+
+vector<int> filled(4);
+iota(filled.begin(), filled.end(), 5);
+for (int x : filled) cout << x;
+```
+
+**Q5. `next_permutation`.** (a) What is the next permutation of `{1, 3, 2}`? (b) Of `{2, 3, 1}`? (c) For `{3, 2, 1}`, what does the call return and what does the vector become? (d) How many lines does the Section 8 `do ... while` loop print if `nums = {1, 1, 2}`?
+
+### Coding Exercises
+
+**E1 (Easy). Maximum product of three.** Write `long long maxProductOfThree(vector<int> nums)` (at least 3 elements, may be negative). Sort first, then compare the only two candidates.
+- `{1, 2, 3, 4}` returns `24`
+- `{-10, -10, 1, 3, 2}` returns `300`
+
+**E2 (Easy–Medium). K closest points with `partial_sort`.** Write `vector<pair<int,int>> kClosest(vector<pair<int,int>> pts, int k)` that returns the `k` points closest to the origin, ordered by distance (ties broken by the point itself, `a < b`). Compare squared distances $x^2 + y^2$ (no `sqrt`) and sort only the first `k` positions.
+- `pts = {{3,3}, {5,-1}, {-2,4}, {1,1}}`, `k = 2` returns `{{1,1}, {3,3}}`
+
+**E3 (Medium). Median in $O(N)$ average.** Write `double median(vector<int> v)` using `nth_element` instead of a full sort. For an even count, return the average of the two middle values.
+- `{5, 2, 9, 1, 7}` returns `5`
+- `{4, 1, 3, 2}` returns `2.5`
+
+#### Dry-Run: Answers
+
+**Q1.** (a) `{"fig", "pie", "kiwi", "apple", "banana"}`. Lengths are fig 3, banana 6, kiwi 4, apple 5, pie 3. `stable_sort` keeps equal-length words in their original order, and `"fig"` came before `"pie"`. (b) With `sort`, the positions of `"kiwi"`, `"apple"` and `"banana"` are still forced (indices 2, 3, 4), but whether `"fig"` or `"pie"` comes first is **not** guaranteed — the comparator says they are equal, and `sort` is not stable.
+
+**Q2.** `{{85, "Bob"}, {85, "Eve"}, {70, "Ann"}, {70, "Dan"}}`. Scores split them into the 85 group and the 70 group (85 first because of `>`); inside each group, names go alphabetically.
+
+**Q3.** Returns `false` after comparing **3** elements (40, 60, 50).
+
+```text
+index:  0   1   2   3   4   5   6
+value: 10  20  30  40  50  60  70
+```
+
+| Step | `low` | `high` | `mid` | `nums[mid]` | Decision |
+|------|-------|--------|-------|-------------|----------|
+| 1 | 0 | 6 | 3 | 40 | $45 > 40$: go right, `low = 4` |
+| 2 | 4 | 6 | 5 | 60 | $45 < 60$: go left, `high = 4` |
+| 3 | 4 | 4 | 4 | 50 | $45 < 50$: go left, `high = 3` |
+| 4 | 4 | 3 | — | — | `low > high`: not found |
+
+At most $\lceil \log_2(7+1) \rceil = 3$ comparisons for 7 elements.
+
+**Q4.** Prints `6 7` and then `5678`.
+- The result type of `accumulate` is the type of the **initial value**. With `0` (an `int`), each step is truncated back to `int`: $0 + 1.5 = 1.5 \to 1$, $1 + 2.5 = 3.5 \to 3$, $3 + 3.0 = 6.0 \to 6$. The true sum is 7.
+- With `0.0`, everything stays `double`: $1.5 + 2.5 + 3.0 = 7$.
+- `iota` fills 4 slots starting at 5: `5, 6, 7, 8`.
+
+**Q5.**
+- (a) `{2, 1, 3}`. In `{1, 3, 2}`, the rightmost position `i` with `nums[i] < nums[i+1]` is index 0 (`1 < 3`). Swap `1` with the smallest larger value to its right (`2`), giving `{2, 3, 1}`, then reverse the suffix after index 0, giving `{2, 1, 3}`.
+- (b) `{3, 1, 2}`. Pivot is index 0 (`2 < 3`); the smallest value to the right that is greater than 2 is `3`. Swap to get `{3, 2, 1}`, then reverse the suffix to get `{3, 1, 2}`.
+- (c) Returns `false`, and the vector wraps around to `{1, 2, 3}`.
+- (d) **3** lines: `1 1 2`, `1 2 1`, `2 1 1`. `next_permutation` produces only **distinct** orderings, so the two `1`s are never "swapped" with each other.
+
+**E1 — reference solution**
+
+```cpp
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+long long maxProductOfThree(vector<int> nums) {
+    sort(nums.begin(), nums.end());
+    int n = nums.size();
+    long long threeLargest = 1LL * nums[n - 1] * nums[n - 2] * nums[n - 3];
+    long long twoSmallestAndLargest = 1LL * nums[0] * nums[1] * nums[n - 1];
+    return max(threeLargest, twoSmallestAndLargest);
+}
+```
+
+$O(N \log N)$ time. Two very negative numbers multiply to a large positive: for `{-10, -10, 1, 2, 3}` (sorted), $3 \times 2 \times 1 = 6$ but $(-10)(-10)(3) = 300$. `1LL` keeps the product in 64-bit math.
+
+**E2 — reference solution**
+
+```cpp
+#include <algorithm>
+#include <utility>
+#include <vector>
+using namespace std;
+
+vector<pair<int,int>> kClosest(vector<pair<int,int>> pts, int k) {
+    auto dist2 = [](const pair<int,int>& p) {
+        return p.first * p.first + p.second * p.second;
+    };
+    partial_sort(pts.begin(), pts.begin() + k, pts.end(),
+                 [&](const pair<int,int>& a, const pair<int,int>& b) {
+                     if (dist2(a) != dist2(b)) return dist2(a) < dist2(b);
+                     return a < b;   // deterministic tie-break
+                 });
+    pts.resize(k);   // keep only the k sorted front elements
+    return pts;
+}
+```
+
+$O(N \log k)$ time. Squared distances: `{3,3}` → 18, `{5,-1}` → 26, `{-2,4}` → 20, `{1,1}` → 2. The two smallest are 2 then 18. Squared distance gives the same order as real distance, since $\sqrt{\ }$ is increasing.
+
+**E3 — reference solution**
+
+```cpp
+#include <algorithm>
+#include <vector>
+using namespace std;
+
+double median(vector<int> v) {
+    int n = v.size();
+    auto mid = v.begin() + n / 2;
+    nth_element(v.begin(), mid, v.end());   // *mid is now the (n/2)-th smallest
+    if (n % 2 == 1) return *mid;
+    // Even n: the other middle value is the LARGEST element in the left part.
+    int lowerMid = *max_element(v.begin(), mid);
+    return (lowerMid + *mid) / 2.0;
+}
+```
+
+$O(N)$ average time. For `{4, 1, 3, 2}`: `n / 2 = 2`, so `nth_element` puts the 3rd smallest (`3`) at index 2 with `{1, 2}` (in some order) to its left. Their max is `2`, and $(2 + 3) / 2.0 = 2.5$. Dividing by `2.0` (not `2`) avoids integer division.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

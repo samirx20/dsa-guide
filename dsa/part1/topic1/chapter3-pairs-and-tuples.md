@@ -359,6 +359,175 @@ pair<int,int> p = {1, 2};
 
 ---
 
+## Practice & Self-Check
+
+The one rule behind most of these questions: pairs and tuples compare **lexicographically** — element 0 first, and only on a tie do you look at element 1, then 2, and so on.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Sorting a vector of pairs.** What is the order after sorting?
+
+```cpp
+vector<pair<int,int>> pts = {{2,5}, {1,9}, {2,1}, {1,2}, {0,7}};
+sort(pts.begin(), pts.end());
+```
+
+**Q2. Comparison drill.** What does this print (`1` = true, `0` = false)?
+
+```cpp
+pair<int,int> a = {3, 1}, b = {2, 9}, c = {3, 0};
+tuple<int,int,int> t1 = {1, 2, 3}, t2 = {1, 1, 9};
+pair<int,string> s1 = {1, "b"}, s2 = {1, "apple"};
+
+cout << (a < b) << (b < c) << (c < a) << (t1 < t2) << (s1 < s2) << "\n";
+```
+
+**Q3. Structured bindings: copy or reference?** What is printed?
+
+```cpp
+pair<int,int> pos = {5, 10};
+
+auto [x, y] = pos;      // unpack a COPY
+x = 99;
+
+auto& [rx, ry] = pos;   // unpack by REFERENCE
+ry = 42;
+
+cout << pos.first << " " << pos.second << " " << x << "\n";
+```
+
+**Q4. Trace the BFS pattern.** Run Pattern 3 from Section 7 on a grid with `rows = 2`, `cols = 3`, starting at `(0, 0)`, with
+
+```cpp
+vector<pair<int,int>> directions = {{1,0}, {-1,0}, {0,1}, {0,-1}};
+```
+
+In what order are cells popped from the queue, and what is the final `dist` grid?
+
+**Q5. Frequency sort with ties.** Run Pattern 2 from Section 7 on `"mississippi"` instead of `"banana"`. What are the counts, and which parts of the final `sorted` order are guaranteed?
+
+### Coding Exercises
+
+**E1 (Easy). Return two indices.** Write `pair<int,int> minMaxIndex(const vector<int>& v)` that returns `{index of the minimum, index of the maximum}` in a single pass. On ties, use the **first** occurrence. Assume `v` is non-empty.
+- `{4, 1, 7, 1, 7}` returns `{1, 2}`
+- `{5}` returns `{0, 0}`
+
+**E2 (Easy–Medium). Deterministic frequency sort.** Write `vector<pair<char,int>> freqSorted(const string& s)` for lowercase strings. Sort by count **descending**, and break ties by character **ascending**, so the output is always the same.
+- `"mississippi"` returns `{{'i',4}, {'s',4}, {'p',2}, {'m',1}}`
+- `"banana"` returns `{{'a',3}, {'n',2}, {'b',1}}`
+
+**E3 (Medium). Multi-key ranking with tuples.** Each student is a `tuple<string,int,int>` holding `(name, score, age)`. Write `void rankStudents(vector<tuple<string,int,int>>& v)` that sorts by score **descending**, then age **ascending**, then name **ascending**.
+- `{("Ana",90,20), ("Ben",85,19), ("Cal",90,19), ("Dee",90,19)}` becomes `Cal, Dee, Ana, Ben`
+
+#### Dry-Run: Answers
+
+**Q1.** `{{0,7}, {1,2}, {1,9}, {2,1}, {2,5}}`. Group by `.first` (0, then 1, then 2); inside each group, order by `.second`: `{1,2}` before `{1,9}`, and `{2,1}` before `{2,5}`.
+
+**Q2.** Prints `01100`.
+
+| Expr | Step 1 | Step 2 | Result |
+|------|--------|--------|--------|
+| `a < b` | $3 < 2$? no, and $3 \ne 2$ | — | `0` |
+| `b < c` | $2 < 3$ | — | `1` |
+| `c < a` | $3 = 3$ tie | $0 < 1$ | `1` |
+| `t1 < t2` | $1 = 1$ tie | $2 < 1$? no | `0` |
+| `s1 < s2` | $1 = 1$ tie | `"b" < "apple"`? `'b'` > `'a'` | `0` |
+
+**Q3.** Prints `5 42 99`. `auto [x, y]` unpacks a hidden copy, so `x = 99` does not touch `pos`. `auto& [rx, ry]` binds to `pos` itself, so `ry = 42` overwrites `pos.second`. `x` is still `99`.
+
+**Q4.** Pop order: `(0,0), (1,0), (0,1), (1,1), (0,2), (1,2)`. Final `dist`:
+
+```text
+0 1 2
+1 2 3
+```
+
+| Pop | Neighbors tried (down, up, right, left) | Newly pushed (dist) |
+|-----|------------------------------------------|---------------------|
+| `(0,0)` | `(1,0)` ok, `(-1,0)` out, `(0,1)` ok, `(0,-1)` out | `(1,0)`=1, `(0,1)`=1 |
+| `(1,0)` | `(2,0)` out, `(0,0)` seen, `(1,1)` ok, `(1,-1)` out | `(1,1)`=2 |
+| `(0,1)` | `(1,1)` seen, `(-1,1)` out, `(0,2)` ok, `(0,0)` seen | `(0,2)`=2 |
+| `(1,1)` | `(2,1)` out, `(0,1)` seen, `(1,2)` ok, `(1,0)` seen | `(1,2)`=3 |
+| `(0,2)` | all out or seen | — |
+| `(1,2)` | all out or seen | — |
+
+Each `dist` value is the Manhattan distance $|r| + |c|$ from `(0,0)`, because the grid has no walls.
+
+**Q5.** Counts: `i` → 4, `s` → 4, `p` → 2, `m` → 1. Guaranteed: the last two entries are `{'p',2}` then `{'m',1}`. **Not** guaranteed: whether `{'i',4}` or `{'s',4}` comes first. The comparator only looks at `.second`, so `i` and `s` are "equal" to it; `sort` is not stable, and the starting order from an `unordered_map` is unspecified anyway. E2 fixes this with a tie-breaker.
+
+**E1 — reference solution**
+
+```cpp
+#include <utility>
+#include <vector>
+using namespace std;
+
+pair<int,int> minMaxIndex(const vector<int>& v) {
+    int minIdx = 0, maxIdx = 0;
+    for (int i = 1; i < (int)v.size(); i++) {
+        if (v[i] < v[minIdx]) minIdx = i;   // strict < keeps the FIRST min
+        if (v[i] > v[maxIdx]) maxIdx = i;   // strict > keeps the FIRST max
+    }
+    return {minIdx, maxIdx};
+}
+
+// Usage: auto [lo, hi] = minMaxIndex(nums);
+```
+
+$O(N)$ time, $O(1)$ space. On `{4, 1, 7, 1, 7}`, the second `1` (index 3) and the second `7` (index 4) never replace the first ones because the comparisons are strict.
+
+**E2 — reference solution**
+
+```cpp
+#include <algorithm>
+#include <string>
+#include <utility>
+#include <vector>
+using namespace std;
+
+vector<pair<char,int>> freqSorted(const string& s) {
+    int freq[26] = {0};
+    for (char c : s) freq[c - 'a']++;
+
+    vector<pair<char,int>> result;
+    for (int i = 0; i < 26; i++) {
+        if (freq[i] > 0) result.push_back({(char)('a' + i), freq[i]});
+    }
+
+    sort(result.begin(), result.end(), [](const pair<char,int>& a, const pair<char,int>& b) {
+        if (a.second != b.second) return a.second > b.second; // count descending
+        return a.first < b.first;                              // char ascending
+    });
+    return result;
+}
+```
+
+$O(N + K \log K)$ time where $K \le 26$ distinct letters, so effectively $O(N)$. The tie-breaker makes `'i'` come before `'s'` every time.
+
+**E3 — reference solution**
+
+```cpp
+#include <algorithm>
+#include <string>
+#include <tuple>
+#include <vector>
+using namespace std;
+
+void rankStudents(vector<tuple<string,int,int>>& v) {
+    sort(v.begin(), v.end(), [](const auto& a, const auto& b) {
+        const auto& [nameA, scoreA, ageA] = a;
+        const auto& [nameB, scoreB, ageB] = b;
+        // Build "sort keys" and let tuple's lexicographic < do the work.
+        // Negating the score turns "descending" into "ascending".
+        return make_tuple(-scoreA, ageA, nameA) < make_tuple(-scoreB, ageB, nameB);
+    });
+}
+```
+
+$O(N \log N)$ time. Keys: Ana `(-90, 20, "Ana")`, Ben `(-85, 19, "Ben")`, Cal `(-90, 19, "Cal")`, Dee `(-90, 19, "Dee")`. Sorting the keys ascending gives Cal, Dee (tie on score and age, so names decide), Ana, then Ben (since $-85 > -90$).
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

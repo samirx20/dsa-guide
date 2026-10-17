@@ -432,6 +432,210 @@ All operations for Stacks, Queues, and Deques (push, pop, top/front) are strictl
 
 ---
 
+## Practice & Self-Check
+
+Draw each container as a row of boxes and mark which end is "top", "front" or "back". Then apply the operations one at a time, just like the chapter's dry-run tables.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Same operations, different container.** Both containers get the exact same calls. What are the final contents, `size()`, and `top()` / `front()` / `back()`?
+
+```cpp
+stack<int> s;            queue<int> q;
+s.push(1);               q.push(1);
+s.push(2);               q.push(2);
+s.push(3);               q.push(3);
+s.pop();                 q.pop();
+s.push(4);               q.push(4);
+s.pop();                 q.pop();
+```
+
+**Q2. Deque from both ends.** What are the final contents, `dq[2]`, `front()` and `back()`?
+
+```cpp
+deque<int> dq;
+dq.push_front(3);
+dq.push_back(7);
+dq.push_front(1);
+dq.push_back(9);
+dq.pop_back();
+dq.push_front(0);
+```
+
+**Q3. Where does `isValid` fail?** Using `isValid` from Section 8, give the result for each input and the exact step / reason it returns:
+(a) `"{[(])}"` (b) `"(()"` (c) `"())"`
+
+**Q4. BFS on a new graph.** Run `bfs` from Section 9 with `start = 0` on
+
+```cpp
+vector<vector<int>> adj = {
+    {2, 1},   // 0
+    {3},      // 1
+    {3, 4},   // 2
+    {5},      // 3
+    {5},      // 4
+    {}        // 5
+};
+```
+
+What is printed? Show the queue after each node is processed.
+
+**Q5. Stack into queue.** What is printed?
+
+```cpp
+stack<int> s;
+for (int x : {5, 1, 4}) s.push(x);
+
+queue<int> q;
+while (!s.empty()) { q.push(s.top()); s.pop(); }
+while (!q.empty()) { cout << q.front() << " "; q.pop(); }
+```
+
+### Coding Exercises
+
+**E1 (Easy). Apply backspaces.** In the string, `'#'` means "backspace": delete the previous character if there is one. Write `string applyBackspaces(const string& s)` using a `stack<char>`.
+- `"ab#c"` returns `"ac"`
+- `"a##b"` returns `"b"` (the second `#` has nothing to delete)
+
+**E2 (Easy–Medium). Remove adjacent duplicates.** Repeatedly delete pairs of equal adjacent characters until none remain. Write `string removeAdjacentDuplicates(const string& s)` in one left-to-right pass.
+- `"abbaca"` returns `"ca"` (remove `bb` giving `"aaca"`, then remove `aa` giving `"ca"`)
+- `"azxxzy"` returns `"ay"`
+
+**E3 (Medium). Sliding window maximum.** Section 5 mentions deques for this problem. Write `vector<int> maxSlidingWindow(const vector<int>& nums, int k)` that returns the maximum of every window of size `k`, in $O(N)$ total time. Keep a `deque<int>` of **indices** whose values are in decreasing order.
+- `nums = {1, 3, -1, -3, 5, 3, 6, 7}`, `k = 3` returns `{3, 3, 5, 5, 6, 7}`
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| Step | `stack` (bottom→top) | `queue` (front→back) |
+|------|----------------------|----------------------|
+| push 1, 2, 3 | `[1, 2, 3]` | `[1, 2, 3]` |
+| `pop()` | `[1, 2]` (removed 3) | `[2, 3]` (removed 1) |
+| push 4 | `[1, 2, 4]` | `[2, 3, 4]` |
+| `pop()` | `[1, 2]` (removed 4) | `[3, 4]` (removed 2) |
+
+Stack: contents `[1, 2]`, `size() == 2`, `top() == 2`. Queue: contents `[3, 4]`, `size() == 2`, `front() == 3`, `back() == 4`. Same calls, completely different survivors: LIFO removes the newest, FIFO removes the oldest.
+
+**Q2.** Final `[0, 1, 3, 7]`; `dq[2] == 3`, `front() == 0`, `back() == 7`.
+
+| Operation | Deque (front→back) |
+|-----------|--------------------|
+| `push_front(3)` | `[3]` |
+| `push_back(7)` | `[3, 7]` |
+| `push_front(1)` | `[1, 3, 7]` |
+| `push_back(9)` | `[1, 3, 7, 9]` |
+| `pop_back()` | `[1, 3, 7]` |
+| `push_front(0)` | `[0, 1, 3, 7]` |
+
+**Q3.**
+- (a) `false`. Steps 1–3 push `{`, `[`, `(`. Step 4 reads `]`, but `top()` is `(`, which does not match, so it returns `false` immediately.
+- (b) `false`. Push `(`, push `(`, then `)` pops one. The loop ends with one `(` left, so `st.empty()` is `false`.
+- (c) `false`. `(` pushed, `)` pops it, then the second `)` finds the stack **empty** and returns `false` at the `if (st.empty())` guard (without that guard, `top()` on an empty stack would be Undefined Behavior — Mistake 1).
+
+**Q4.** Prints `0 2 1 3 4 5`.
+
+| Process | Neighbors | Newly enqueued | Queue after |
+|---------|-----------|----------------|-------------|
+| 0 | 2, 1 | 2, 1 | `[2, 1]` |
+| 2 | 3, 4 | 3, 4 | `[1, 3, 4]` |
+| 1 | 3 | — (3 already visited) | `[3, 4]` |
+| 3 | 5 | 5 | `[4, 5]` |
+| 4 | 5 | — (5 already visited) | `[5]` |
+| 5 | — | — | `[]` |
+
+Node 2 comes before node 1 because the neighbor **list order** `{2, 1}` decides the enqueue order. Marking `visited` when pushing (not when popping) stops 3 and 5 from being enqueued twice.
+
+**Q5.** Prints `4 1 5`. The stack holds `[5, 1, 4]` with `4` on top. Popping it moves `4`, `1`, `5` (reversed) into the queue, and the queue then outputs them in that same FIFO order.
+
+**E1 — reference solution**
+
+```cpp
+#include <stack>
+#include <string>
+using namespace std;
+
+string applyBackspaces(const string& s) {
+    stack<char> st;
+    for (char c : s) {
+        if (c == '#') {
+            if (!st.empty()) st.pop();   // guard: never pop an empty stack
+        } else {
+            st.push(c);
+        }
+    }
+    // The stack holds the answer reversed (top = last char); fill from the back.
+    string result(st.size(), ' ');
+    for (int i = (int)result.size() - 1; i >= 0; i--) {
+        result[i] = st.top();
+        st.pop();
+    }
+    return result;
+}
+```
+
+$O(N)$ time and space. For `"a##b"`: push `a`, pop it, the second `#` sees an empty stack and does nothing, push `b`, giving `"b"`.
+
+**E2 — reference solution**
+
+```cpp
+#include <string>
+using namespace std;
+
+string removeAdjacentDuplicates(const string& s) {
+    string st;                         // a string used as a stack: back() is the top
+    for (char c : s) {
+        if (!st.empty() && st.back() == c) {
+            st.pop_back();             // c cancels the top
+        } else {
+            st.push_back(c);
+        }
+    }
+    return st;
+}
+```
+
+$O(N)$ time. Trace on `"abbaca"`: `a` gives `[a]`, `b` gives `[a, b]`, `b` cancels to `[a]`, `a` cancels to `[]`, `c` gives `[c]`, `a` gives `[c, a]`, so `"ca"`. Using a `string` as the stack avoids the reverse-copy step of E1.
+
+**E3 — reference solution**
+
+```cpp
+#include <deque>
+#include <vector>
+using namespace std;
+
+vector<int> maxSlidingWindow(const vector<int>& nums, int k) {
+    deque<int> dq;                     // indices; nums[dq] is decreasing front->back
+    vector<int> result;
+    for (int i = 0; i < (int)nums.size(); i++) {
+        if (!dq.empty() && dq.front() <= i - k) {
+            dq.pop_front();            // front index slid out of the window
+        }
+        while (!dq.empty() && nums[dq.back()] <= nums[i]) {
+            dq.pop_back();             // smaller values can never be a max again
+        }
+        dq.push_back(i);
+        if (i >= k - 1) result.push_back(nums[dq.front()]);
+    }
+    return result;
+}
+```
+
+$O(N)$ time: each index is pushed once and popped at most once. Trace (deque shown as indices with values):
+
+| `i` | `nums[i]` | Deque after | Output |
+|-----|-----------|-------------|--------|
+| 0 | 1 | `[0:1]` | — |
+| 1 | 3 | `[1:3]` | — |
+| 2 | -1 | `[1:3, 2:-1]` | 3 |
+| 3 | -3 | `[1:3, 2:-1, 3:-3]` | 3 |
+| 4 | 5 | `[4:5]` (index 1 expired; -1, -3 popped) | 5 |
+| 5 | 3 | `[4:5, 5:3]` | 5 |
+| 6 | 6 | `[6:6]` | 6 |
+| 7 | 7 | `[7:7]` | 7 |
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
