@@ -577,6 +577,191 @@ APIs are how your agents will interact with the outside world. JSON is the text-
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. The round trip is not always perfect.** Predict all three printed lines:
+
+```python
+import json
+
+d = {"ok": True, "err": None, "ids": (1, 2), 7: 1.0}
+s = json.dumps(d)
+print(s)
+d2 = json.loads(s)
+print(d2)
+print(d2 == d)
+```
+
+**Q2. Chained indexing.** Using the chapter's `factory_json` from Section 5 (after `data = json.loads(factory_json)`), predict each value:
+
+```python
+print(data["sensors"][1]["readings"][-1])
+print(len(data["alerts"]["critical"]))
+print(data["sensors"][1]["id"][:4])
+print(type(data["alerts"]["count"]).__name__)
+```
+
+**Q3. Re-run the averaging loop.** Suppose the API now returns four temperature readings: `"readings": [22.5, 23.1, 22.8, 24.0]` for `TEMP-001` (`PRES-001` is unchanged). Using the chapter's loop (`print(f"Sensor {sensor_id} ({sensor_type}): avg = {avg_reading:.1f}")`), fill in the trace and give both printed lines.
+
+| Sensor | `sum(readings)` | `len(readings)` | `avg_reading` | Printed with `:.1f` |
+|--------|-----------------|-----------------|---------------|---------------------|
+| `TEMP-001` | ? | ? | ? | ? |
+| `PRES-001` | ? | ? | ? | ? |
+
+**Q4. Which guard fires?** Feed each raw string to the chapter's `parse_sensor_response` (Section 8). For each one, say whether it returns a dict (and which one) or raises `ValueError` (and from which check):
+
+```python
+'{"sensor_id": "T2", "temperature": "22.5"}'
+'{"temperature": 0}'
+"{'sensor_id': 'T3'}"
+'{"sensor_id": "T4", "temperature": null}'
+'{"sensor_id": "T5", "temperature": true}'
+```
+
+### Coding Exercises
+
+**E1 (Easy). Count live sensors.** Write `count_active(raw: str) -> int` that parses a factory-style JSON string and returns how many entries in `"sensors"` have `"status": "active"`. A missing `"sensors"` key counts as zero sensors.
+
+```python
+raw = '{"sensors": [{"id": "TEMP-001", "status": "active"}, {"id": "PRES-001", "status": "offline"}, {"id": "HUM-001", "status": "active"}]}'
+count_active(raw)   # 2
+count_active('{}')  # 0
+```
+
+**E2 (Easy–Medium). Per-sensor averages.** Write `sensor_averages(raw: str) -> dict[str, float]` that maps each sensor `"id"` to the average of its `"readings"`, rounded to 1 decimal. Skip sensors whose readings list is empty or missing (do not divide by zero).
+
+```python
+raw = '{"sensors": [{"id": "TEMP-001", "readings": [22.5, 23.1, 22.8]}, {"id": "PRES-001", "readings": []}, {"id": "HUM-001", "readings": [40.0, 45.0]}]}'
+sensor_averages(raw)   # {'TEMP-001': 22.8, 'HUM-001': 42.5}
+```
+
+**E3 (Medium). Layered robot config.** Write `merge_config(defaults_json: str, override_json: str) -> str`. Parse both strings, then merge them *deeply*: if a key holds a dict in both, merge those dicts recursively. Otherwise the override value wins. Return the result with `json.dumps(..., sort_keys=True)`. If either input is invalid JSON, raise `ValueError` with a message that starts with `Invalid config JSON:`.
+
+```python
+defaults = '{"robot": "amr-7", "limits": {"max_vel": 2.0, "max_accel": 1.0}, "debug": false}'
+override = '{"limits": {"max_vel": 1.5}, "debug": true}'
+merge_config(defaults, override)
+# '{"debug": true, "limits": {"max_accel": 1.0, "max_vel": 1.5}, "robot": "amr-7"}'
+merge_config('{"a": {"b": 1}}', '{"a": 5}')
+# '{"a": 5}'
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Output:
+
+```python
+{"ok": true, "err": null, "ids": [1, 2], "7": 1.0}
+{'ok': True, 'err': None, 'ids': [1, 2], '7': 1.0}
+False
+```
+
+| Python value | JSON text | Back in Python |
+|--------------|-----------|----------------|
+| `True` | `true` | `True` |
+| `None` | `null` | `None` |
+| tuple `(1, 2)` | array `[1, 2]` | **list** `[1, 2]` |
+| int key `7` | string key `"7"` | **str** key `'7'` |
+
+`d2 != d` because the tuple came back as a list and the key `7` came back as `'7'`. Note that `json.dumps` silently converts `int`, `float`, `bool` and `None` keys to strings. It only raises `TypeError` for keys like tuples (`{(1, 2): "v"}`). Never assume a dict with non-string keys survives a JSON round trip unchanged.
+
+**Q2.** Output:
+
+```python
+101.4
+0
+PRES
+int
+```
+
+- `data["sensors"][1]` is the pressure sensor, and `[-1]` is its last reading, `101.4`.
+- `data["alerts"]["critical"]` is the empty list `[]`, so its length is `0`.
+- `"PRES-001"[:4]` is `"PRES"`.
+- The JSON number `0` (no decimal point) parses as a Python `int`.
+
+**Q3.**
+
+| Sensor | `sum(readings)` | `len(readings)` | `avg_reading` | Printed with `:.1f` |
+|--------|-----------------|-----------------|---------------|---------------------|
+| `TEMP-001` | $22.5+23.1+22.8+24.0 = 92.4$ | 4 | $92.4/4 = 23.1$ | `23.1` |
+| `PRES-001` | $101.3+101.2+101.4 = 303.9$ | 3 | $303.9/3 = 101.3$ | `101.3` |
+
+```python
+Sensor TEMP-001 (temperature): avg = 23.1
+Sensor PRES-001 (pressure): avg = 101.3
+```
+
+**Q4.**
+
+| Input | Result | Which check |
+|-------|--------|-------------|
+| `"temperature": "22.5"` | `ValueError: Sensor T2: temperature must be numeric, got <class 'str'>` | `isinstance` check: a quoted number is a *string* |
+| `{"temperature": 0}` | `{'sensor_id': 'UNKNOWN', 'temperature': 0.0, 'valid': True}` | passes: `0 is None` is `False`, so `0` is accepted, and `.get` supplies `"UNKNOWN"` |
+| `"{'sensor_id': 'T3'}"` | `ValueError: Invalid JSON from sensor: Expecting property name enclosed in double quotes: ...` | `json.loads` fails on single quotes (Mistake 4) |
+| `"temperature": null` | `ValueError: Sensor T4: missing temperature reading` | `null` becomes `None` |
+| `"temperature": true` | `{'sensor_id': 'T5', 'temperature': 1.0, 'valid': True}` | **passes!** In Python `bool` is a subclass of `int`, so `isinstance(True, (int, float))` is `True` and `float(True)` is `1.0` |
+
+The last row is a real validation hole: add `if isinstance(temperature, bool): raise ValueError(...)` *before* the numeric check (or use Pydantic, which comes later in the course).
+
+**E1 — reference solution**
+
+```python
+import json
+
+def count_active(raw: str) -> int:
+    data = json.loads(raw)
+    return sum(1 for s in data.get("sensors", []) if s.get("status") == "active")
+```
+
+`.get("sensors", [])` gives the missing-key case for free, and `.get("status")` returns `None` instead of crashing on a sensor without a status. Cost: $O(n)$ in the number of sensors.
+
+**E2 — reference solution**
+
+```python
+import json
+
+def sensor_averages(raw: str) -> dict[str, float]:
+    data = json.loads(raw)
+    result: dict[str, float] = {}
+    for sensor in data.get("sensors", []):
+        readings = sensor.get("readings", [])
+        if not readings:            # empty or missing: skip, never divide by zero
+            continue
+        result[sensor["id"]] = round(sum(readings) / len(readings), 1)
+    return result
+```
+
+Check: $(22.5 + 23.1 + 22.8)/3 = 68.4/3 = 22.8$ and $(40 + 45)/2 = 42.5$. Cost: $O(\text{total readings})$.
+
+**E3 — reference solution**
+
+```python
+import json
+
+def deep_merge(base: dict, override: dict) -> dict:
+    merged = dict(base)                     # shallow copy: never mutate the caller's dict
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge(merged[key], value)   # both sides are dicts: recurse
+        else:
+            merged[key] = value                            # otherwise the override wins
+    return merged
+
+def merge_config(defaults_json: str, override_json: str) -> str:
+    try:
+        defaults = json.loads(defaults_json)
+        override = json.loads(override_json)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid config JSON: {e}")
+    return json.dumps(deep_merge(defaults, override), sort_keys=True)
+```
+
+Why it works: recursion only happens when *both* sides hold a dict, so `limits.max_accel` survives while `limits.max_vel` is replaced. In the second example the override value `5` is not a dict, so it replaces the whole `{"b": 1}` subtree. `sort_keys=True` makes the output deterministic. Cost: $O(\text{total keys})$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

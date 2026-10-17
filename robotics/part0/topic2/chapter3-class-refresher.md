@@ -592,6 +592,230 @@ Classes are blueprints for creating structured data objects. We will soon use a 
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Methods and `self`.** Using the plain (non-dataclass) `SensorReading` from Section 2 (with `__str__`, `is_overheated`, `difference_from`), predict every printed value:
+
+```python
+reading_1 = SensorReading("S-003", 79.5)
+reading_2 = SensorReading("S-004", 81.0)
+
+print(reading_1)
+print(reading_1.is_overheated(), reading_2.is_overheated())
+print(reading_1.is_overheated(threshold=79.5))
+print(reading_2.difference_from(reading_1))
+```
+
+**Q2. Equality vs. identity.** Using the two-field `@dataclass SensorReading` from Section 4 (no custom `__str__`), predict each line:
+
+```python
+a = SensorReading("S-001", 22.5)
+b = SensorReading("S-001", 22.5)
+c = a
+print(a == b, a is b)
+c.temperature = 30.0
+print(a == b, a is c, a.temperature)
+print(b)
+```
+
+What would `print(a == b)` on the **first** line print if `SensorReading` were the plain class from Section 1 (no `@dataclass`, no `__eq__`)?
+
+**Q3. Class attribute vs. instance attribute.** Extend Mistake 4 by one line. Predict the output:
+
+```python
+class SensorReading:
+    default_unit = "celsius"
+
+r1 = SensorReading()
+r2 = SensorReading()
+r1.default_unit = "fahrenheit"
+SensorReading.default_unit = "kelvin"    # changed on the CLASS
+r3 = SensorReading()
+print(r1.default_unit, r2.default_unit, r3.default_unit)
+```
+
+**Q4. A freezer sensor.** Using `SensorConfig` from Section 8, predict all four outputs. (Look closely at how `__str__` builds `alert_str`.)
+
+```python
+freezer = SensorConfig("FRZ-01", "temperature", -30.0, 10.0, alert_threshold=0.0)
+print(freezer)
+print(freezer.is_alert(0.0))
+print(freezer.validate_reading(10.0))
+print(freezer.validate_reading(-30.5))
+```
+
+**Q5. What really happens?**
+1. You actually run the "WRONG" version from Section 5's mutable-default mistake: a `@dataclass` with `readings: list = []`. On which line does Python stop, and with what error?
+2. Using the Section 6 `HumiditySensor`, what do `print(h)`, `h.is_overheated()` and `h.is_humid()` give for `h = HumiditySensor("S-9", 90.0)`?
+
+### Coding Exercises
+
+**E1 (Easy). Battery gauge.** Write a `@dataclass Battery` with `voltage: float`, `min_voltage: float = 22.0`, `max_voltage: float = 25.2` (a 6-cell Li-ion pack), and a method `percent(self) -> float` that maps the voltage linearly onto 0–100 %, **clamps** to that range, and rounds to 1 decimal.
+
+```python
+Battery(23.6).percent()   # 50.0
+Battery(25.5).percent()   # 100.0  (clamped)
+Battery(21.0).percent()   # 0.0    (clamped)
+```
+
+**E2 (Easy–Medium). A log that owns its own list.** Write a `@dataclass SensorLog` with `sensor_id: str` and `readings: list[float]` (default: a new empty list per instance), plus `add(self, value: float) -> None` and `average(self) -> float | None` (return `None` when empty). Two logs must never share readings.
+
+```python
+a = SensorLog("TEMP-001"); b = SensorLog("TEMP-002")
+a.add(22.5); a.add(23.5)
+a.average()   # 23.0
+b.average()   # None
+b.readings    # []
+```
+
+**E3 (Medium). Inherit and extend.** Write `@dataclass AlertingLog(SensorLog)` that adds `threshold: float = 80.0` and `alerts: list[float]` (own empty list). Override `add` so that it still stores the reading (reuse the parent with `super()`) and *also* records it in `alerts` when `value >= threshold`. Add `alert_ratio(self) -> float` = alerts / readings (0.0 when there are no readings).
+
+```python
+log = AlertingLog("TEMP-001", threshold=80.0)
+for v in [75.0, 82.5, 80.0, 60.0]:
+    log.add(v)
+log.alerts         # [82.5, 80.0]
+log.alert_ratio()  # 0.5
+log.average()      # 74.375   (inherited, unchanged)
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Output:
+
+```python
+Sensor S-003: 79.5°C
+False True
+False
+1.5
+```
+
+| Call | `self.temperature` | Comparison | Result |
+|------|--------------------|------------|--------|
+| `reading_1.is_overheated()` | 79.5 | $79.5 > 80.0$ | `False` |
+| `reading_2.is_overheated()` | 81.0 | $81.0 > 80.0$ | `True` |
+| `reading_1.is_overheated(threshold=79.5)` | 79.5 | $79.5 > 79.5$ (strict `>`) | `False` |
+| `reading_2.difference_from(reading_1)` | 81.0 | $\lvert 81.0 - 79.5 \rvert$ | `1.5` |
+
+**Q2.** Output:
+
+```python
+True False
+False True 30.0
+SensorReading(sensor_id='S-001', temperature=22.5)
+```
+
+`a == b` uses the auto-generated `__eq__` (compare field values), while `a is b` asks "same object in memory?". `c = a` copies the *reference*, not the object, so `c.temperature = 30.0` changes `a` as well, and now `a != b`. `b` is untouched, and `print(b)` uses the auto-generated `__repr__`.
+
+Without `@dataclass` (and with no hand-written `__eq__`), `==` falls back to identity, so `a == b` would print `False` even though the values match.
+
+**Q3.** Output:
+
+```python
+fahrenheit kelvin kelvin
+```
+
+| Object | Has its own `default_unit`? | Lookup finds |
+|--------|-----------------------------|--------------|
+| `r1` | yes (`"fahrenheit"`, created by the assignment) | instance value `fahrenheit` |
+| `r2` | no | class value, which is now `kelvin` |
+| `r3` | no | class value `kelvin` |
+
+Attribute lookup checks the instance first, then the class. Changing the class attribute changes what every instance *without* its own copy sees, including instances that already existed (`r2`).
+
+**Q4.** Output:
+
+```python
+[ACTIVE] FRZ-01 (temperature): -30.0-10.0celsius
+True
+True
+False
+```
+
+- The `, alert@0.0` suffix is **missing** because `__str__` tests `if self.alert_threshold`, and `0.0` is falsy. (The correct test is `is not None`, which `is_alert` already uses.)
+- `is_alert(0.0)`: the threshold is not `None`, and $0.0 \ge 0.0$, so `True`.
+- `validate_reading(10.0)`: $-30.0 \le 10.0 \le 10.0$, so `True` (the bounds are inclusive).
+- `validate_reading(-30.5)`: $-30.5 < -30.0$, so `False`.
+
+**Q5.**
+1. Python stops while **defining the class**, before any instance is created. `@dataclass` refuses list, dict and set defaults outright: `ValueError: mutable default <class 'list'> for field readings is not allowed: use default_factory`. So with `@dataclass` you never reach the shared-list bug. You *do* get that bug with a plain class that uses a class attribute `readings = []`, or with a function default `def f(readings=[])`. Either way, the fix is still `field(default_factory=list)`.
+2. Output:
+
+```python
+HumiditySensor(sensor_id='S-9', temperature=90.0, humidity=0.0)
+True
+False
+```
+
+`humidity` takes its default `0.0`. The inherited `is_overheated` gives $90.0 > 80.0$, so `True`. `is_humid` gives $0.0 > 70.0$, so `False`.
+
+**E1 — reference solution**
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Battery:
+    voltage: float
+    min_voltage: float = 22.0
+    max_voltage: float = 25.2
+
+    def percent(self) -> float:
+        fraction = (self.voltage - self.min_voltage) / (self.max_voltage - self.min_voltage)
+        fraction = max(0.0, min(1.0, fraction))     # clamp to [0, 1]
+        return round(fraction * 100, 1)
+```
+
+Check: $\dfrac{23.6 - 22.0}{25.2 - 22.0} = \dfrac{1.6}{3.2} = 0.5$, which gives `50.0`. Clamping happens *before* scaling, so a 25.5 V pack reads `100.0`, not `109.4`.
+
+**E2 — reference solution**
+
+```python
+from dataclasses import dataclass, field
+
+@dataclass
+class SensorLog:
+    sensor_id: str
+    readings: list[float] = field(default_factory=list)   # fresh list per instance
+
+    def add(self, value: float) -> None:
+        self.readings.append(value)
+
+    def average(self) -> float | None:
+        if not self.readings:
+            return None
+        return sum(self.readings) / len(self.readings)
+```
+
+`default_factory=list` calls `list()` once *per object*, which is why `b.readings` stays `[]`. Check: $(22.5 + 23.5)/2 = 23.0$.
+
+**E3 — reference solution**
+
+```python
+from dataclasses import dataclass, field
+
+@dataclass
+class AlertingLog(SensorLog):
+    threshold: float = 80.0
+    alerts: list[float] = field(default_factory=list)
+
+    def add(self, value: float) -> None:
+        super().add(value)                 # parent still stores the reading
+        if value >= self.threshold:
+            self.alerts.append(value)
+
+    def alert_ratio(self) -> float:
+        if not self.readings:
+            return 0.0
+        return len(self.alerts) / len(self.readings)
+```
+
+Trace for `[75.0, 82.5, 80.0, 60.0]` with threshold 80.0: `75.0` is not an alert; `82.5` is; `80.0` is (because of `>=`); `60.0` is not. So `alerts = [82.5, 80.0]` and the ratio is $2/4 = 0.5$. The inherited `average()` gives $(75 + 82.5 + 80 + 60)/4 = 297.5/4 = 74.375$. The new fields need defaults, because a dataclass field without a default cannot follow inherited fields that have one (`readings`).
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

@@ -368,6 +368,227 @@ git switch -c rescue-my-work
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Which zone is each change in?** A repo has three tracked, committed files: `pid.cpp`, `lidar.cpp`, `ekf.cpp`. You run:
+
+```bash
+echo "kp = 1.2" >> pid.cpp
+echo "range_max = 12" >> lidar.cpp
+echo "q = 0.01" >> ekf.cpp
+git add pid.cpp lidar.cpp
+echo "ki = 0.05" >> pid.cpp
+git status --short
+```
+
+1. Predict the three lines printed by `git status --short` (first column = Staging Index, second column = Working Directory).
+2. You now run `git commit -m "Tune gains"`. Which of the four edits are inside the commit, and what does `git status --short` print afterwards?
+
+**Q2. Where do the sticky notes point?** Start from the chapter's diagram: `a1b2c3 <- d4e5f6`, with `main` and `HEAD` on `d4e5f6`. Then (assume you edit a tracked file before each commit):
+
+```bash
+git switch -c feat/ekf-slam
+git commit -am "Add EKF predict"     # creates commit 98f01a
+git commit -am "Add EKF update"      # creates commit 3c7d22
+git switch main
+git commit -am "Fix battery monitor" # creates commit 5e6b90
+git log --oneline
+```
+
+Where do `main`, `feat/ekf-slam` and `HEAD` point at the end, and what does the final `git log --oneline` print (newest first)?
+
+**Q3. Merge vs. rebase bookkeeping.** Use the chapter's diverged history: `C1 <- C2` on `main`, and `C1 <- C3 <- C4` on `feat/ekf-slam`.
+1. After `git switch main && git merge feat/ekf-slam`: how many commits are reachable from `main`, how many parents does the new commit have, and do `C3`/`C4` keep their hashes?
+2. If instead you had run `git switch feat/ekf-slam && git rebase main`: how many commits are reachable from `feat/ekf-slam`, which hashes are brand new, and where does `main` point?
+
+**Q4. Read the conflict markers.** You are on `feat/outdoor` and run `git merge main`. Git writes:
+
+```cpp
+<<<<<<< HEAD
+const double MAX_ACCEL = 1.5; // outdoor gravel
+=======
+const double MAX_ACCEL = 0.8; // indoor tile
+>>>>>>> main
+```
+
+1. Which value came from `feat/outdoor` and which from `main`?
+2. You choose `1.0` as the compromise. List the exact remaining steps until the merge is finished.
+
+**Q5. Does `.gitignore` catch it?** Using the chapter's `.gitignore` exactly as written, which of these paths are ignored?
+
+```bash
+build/CMakeCache.txt
+src/lidar/build/voxel.o
+scans/run1.mcap
+config/.env
+src/env.py
+notes.bag.txt
+src/log/parser.cpp
+src/logger/log.cpp
+```
+
+### Coding Exercises
+
+**E1 (Easy). Fresh feature branch.** Automate the "safe habit" from Mistake 2. Write a bash function `new_feature <name>` that switches to `main`, pulls `origin main`, and creates and switches to `feat/<name>`. Each step must run only if the previous one succeeded. With no argument it prints `usage: new_feature <name>` to stderr and returns `1`.
+
+```bash
+new_feature voxel-filter   # ends on branch feat/voxel-filter, created from an up-to-date main
+new_feature                # stderr: usage: new_feature <name>   ($? = 1)
+```
+
+**E2 (Easy–Medium). Catch the 2 GB bag before you commit.** Write `staged_too_big <limit_kb>`. For each **staged** file (`git diff --cached --name-only`) that exists on disk and is larger than `limit_kb` kilobytes (1 KB = 1024 bytes), print `<path> <size_in_whole_KB>KB`. Return `1` if any file was too big, otherwise `0`, so it can be used as a pre-commit check.
+
+```bash
+# lidar.mcap (3,000,000 bytes) and notes.txt (100 bytes) are staged
+staged_too_big 1024    # prints: lidar.mcap 2929KB     ($? = 1)
+staged_too_big 5000    # prints nothing               ($? = 0)
+```
+
+**E3 (Medium). Branch drift report.** Write `branch_report [base]` (default base `main`). For every local branch other than the base, print `<branch>: ahead <A>, behind <B>`, where `A` is the number of commits on the branch that are not on the base and `B` is the number of commits on the base that are not on the branch. Hint: `git rev-list --left-right --count base...branch` prints `B A`.
+
+```bash
+# feat/a has 2 commits main doesn't; main has 1 commit feat/a doesn't
+branch_report
+# feat/a: ahead 2, behind 1
+# feat/b: ahead 0, behind 0
+```
+
+#### Dry-Run: Answers
+
+**Q1.**
+1. Output:
+
+```bash
+MM pid.cpp
+M  lidar.cpp
+ M ekf.cpp
+```
+
+| File | Index column | Work-tree column | Why |
+|------|--------------|------------------|-----|
+| `pid.cpp` | `M` | `M` | The `kp` line was staged, then the `ki` line was added *after* `git add`, so the file is modified in both zones |
+| `lidar.cpp` | `M` | (blank) | Staged, and not touched since |
+| `ekf.cpp` | (blank) | `M` | Edited but never staged |
+
+2. The commit contains exactly what was in the Staging Index: the `kp = 1.2` line and the `range_max = 12` line. The `ki = 0.05` edit and the `ekf.cpp` edit stay in the Working Directory, so `git status --short` prints:
+
+```bash
+ M ekf.cpp
+ M pid.cpp
+```
+
+`git add` snapshots the file *at that moment*. It is not a standing "always include this file" flag.
+
+**Q2.** At the end: `feat/ekf-slam` points at `3c7d22`, `main` points at `5e6b90`, and `HEAD` is attached to `main`. Output:
+
+```bash
+5e6b90 Fix battery monitor
+d4e5f6 Add PID
+a1b2c3 Init
+```
+
+| Step | `main` | `feat/ekf-slam` | `HEAD` on |
+|------|--------|-----------------|-----------|
+| start | `d4e5f6` | (none) | `main` |
+| `switch -c feat/ekf-slam` | `d4e5f6` | `d4e5f6` | `feat/ekf-slam` |
+| commit `98f01a` | `d4e5f6` | `98f01a` | `feat/ekf-slam` |
+| commit `3c7d22` | `d4e5f6` | `3c7d22` | `feat/ekf-slam` |
+| `switch main` | `d4e5f6` | `3c7d22` | `main` |
+| commit `5e6b90` (parent `d4e5f6`) | `5e6b90` | `3c7d22` | `main` |
+
+Plain `git log` only walks parent pointers back from `HEAD`, so `98f01a` and `3c7d22` are not shown. You would need `--all` to see them.
+
+**Q3.**
+1. Merge: `main` reaches **5** commits ($C1, C2, C3, C4, M$). `M` has **2** parents ($C2$ and $C4$). Merging never rewrites existing commits, so `C3` and `C4` keep their hashes.
+2. Rebase: `feat/ekf-slam` reaches **4** commits ($C1, C2, C3', C4'$). `C3'` and `C4'` are brand-new hashes, because each has a different parent (and therefore different content to hash) from the original. `main` still points at `C2`, since rebasing the feature branch only moves the feature branch's pointer. The old `C3`/`C4` are no longer on any branch.
+
+**Q4.**
+1. The section between `<<<<<<< HEAD` and `=======` is your **current** branch, `feat/outdoor`: `1.5`. The section between `=======` and `>>>>>>> main` is the **incoming** branch, `main`: `0.8`.
+2. Steps:
+
+```bash
+# 1. Edit the file so it contains ONLY this line (all 3 marker lines deleted):
+#    const double MAX_ACCEL = 1.0; // compromise for gravel and tile
+# 2. Mark the conflict as resolved by staging the file:
+git add config/robot_limits.hpp
+# 3. Finish the merge commit:
+git commit -m "Merge main into feat/outdoor; set MAX_ACCEL to 1.0"
+```
+
+**Q5.** Ignored: `build/CMakeCache.txt`, `src/lidar/build/voxel.o`, `scans/run1.mcap`, `config/.env`, `src/log/parser.cpp`. Not ignored: `src/env.py`, `notes.bag.txt`, `src/logger/log.cpp`.
+
+| Path | Ignored? | Matching rule |
+|------|----------|---------------|
+| `build/CMakeCache.txt` | yes | `build/` |
+| `src/lidar/build/voxel.o` | yes | `build/` (with no leading `/`, it matches at any depth); `*.o` also matches |
+| `scans/run1.mcap` | yes | `*.mcap` |
+| `config/.env` | yes | `.env` matches that name in any folder |
+| `src/env.py` | no | `.env` must match the whole name, and `env.py` is a different name |
+| `notes.bag.txt` | no | `*.bag` needs the name to **end** in `.bag` |
+| `src/log/parser.cpp` | **yes (surprise!)** | `log/` matches *any* folder named `log`, not just the colcon `log/` at the root |
+| `src/logger/log.cpp` | no | `logger` is not `log`, and `log/` only matches directories |
+
+The fix for the surprise is to anchor root-only patterns with a leading slash: `/log/`, `/build/`, `/install/`. You can check any path with `git check-ignore -v <path>`.
+
+**E1 — reference solution**
+
+```bash
+new_feature() {
+    local name="$1"
+    if [ -z "$name" ]; then
+        echo "usage: new_feature <name>" >&2
+        return 1
+    fi
+    # '&&' chain: if the pull fails (e.g. offline), no branch is created from a stale main
+    git switch main && git pull origin main && git switch -c "feat/$name"
+}
+```
+
+The function's exit code is the exit code of the last command in the chain that ran, so callers can tell whether it worked.
+
+**E2 — reference solution**
+
+```bash
+staged_too_big() {
+    local limit_kb="$1"
+    local limit_bytes=$((limit_kb * 1024))
+    local bad=0
+    local f size
+    while IFS= read -r f; do
+        [ -f "$f" ] || continue              # staged deletions have no file on disk
+        size=$(wc -c < "$f")                 # size in bytes
+        if [ "$size" -gt "$limit_bytes" ]; then
+            echo "$f $((size / 1024))KB"     # integer division gives whole KB
+            bad=1
+        fi
+    done < <(git diff --cached --name-only)
+    return "$bad"
+}
+```
+
+Check: $3{,}000{,}000 / 1024 = 2929.69$, so integer division prints `2929KB`, and that is larger than $1024 \times 1024 = 1{,}048{,}576$ bytes. Reading line by line with `IFS= read -r` keeps paths that contain spaces intact.
+
+**E3 — reference solution**
+
+```bash
+branch_report() {
+    local base="${1:-main}"
+    local br behind ahead
+    for br in $(git for-each-ref --format='%(refname:short)' refs/heads/); do
+        [ "$br" = "$base" ] && continue
+        # left side of 'base...br' = commits only on base, right side = only on br
+        read -r behind ahead < <(git rev-list --left-right --count "$base...$br")
+        echo "$br: ahead $ahead, behind $behind"
+    done
+}
+```
+
+Why it works: `base...branch` (three dots) is the symmetric difference, meaning the commits reachable from exactly one of the two refs. `--left-right --count` splits that set into two counts. A branch that is "behind" by more than 0 is a candidate for `git rebase main` before you open its PR. Cost: one graph walk per branch.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Blueprint for Claude

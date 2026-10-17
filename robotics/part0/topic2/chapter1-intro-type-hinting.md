@@ -577,6 +577,176 @@ Type hints don't change how Python runs your code; they act as rigorous document
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Hints are not enforced at runtime.** Using the chapter's un-hinted `process_data(data)` (returns `data * 2`) and the hinted `add_numbers(a: int, b: int) -> int` (returns `a + b`), predict each printed line. Does any line raise an error when you *run* the file?
+
+```python
+print(process_data([1, 2]))
+print(add_numbers([1], [2]))
+print(process_data("ab") + str(process_data(3)))
+```
+
+**Q2. `Optional` and `Union` in action.** Using the chapter's `find_sensor` (dict `{"S001": "Temperature", "S002": "Pressure"}`) and `parse_id`, predict the output:
+
+```python
+print(find_sensor("S002"), find_sensor("s001"))
+print(parse_id("007") + parse_id(3))
+```
+
+**Q3. Trace `configure_sensor`.** Using the chapter's `configure_sensor` from Section 7, predict both printed dictionaries exactly (key order matters):
+
+```python
+print(configure_sensor("PRESS-7", 0.0, 10.0, unit="bar"))
+print(configure_sensor("PRESS-7", 0.0, 10.0, 0.0))
+```
+
+**Q4. Runtime vs. type checker.** Take the buggy version from Mistake 4:
+
+```python
+def calculate_average(values: list[float]) -> int:
+    return sum(values) / len(values)
+```
+
+For each call, say what Python **prints** when you run it, and whether a type checker such as mypy would complain about the **function definition**:
+
+```python
+print(calculate_average([1.0, 2.0]))
+print(calculate_average([2, 4]))
+```
+
+**Q5. Write the label.** Give the most precise modern (3.10+) type hint for each value or function, without using `Any`:
+1. `{"S01": [22.5, 23.0], "S02": []}`
+2. `["S01", None, "S03"]`
+3. A function that takes a sensor ID string and returns either the latest temperature as a float or `None` if the sensor is offline.
+4. `{"id": "TEMP-001", "min": -40.0, "has_alert": True}`
+
+### Coding Exercises
+
+**E1 (Easy). Fully hinted unit converter.** Write `to_fahrenheit(readings: list[float]) -> list[float]` that converts every Celsius reading with $F = C \cdot \tfrac{9}{5} + 32$.
+
+```python
+to_fahrenheit([0.0, 100.0, -40.0])   # [32.0, 212.0, -40.0]
+to_fahrenheit([])                    # []
+```
+
+**E2 (Easy–Medium). Hottest sensor, or nothing.** Write `find_hottest(readings: dict[str, float]) -> str | None` that returns the ID with the highest temperature, or `None` for an empty dict. It must work when every temperature is negative.
+
+```python
+find_hottest({"S01": 22.5, "S02": 24.0, "S03": 21.8})   # "S02"
+find_hottest({"A": -5.0, "B": -2.0})                    # "B"
+find_hottest({})                                        # None
+```
+
+**E3 (Medium). Summarize readings with dropouts.** A sensor sometimes misses a sample and you get `None`. Write `summarize(readings: list[float | None]) -> dict[str, int | float | None]` returning `{"valid": <count of real readings>, "missing": <count of None>, "avg": <average of real readings rounded to 2 decimals, or None if there are none>}`. A reading of `0.0` is a real reading, not a missing one.
+
+```python
+summarize([22.5, None, 24.0, 21.3])   # {'valid': 3, 'missing': 1, 'avg': 22.6}
+summarize([None, None])               # {'valid': 0, 'missing': 2, 'avg': None}
+summarize([0.0])                      # {'valid': 1, 'missing': 0, 'avg': 0.0}
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Output (no line raises an error):
+
+```python
+[1, 2, 1, 2]
+[1, 2]
+abab6
+```
+
+- `[1, 2] * 2` repeats the list.
+- `add_numbers([1], [2])` evaluates `[1] + [2]`, which concatenates the lists. The `int` hints are ignored at runtime, and only a type checker would flag the call.
+- `process_data("ab")` is `"abab"`, `process_data(3)` is `6`, and `"abab" + "6"` gives `"abab6"`.
+
+**Q2.** Output:
+
+```python
+Pressure None
+10
+```
+
+`"s001"` (lowercase `s`) is not a key, so `.get` returns `None`, and that is exactly why the return type is `Optional[str]`. `parse_id("007")` hits the `isinstance(raw, str)` branch, and `int("007")` is `7`. `parse_id(3)` returns `3` unchanged, and $7 + 3 = 10$.
+
+**Q3.** Output:
+
+```python
+{'id': 'PRESS-7', 'min': 0.0, 'max': 10.0, 'unit': 'bar', 'has_alert': False}
+{'id': 'PRESS-7', 'min': 0.0, 'max': 10.0, 'unit': 'celsius', 'has_alert': True, 'alert_at': 0.0}
+```
+
+| Call | `alert_threshold` | `unit` | `alert_threshold is not None` | `"alert_at"` added? |
+|------|-------------------|--------|-------------------------------|---------------------|
+| 1 | `None` (default) | `"bar"` (keyword) | `False` | no |
+| 2 | `0.0` (4th positional) | `"celsius"` (default) | `True` | yes, `0.0` |
+
+The second call is the trap. `0.0` is falsy, so a check written as `if alert_threshold:` would have silently dropped a real threshold. `is not None` is the correct test for an `Optional` value.
+
+**Q4.** Output:
+
+```python
+1.5
+3.0
+```
+
+Both calls run fine, because Python never checks the `-> int` label. A type checker **does** complain about the definition: `/` always produces a `float` (even `4 / 2` is `2.0`), so the declared return type `int` does not match. The fix is `-> float`, as in the chapter. Note that the second call passes `int`s to a `list[float]` parameter, and that is fine: type checkers accept `int` wherever `float` is expected.
+
+**Q5.**
+1. `dict[str, list[float]]`. An empty list still satisfies `list[float]`, because `list[...]` never fixes the length.
+2. `list[str | None]`. The hint goes on the items, not on the list itself.
+3. `def latest_temp(sensor_id: str) -> float | None:` (or `Optional[float]`).
+4. `dict[str, str | float | bool]`, the same shape the chapter uses for `configure_sensor`.
+
+**E1 — reference solution**
+
+```python
+def to_fahrenheit(readings: list[float]) -> list[float]:
+    return [c * 9 / 5 + 32 for c in readings]
+```
+
+Check: $-40 \cdot 9/5 + 32 = -72 + 32 = -40$. This is $O(n)$, and an empty input gives an empty list for free.
+
+**E2 — reference solution**
+
+```python
+def find_hottest(readings: dict[str, float]) -> str | None:
+    if not readings:
+        return None
+    best_id: str | None = None
+    best_temp = 0.0
+    for sensor_id, temp in readings.items():
+        # The 'best_id is None' check makes the FIRST sensor the starting best,
+        # so an all-negative dict still works (starting from 0.0 alone would fail).
+        if best_id is None or temp > best_temp:
+            best_id = sensor_id
+            best_temp = temp
+    return best_id
+```
+
+One pass, $O(n)$. (The one-liner `max(readings, key=readings.get)` also works once you have handled the empty case.)
+
+**E3 — reference solution**
+
+```python
+def summarize(readings: list[float | None]) -> dict[str, int | float | None]:
+    valid: list[float] = [r for r in readings if r is not None]   # keeps 0.0!
+    avg: float | None = None
+    if valid:
+        avg = round(sum(valid) / len(valid), 2)
+    return {
+        "valid": len(valid),
+        "missing": len(readings) - len(valid),
+        "avg": avg,
+    }
+```
+
+Check: $(22.5 + 24.0 + 21.3) / 3 = 67.8 / 3 = 22.6$. Filtering with `is not None` instead of `if r` is what keeps `0.0` as a valid reading. Cost: $O(n)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

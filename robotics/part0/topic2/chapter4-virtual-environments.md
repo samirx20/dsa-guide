@@ -528,6 +528,193 @@ Always work inside a virtual environment. Use `uv` for speed if possible, or `ve
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Which `python` runs?** On a Linux robot, the project lives in `/home/robot/factory-agent`, and the only system interpreter is `/usr/bin/python`. Before activation, `echo $PATH` prints `/usr/local/bin:/usr/bin:/bin`. Predict each `which python` line:
+
+```bash
+cd /home/robot/factory-agent
+source .venv/bin/activate
+which python            # (a)
+cd /tmp
+which python            # (b)
+deactivate
+which python            # (c)
+```
+
+What does `echo $PATH` print right after `source .venv/bin/activate`?
+
+**Q2. Does this version satisfy the spec?** The chapter's `pyproject.toml` requires `"fastapi>=0.110"` and `requires-python = ">=3.11"`. For each candidate, answer yes or no:
+1. FastAPI `0.100.0`
+2. FastAPI `0.99.1`
+3. FastAPI `0.115.2`
+4. Python `3.10.12`
+5. Python `3.12.3`
+
+**Q3. Am I inside the venv?** `sys.prefix` is the root of the *currently running* environment, and `sys.base_prefix` is the root of the base Python it was created from. Predict the output of each command:
+
+```bash
+python -c "import sys; print(sys.prefix != sys.base_prefix)"            # system Python, no venv active
+.venv/bin/python -c "import sys; print(sys.prefix != sys.base_prefix)"  # venv Python, NOT activated
+```
+
+**Q4. Trace Mistake 1.** `httpx` is not installed anywhere yet. Predict what the last line prints:
+
+```bash
+python -m venv .venv
+pip install httpx                   # venv NOT activated yet
+source .venv/bin/activate
+python -c "import httpx; print('ok')"
+```
+
+**Q5. What does `-e ".[dev]"` install?** In a fresh, activated venv inside the chapter's `factory-agent` folder, list everything that `pip install -e ".[dev]"` installs, and what changes if you run `pip install -e .` instead.
+
+### Coding Exercises
+
+**E1 (Easy). Guard your scripts.** Write `in_virtualenv() -> bool` that returns `True` only when the running interpreter belongs to a virtual environment. Then show how a robot bring-up script would print `Refusing to run outside a venv` to stderr and exit with code `1` when it returns `False`.
+
+```python
+in_virtualenv()   # True when run with .venv/bin/python, False with /usr/bin/python
+```
+
+**E2 (Easy–Medium). Read a freeze file.** Write `parse_requirements(text: str) -> dict[str, str]` for `pip freeze`-style text. Map lowercase package name to pinned version. Skip blank lines and strip `#` comments (whole-line or trailing). Raise `ValueError("Unpinned requirement: '<line>'")` for any line without `==`.
+
+```python
+parse_requirements("# pinned by pip freeze\nFastAPI==0.110.0\n\nhttpx==0.27.0  # http client\npydantic==2.6.1\n")
+# {'fastapi': '0.110.0', 'httpx': '0.27.0', 'pydantic': '2.6.1'}
+parse_requirements("fastapi>=0.110")
+# ValueError: Unpinned requirement: 'fastapi>=0.110'
+```
+
+**E3 (Medium). A tiny version checker.** Write `satisfies(version: str, spec: str) -> bool` for purely numeric versions such as `0.115.2`. `spec` is one or more comma-separated clauses using `>=`, `<=`, `==`, `<`, `>`; all clauses must hold. Compare versions **numerically, part by part**, treating missing parts as `0` (so `2.0 == 2.0.0`).
+
+```python
+satisfies("0.99.1", ">=0.110")    # False
+satisfies("2.6.1", ">=2.0,<3")    # True
+satisfies("3.0", ">=2.0,<3")      # False
+satisfies("2.0", "==2.0.0")       # True
+```
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| Line | Output | Why |
+|------|--------|-----|
+| (a) | `/home/robot/factory-agent/.venv/bin/python` | `activate` put `.venv/bin` at the **front** of `$PATH` |
+| (b) | `/home/robot/factory-agent/.venv/bin/python` | Activation belongs to the *shell session*, not the folder. `cd` does not undo it |
+| (c) | `/usr/bin/python` | `deactivate` restores the old `$PATH` |
+
+Right after activation, `echo $PATH` prints `/home/robot/factory-agent/.venv/bin:/usr/local/bin:/usr/bin:/bin`. The shell searches left to right, so the venv's `python` and `pip` win.
+
+**Q2.**
+
+| Candidate | Satisfies? | Reason |
+|-----------|------------|--------|
+| FastAPI `0.100.0` | no | $100 < 110$ in the second part |
+| FastAPI `0.99.1` | no | $99 < 110$. Versions compare **numerically per part**, not as text (as text, `"0.99"` would wrongly sort after `"0.110"`) |
+| FastAPI `0.115.2` | yes | $115 \ge 110$ |
+| Python `3.10.12` | no | $10 < 11$ in the minor part; pip refuses to install the project |
+| Python `3.12.3` | yes | $12 \ge 11$ |
+
+**Q3.** Output:
+
+```bash
+False
+True
+```
+
+You do not need to *activate* a venv to use it. Running its interpreter by path (Mistake 3's fix) is enough, because `sys.prefix` points to `.venv` while `sys.base_prefix` still points to the base install. Activation only changes `$PATH` for convenience.
+
+**Q4.** It prints a traceback ending in:
+
+```bash
+ModuleNotFoundError: No module named 'httpx'
+```
+
+| Step | Which `pip`/`python` | Effect |
+|------|----------------------|--------|
+| `python -m venv .venv` | system | creates an empty `.venv` |
+| `pip install httpx` | **system** `pip` (not activated) | `httpx` goes into the global site-packages |
+| `source .venv/bin/activate` | | `.venv/bin` moves to the front of `$PATH` |
+| `python -c "import httpx"` | **venv** `python` | searches only `.venv`'s site-packages (venvs do not see global packages by default), so the import fails |
+
+**Q5.** `pip install -e ".[dev]"` installs:
+- the project `factory-agent` itself in **editable** mode (`-e`: edits under `src/` take effect without reinstalling),
+- its core `dependencies`: `fastapi>=0.110`, `httpx>=0.27`, `pydantic>=2.0` (plus their own sub-dependencies),
+- the `dev` extra: `pytest` and `ruff`.
+
+`pip install -e .` installs the same thing **without** `pytest` and `ruff`. That is what you want on the robot itself, where no tests or linting run.
+
+**E1 — reference solution**
+
+```python
+import sys
+
+def in_virtualenv() -> bool:
+    # Inside a venv, sys.prefix is the .venv folder; sys.base_prefix is the base Python.
+    return sys.prefix != sys.base_prefix
+
+if __name__ == "__main__":
+    if not in_virtualenv():
+        print("Refusing to run outside a venv", file=sys.stderr)
+        sys.exit(1)
+    print("Starting robot bring-up...")
+```
+
+This works whether or not the venv was activated (see Q3), which makes it more reliable than checking `$PATH` or the prompt.
+
+**E2 — reference solution**
+
+```python
+def parse_requirements(text: str) -> dict[str, str]:
+    pins: dict[str, str] = {}
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()   # drop comments, then whitespace
+        if not line:
+            continue
+        if "==" not in line:
+            raise ValueError(f"Unpinned requirement: {line!r}")
+        name, version = line.split("==", 1)
+        pins[name.strip().lower()] = version.strip()
+    return pins
+```
+
+Package names are case-insensitive on PyPI (`FastAPI` and `fastapi` are the same package), so we normalise to lowercase. Cost: $O(\text{characters})$.
+
+**E3 — reference solution**
+
+```python
+def _vtuple(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split("."))
+
+def _pad(a: tuple[int, ...], b: tuple[int, ...]) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    n = max(len(a), len(b))
+    return a + (0,) * (n - len(a)), b + (0,) * (n - len(b))
+
+def satisfies(version: str, spec: str) -> bool:
+    for clause in spec.split(","):
+        clause = clause.strip()
+        # Two-character operators must be tried before '<' and '>'.
+        for op in (">=", "<=", "==", "<", ">"):
+            if clause.startswith(op):
+                target = clause[len(op):].strip()
+                break
+        else:
+            raise ValueError(f"Unknown operator in {clause!r}")
+        v, t = _pad(_vtuple(version), _vtuple(target))
+        ok = {">=": v >= t, "<=": v <= t, "==": v == t, "<": v < t, ">": v > t}[op]
+        if not ok:
+            return False
+    return True
+```
+
+Why it works: Python compares tuples element by element, so `(0, 99, 1) < (0, 110, 0)` because $99 < 110$. That is exactly the numeric rule from Q2. Padding with zeros makes `(2, 0)` equal to `(2, 0, 0)`. Trace for `"3.0"` against `">=2.0,<3"`: $(3,0) \ge (2,0)$ holds, then $(3,0) < (3,0)$ fails, so the result is `False`. (Real projects should use `packaging.specifiers.SpecifierSet`, which also handles pre-releases like `2.0rc1`.)
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

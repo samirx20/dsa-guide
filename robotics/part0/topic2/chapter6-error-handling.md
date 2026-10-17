@@ -705,6 +705,272 @@ Define custom exception hierarchies for your domain, use `try/except/else/finall
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Which handler catches it?** Using the Section 1 hierarchy, predict what `classify` returns for each exception, or whether the exception escapes:
+
+```python
+def classify(exc: Exception) -> str:
+    try:
+        raise exc
+    except LLMRateLimitError:
+        return "rate-limit handler"
+    except LLMError:
+        return "LLM handler"
+    except AgentError:
+        return "agent handler"
+
+classify(LLMTimeoutError("t"))
+classify(SensorReadingError("s"))
+classify(LLMRateLimitError("r"))
+classify(ToolExecutionError("x"))
+classify(ValueError("v"))
+```
+
+Bonus: what would change if the `except LLMError:` clause were moved **above** `except LLMRateLimitError:`?
+
+**Q2. Order of `try` / `except` / `else` / `finally`.** Predict every printed line, in order:
+
+```python
+def read(x: float) -> float:
+    try:
+        print("try")
+        v = 10 / x
+    except ZeroDivisionError:
+        print("except")
+        return -1
+    else:
+        print("else")
+        return v
+    finally:
+        print("finally")
+
+print(read(4))
+print(read(0))
+```
+
+**Q3. A context manager when the body crashes.** Predict the output:
+
+```python
+from contextlib import contextmanager
+
+@contextmanager
+def motor_guard(name: str):
+    print(f"enable {name}")
+    try:
+        yield
+    finally:
+        print(f"disable {name}")
+
+try:
+    with motor_guard("left"):
+        print("drive")
+        raise LLMTimeoutError("planner timed out")
+        print("unreachable")
+except AgentError as e:
+    print("caught:", e)
+```
+
+**Q4. Chained Results.** Using the chapter's `validate_sensor` (Section 4, "Result with chaining") and the same `match` used in its usage example, predict the line printed for each call:
+
+```python
+validate_sensor(250.0, 101.3)
+validate_sensor(22.5, -1)
+validate_sensor(-60, 400)
+validate_sensor(22.5, 101.3)
+```
+
+**Q5. Trace `parse_sensor_data`.** Using Section 7's `parse_sensor_data`, give the returned value or the exact `SensorError` message for each input. Also give the type of `e.__cause__` in each error case.
+
+```python
+{"sensor_id": "S1", "temperature": "22.5", "humidity": 40}
+{"sensor_id": "S1", "temperature": "hot", "humidity": 40}
+{"sensor_id": "S1", "temperature": 22.5}
+{"sensor_id": "S1", "temperature": 22.5, "humidity": None}
+{"sensor_id": "S1", "temperature": 250, "humidity": 40}
+```
+
+### Coding Exercises
+
+**E1 (Easy). A motor fault that carries data.** Add `MotorError(AgentError)` and `MotorStallError(MotorError)` to the hierarchy. `MotorStallError.__init__(self, motor_id: str, current_amps: float, limit: float)` must store all three as attributes and produce the message `"<motor_id> stalled: <current_amps> A > <limit> A"`. Then write `check_current(motor_id: str, amps: float, limit: float = 10.0) -> None` that raises it when `amps > limit`.
+
+```python
+check_current("left", 8.0)    # returns None
+check_current("left", 12.5)   # MotorStallError: left stalled: 12.5 A > 10.0 A
+# and in the except block: e.current_amps == 12.5, isinstance(e, AgentError) is True
+```
+
+**E2 (Easy–Medium). A motor-safety context manager.** Write `@contextmanager motor_enabled(motor_id: str, log: list[str])`. It appends `"enable <id>"` on entry. If the body raises, it appends `"fault <ExceptionClassName>"` and **re-raises**. It *always* appends `"disable <id>"` last.
+
+```python
+log = []
+with motor_enabled("left", log):
+    log.append("drive")
+try:
+    with motor_enabled("right", log):
+        check_current("right", 15.0)
+except MotorStallError:
+    pass
+log
+# ['enable left', 'drive', 'disable left',
+#  'enable right', 'fault MotorStallError', 'disable right']
+```
+
+**E3 (Medium). Retry with exponential backoff.** Write `retry(fn: Callable[[], T], attempts: int, retry_on: tuple[type[Exception], ...], base_delay: float = 0.5, sleep: Callable[[float], None] = time.sleep) -> T`. Call `fn`. If it raises one of `retry_on`, sleep `base_delay * 2**i` (i = 0, 1, 2, ...) and try again, up to `attempts` calls in total. After the last failed attempt, re-raise that exception unchanged, without sleeping. Exceptions **not** in `retry_on` must propagate immediately, with no retry. (Injecting `sleep` makes it testable: pass `delays.append`.)
+
+```python
+# flaky() raises LLMTimeoutError on calls 1 and 2, returns "plan ok" on call 3
+delays = []
+retry(flaky, 5, (LLMTimeoutError,), sleep=delays.append)   # 'plan ok'
+delays                                                      # [0.5, 1.0]
+# with a fresh flaky and attempts=2: raises LLMTimeoutError('timeout #2'), delays == [0.5]
+# retry(raises_value_error, 3, (LLMError,)) raises ValueError at once, delays == []
+```
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| Raised | Handler that runs | Why |
+|--------|-------------------|-----|
+| `LLMTimeoutError` | `"LLM handler"` | not a `LLMRateLimitError`, but it **is** an `LLMError` |
+| `SensorReadingError` | `"agent handler"` | its chain is `ValidationError` then `AgentError`, and only `AgentError` is listed |
+| `LLMRateLimitError` | `"rate-limit handler"` | the first matching clause wins |
+| `ToolExecutionError` | `"agent handler"` | a direct child of `AgentError` |
+| `ValueError` | **escapes** `classify` | it is not part of the `AgentError` tree |
+
+Bonus: `except` clauses are tested top to bottom, and the first `isinstance` match wins. With `except LLMError:` first, `LLMRateLimitError` would be caught there, and the rate-limit handler would become unreachable dead code. Always list the **most specific** exceptions first.
+
+**Q2.** Output:
+
+```python
+try
+else
+finally
+2.5
+try
+except
+finally
+-1
+```
+
+The `return v` in `else` (and the `return -1` in `except`) *schedules* the return value, then `finally` runs, and only then does the function actually return. That is why `finally` is printed before the caller prints the value.
+
+**Q3.** Output:
+
+```python
+enable left
+drive
+disable left
+caught: planner timed out
+```
+
+The `raise` inside the `with` block jumps back into the generator at `yield`, so its `finally` disables the motor *before* the exception continues outward to `except AgentError` (which matches, because `LLMTimeoutError` is an `AgentError`). `"unreachable"` is never printed. This is exactly the guarantee you want for actuators.
+
+**Q4.** Output, one line per call:
+
+```python
+Validation failed: Temperature validation: Temperature 250.0 out of range
+Validation failed: Pressure validation: Pressure -1 out of range
+Validation failed: Temperature validation: Temperature -60 out of range
+Sensor data: {'temperature': 22.5, 'pressure': 101.3}
+```
+
+| Call | `validate_temperature` | `validate_pressure` | Result |
+|------|------------------------|---------------------|--------|
+| `(250.0, 101.3)` | `Err` ($250 > 200$) | never runs | `Err`, temperature prefix |
+| `(22.5, -1)` | `Ok(22.5)` | `Err` ($-1 < 0$) | `Err`, pressure prefix |
+| `(-60, 400)` | `Err` ($-60 < -50$) | never runs (so the bad pressure is not reported) | `Err`, temperature prefix |
+| `(22.5, 101.3)` | `Ok` | `Ok` | `Ok` dict |
+
+Note that the message shows `-60`, not `-60.0`, because the f-string formats the original `int`. The third row shows a property of this chaining style: it short-circuits and reports only the **first** failure.
+
+**Q5.**
+
+| Input | Result | `e.__cause__` |
+|-------|--------|---------------|
+| temperature `"22.5"`, humidity `40` | returns `SensorReading(sensor_id='S1', temperature=22.5, humidity=40.0)` | (no error) |
+| temperature `"hot"` | `SensorError: Invalid sensor data: could not convert string to float: 'hot'` | `ValueError` |
+| no `"humidity"` key | `SensorError: Invalid sensor data: 'humidity'` | `KeyError` |
+| humidity `None` | `SensorError: Invalid sensor data: float() argument must be a string or a real number, not 'NoneType'` | `TypeError` |
+| temperature `250` | `SensorError: Temperature 250.0 out of range` | `None` (raised directly, not `from` another error) |
+
+`float("22.5")` and `float(40)` succeed, so the first input is accepted and converted. The temperature message prints `250.0` because the value was already converted by `float()`. A side note on Mistake 1: `except Exception` does **not** catch `KeyboardInterrupt` or `SystemExit`, because both inherit from `BaseException` directly (`issubclass(KeyboardInterrupt, Exception)` is `False`). The real danger of a bare `except Exception` is that it swallows every *ordinary* bug, such as a `TypeError` caused by a typo.
+
+**E1 — reference solution**
+
+```python
+class MotorError(AgentError):
+    pass
+
+class MotorStallError(MotorError):
+    def __init__(self, motor_id: str, current_amps: float, limit: float) -> None:
+        super().__init__(f"{motor_id} stalled: {current_amps} A > {limit} A")  # sets str(e)
+        self.motor_id = motor_id
+        self.current_amps = current_amps
+        self.limit = limit
+
+def check_current(motor_id: str, amps: float, limit: float = 10.0) -> None:
+    if amps > limit:
+        raise MotorStallError(motor_id, amps, limit)
+```
+
+Storing the numbers as attributes lets a handler react (for example, reduce torque by `e.current_amps - e.limit`) without parsing the message string. Because it inherits from `AgentError`, the existing broad `except AgentError` fallbacks still catch it.
+
+**E2 — reference solution**
+
+```python
+from contextlib import contextmanager
+from typing import Iterator
+
+@contextmanager
+def motor_enabled(motor_id: str, log: list[str]) -> Iterator[None]:
+    log.append(f"enable {motor_id}")
+    try:
+        yield
+    except Exception as exc:
+        log.append(f"fault {type(exc).__name__}")
+        raise                       # never swallow: the caller must still see the fault
+    finally:
+        log.append(f"disable {motor_id}")
+```
+
+Trace for the failing block: `enable right` is logged, then `check_current` raises inside `yield`, then `except` logs `fault MotorStallError` and re-raises, then `finally` logs `disable right`, and then the exception reaches the caller's `except MotorStallError`.
+
+**E3 — reference solution**
+
+```python
+import time
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+
+def retry(fn: Callable[[], T], attempts: int, retry_on: tuple[type[Exception], ...],
+          base_delay: float = 0.5, sleep: Callable[[float], None] = time.sleep) -> T:
+    if attempts < 1:
+        raise ValueError("attempts must be >= 1")
+    for i in range(attempts):
+        try:
+            return fn()
+        except retry_on:                 # only the listed (transient) errors are retried
+            if i == attempts - 1:
+                raise                    # out of attempts: re-raise the last error unchanged
+            sleep(base_delay * 2 ** i)   # 0.5, 1.0, 2.0, ...
+    raise AssertionError("unreachable")
+```
+
+| Call # | `i` | `flaky()` | Action |
+|--------|-----|-----------|--------|
+| 1 | 0 | raises `timeout #1` | sleep $0.5 \cdot 2^0 = 0.5$ |
+| 2 | 1 | raises `timeout #2` | sleep $0.5 \cdot 2^1 = 1.0$ |
+| 3 | 2 | returns `"plan ok"` | return |
+
+With `attempts=2`, call 2 is the last one (`i == 1`), so it re-raises `timeout #2` and `delays == [0.5]`. A `ValueError` is not in `(LLMError,)`, so the `except` does not match and it propagates on the first call. Worst-case total wait is $\sum_{i=0}^{n-2} b \cdot 2^i = b\,(2^{n-1} - 1)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

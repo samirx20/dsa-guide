@@ -368,6 +368,214 @@ sudo usermod -aG dialout $USER
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Where does the shell end up?** You start in `/home/robot` (so `~` is `/home/robot`). Predict every line printed to the terminal:
+
+```bash
+cd /dev
+cd ~/ros2_ws
+cd ..
+cd -
+pwd
+```
+
+**Q2. Exit codes and `&&` / `||`.** Predict the output of each line (assume `nosuchcmd` does not exist anywhere on `$PATH`):
+
+```bash
+nosuchcmd; echo "code=$?"
+false && echo "A" || echo "B"
+true && echo "C" && false; echo "code=$?"
+```
+
+**Q3. `>` versus `>>`.** Predict exactly what `cat` prints:
+
+```bash
+echo "run 1" > cal.log
+echo "run 2" >> cal.log
+echo "run 3" > cal.log
+echo "run 4" >> cal.log
+cat cal.log
+```
+
+**Q4. Where does `stderr` go?** On the robot, `/dev/ttyUSB0` exists but `/dev/ttyUSB7` does not. For each command, say what appears on the **terminal** and what ends up **inside the file**:
+
+```bash
+# (a)
+ls /dev/ttyUSB0 /dev/ttyUSB7 > scan.txt
+# (b)
+ls /dev/ttyUSB0 /dev/ttyUSB7 > scan.txt 2>&1
+# (c)  note the ORDER of the two redirections
+ls /dev/ttyUSB0 /dev/ttyUSB7 2>&1 > scan.txt
+```
+
+**Q5. Decode the permission bits.** `ls -la` shows `-rw-r--r--  launch_robot.sh`.
+1. Who may read it, who may write it, and can anyone execute it with `./launch_robot.sh`?
+2. You run `chmod +x launch_robot.sh` (with the common default `umask` of `022`). What does the permission string become, and what is its octal value?
+
+### Coding Exercises
+
+**E1 (Easy). Sensor presence check.** Write a bash function `check_device` that takes one path. If the path exists, print `OK <path>` to **stdout** and return exit code `0`; otherwise print `MISSING <path>` to **stderr** and return `1`.
+
+```bash
+check_device /dev/ttyUSB0   # stdout: OK /dev/ttyUSB0      ($? = 0)
+check_device /dev/ttyUSB9   # stderr: MISSING /dev/ttyUSB9  ($? = 1)
+```
+
+**E2 (Easy–Medium). Log-level summary.** Write a bash function `log_summary <logfile>` that prints how many lines contain `[ERROR]`, `[WARN]`, and `[INFO]`, in that order.
+
+```bash
+# nav.log contains:
+# [INFO] Scan OK
+# [WARN] Drop
+# [INFO] Scan OK
+# [ERROR] Timeout
+# [INFO] Scan OK
+log_summary nav.log
+# ERROR: 1
+# WARN: 1
+# INFO: 3
+```
+
+**E3 (Medium). Polite-then-forceful shutdown.** Write `safe_stop <process_name> [timeout_seconds]` (default timeout `5`). It must find the PID (use `pgrep -x`), send `SIGTERM`, poll once per second until the process is gone, and only if it is still alive after the timeout send `SIGKILL`. Print `<name> not running` (exit `0`) if there is no such process, `<name> (<pid>) stopped cleanly` (exit `0`) on a clean stop, and return `2` if `SIGKILL` was needed.
+
+```bash
+safe_stop lidar_node      # lidar_node (3104) stopped cleanly
+safe_stop ghost_node      # ghost_node not running
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Output:
+
+```bash
+/home/robot/ros2_ws
+/home/robot/ros2_ws
+```
+
+| Command | Directory after | Printed |
+|---------|-----------------|---------|
+| `cd /dev` | `/dev` | nothing |
+| `cd ~/ros2_ws` | `/home/robot/ros2_ws` | nothing |
+| `cd ..` | `/home/robot` | nothing |
+| `cd -` | `/home/robot/ros2_ws` (the previous directory) | `/home/robot/ros2_ws` (`cd -` echoes where it jumped) |
+| `pwd` | `/home/robot/ros2_ws` | `/home/robot/ros2_ws` |
+
+**Q2.** Output:
+
+```bash
+bash: nosuchcmd: command not found
+code=127
+B
+C
+code=1
+```
+
+- Line 1: the shell cannot find the command, prints an error on `stderr`, and sets `$?` to `127` ("command not found").
+- Line 2: `false` exits `1`, so `&& echo "A"` is skipped; the whole left side failed, so `|| echo "B"` runs.
+- Line 3: `true` exits `0`, so `echo "C"` runs (exit `0`), so `false` runs (exit `1`). The `;` then runs `echo` unconditionally, and `$?` is the exit code of the last command, `false`, which is `1`.
+
+**Q3.** Output:
+
+```bash
+run 3
+run 4
+```
+
+| Line | Operator | File contents after |
+|------|----------|---------------------|
+| `echo "run 1" > cal.log` | overwrite | `run 1` |
+| `echo "run 2" >> cal.log` | append | `run 1`, `run 2` |
+| `echo "run 3" > cal.log` | overwrite (truncates first!) | `run 3` |
+| `echo "run 4" >> cal.log` | append | `run 3`, `run 4` |
+
+**Q4.**
+
+| Case | Terminal shows | `scan.txt` contains |
+|------|----------------|---------------------|
+| (a) `> scan.txt` | `ls: cannot access '/dev/ttyUSB7': No such file or directory` | `/dev/ttyUSB0` |
+| (b) `> scan.txt 2>&1` | nothing | both the `/dev/ttyUSB0` line and the error line |
+| (c) `2>&1 > scan.txt` | the error line | `/dev/ttyUSB0` only |
+
+Redirections are processed left to right. In (c), `2>&1` runs first, while stdout still points at the terminal, so stderr is copied to *the terminal*. Only after that is stdout moved to `scan.txt`. In (b), stdout is moved to the file first, so `2>&1` copies the *file* target. This is the "wherever descriptor 1 is currently pointing" rule from Section 3.
+
+**Q5.**
+1. `-rw-r--r--`: the owner can read and write; the group and others can only read. Nobody has the `x` bit, so `./launch_robot.sh` fails with `Permission denied`.
+2. `chmod +x` adds execute for user, group and others (minus the bits masked by `umask 022`, and `022` masks only write bits). The result is `-rwxr-xr-x`, octal `755`:
+
+| Class | Bits | Value |
+|-------|------|-------|
+| Owner | `rwx` | $4+2+1 = 7$ |
+| Group | `r-x` | $4+0+1 = 5$ |
+| Others | `r-x` | $4+0+1 = 5$ |
+
+**E1 — reference solution**
+
+```bash
+check_device() {
+    local path="$1"
+    if [ -e "$path" ]; then
+        echo "OK $path"
+        return 0
+    else
+        echo "MISSING $path" >&2     # '>&2' sends this echo to stderr (descriptor 2)
+        return 1
+    fi
+}
+```
+
+Why it works: `[ -e path ]` is itself a command whose exit code is `0` if the path exists. `>&2` sends the message to stderr, so `check_device ... > ok.txt` collects only the healthy devices. (Use `-c` instead of `-e` if you also want to require a *character device* such as `/dev/ttyUSB0`.)
+
+**E2 — reference solution**
+
+```bash
+log_summary() {
+    local log="$1"
+    local level
+    for level in ERROR WARN INFO; do
+        # '\[' escapes the bracket so grep matches the literal text "[ERROR]"
+        echo "$level: $(grep -c "\[$level\]" "$log")"
+    done
+}
+```
+
+`grep -c` prints the number of matching lines. It still prints `0` when nothing matches (it just exits with code `1`), so the summary is correct for empty levels. Cost: three passes over the file, $O(3n)$ = $O(n)$ in the number of lines.
+
+**E3 — reference solution**
+
+```bash
+safe_stop() {
+    local name="$1"
+    local timeout="${2:-5}"          # default to 5 seconds if no 2nd argument
+    local pid
+    pid=$(pgrep -x "$name" | head -n 1)
+    if [ -z "$pid" ]; then
+        echo "$name not running"
+        return 0
+    fi
+
+    kill "$pid"                      # SIGTERM (15): let it zero the motors and flush logs
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null; do     # signal 0 = "are you still alive?" probe
+        if [ "$waited" -ge "$timeout" ]; then
+            echo "$name ($pid) ignored SIGTERM, sending SIGKILL" >&2
+            kill -9 "$pid"           # last resort: kernel destroys it, no cleanup runs
+            return 2
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+    echo "$name ($pid) stopped cleanly"
+    return 0
+}
+```
+
+Why it works: `kill -0` sends no signal but its exit code tells you whether the PID still exists, so the loop waits at most `timeout` seconds. `SIGKILL` is only ever used after `SIGTERM` has had a fair chance, which is the motor-safety rule from Section 4.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Blueprint for Claude

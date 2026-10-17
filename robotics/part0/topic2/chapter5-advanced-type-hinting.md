@@ -723,6 +723,249 @@ Use `TypeVar`/`Generic` for reusable data structures, `Union`/`Optional` for fle
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Trace the generic `Stack`.** Using the chapter's `Stack(Generic[T])`, predict every printed line, and fill in the stack contents (bottom to top) after each step:
+
+```python
+s: Stack[int] = Stack()
+s.push(3)
+s.push(7)
+print(s.pop())
+s.push(5)
+print(s.peek())
+print(s.pop(), s.pop())
+s.push("hello")        # the line a type checker flags
+print(s._items)
+```
+
+**Q2. A hole in the `match`.** Using the chapter's `parse_sensor_reading(raw: str | float) -> float` (with `case float()` and `case str()`), predict the output:
+
+```python
+print(parse_sensor_reading("22.5"))
+print(parse_sensor_reading(22.5))
+print(parse_sensor_reading(22))
+```
+
+**Q3. Callables in, results out.** Using the chapter's `process_input`, `check_reading` and `validate_temperature`, predict each result:
+
+```python
+print(process_input(lambda s: {"len": len(s)}, "lidar"))
+print(check_reading(validate_temperature, "S-001", -50))
+print(check_reading(validate_temperature, "S-001", 200.5))
+print(check_reading(lambda sid, t: sid.startswith("S") and t < 100, "X-9", 22.5))
+```
+
+**Q4. `TypedDict` at runtime.** Using the `SensorData(TypedDict)` from Mistake 2 (`id: str`, `temp: float`), predict what each line does when you **run** it (output or exception):
+
+```python
+x = SensorData(id="S-001", temp=22.5)
+print(x, type(x).__name__)
+SensorData("S-001", 22.5)
+y: SensorData = {"id": "S-2", "temp": "hot"}
+print(y["temp"])
+```
+
+**Q5. Who satisfies the `Agent` protocol?** With `class Agent(Protocol): def run(self, query: str) -> str: ...`, which of these classes can a type checker accept for `dispatch(agent: Agent, ...)`?
+
+```python
+class LidarAgent:
+    def run(self, query: str) -> str: return "scan ok"
+    def reset(self) -> None: ...
+
+class CountAgent:
+    def run(self, query: str) -> int: return len(query)
+
+class PlannerAgent:
+    def execute(self, query: str) -> str: return "path"
+
+class VerboseAgent:
+    def run(self, query: str, verbose: bool = False) -> str: return "done"
+```
+
+### Coding Exercises
+
+**E1 (Easy). A generic fallback.** Write `last_or_default(items: list[T], default: T) -> T` that returns the last element, or `default` when the list is empty. The type checker should infer `float` for a `list[float]`, and `str` for a `list[str]`. Be careful: a last element of `0` is a real value.
+
+```python
+last_or_default([0.4, 0.7], 0.0)   # 0.7
+last_or_default([], "none")        # 'none'
+last_or_default([0], 99)           # 0
+```
+
+**E2 (Easy–Medium). A generic sensor ring buffer.** Write `class RingBuffer(Generic[T])` with `__init__(self, capacity: int)` (raise `ValueError` if `capacity <= 0`), `push(self, item: T) -> None` (when full, drop the **oldest** item), `items(self) -> list[T]` (oldest first, as a copy), and `__len__`.
+
+```python
+rb: RingBuffer[float] = RingBuffer(3)
+for v in [1.0, 2.0, 3.0, 4.0, 5.0]:
+    rb.push(v)
+rb.items()   # [3.0, 4.0, 5.0]
+len(rb)      # 3
+```
+
+**E3 (Medium). Execute an agent's tool calls.** Using the chapter's `LLMToolCall` and `AgentState` TypedDicts, and the alias `Tool = Callable[[dict[str, str | int | float | bool]], str]`, write `execute_calls(state: AgentState, tools: dict[str, Tool]) -> list[str]`. Set `status` to `"analyzing"`. Run each call's tool with its `arguments` and collect the result strings in order. For an unknown tool name, add 1 to `retries`, set `error` to `"unknown tool: <name>"`, and skip that call. Finish by setting `status` to `"responding"`.
+
+```python
+tools = {
+    "get_temp": lambda args: f"{args['sensor_id']}=22.5C",
+    "set_speed": lambda args: f"speed set to {args['mps']} m/s",
+}
+state = {"status": "idle", "retries": 0, "error": None, "tool_calls": [
+    {"name": "get_temp", "arguments": {"sensor_id": "TEMP-001"}},
+    {"name": "fly", "arguments": {}},
+    {"name": "set_speed", "arguments": {"mps": 1.5}},
+]}
+execute_calls(state, tools)   # ['TEMP-001=22.5C', 'speed set to 1.5 m/s']
+state["status"], state["retries"], state["error"]   # ('responding', 1, 'unknown tool: fly')
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Output:
+
+```python
+7
+5
+5 3
+['hello']
+```
+
+| Step | `_items` (bottom to top) | Printed |
+|------|--------------------------|---------|
+| `push(3)` | `[3]` | |
+| `push(7)` | `[3, 7]` | |
+| `pop()` | `[3]` | `7` |
+| `push(5)` | `[3, 5]` | |
+| `peek()` | `[3, 5]` (unchanged) | `5` |
+| `pop(), pop()` | `[]` | `5 3` (arguments are evaluated left to right) |
+| `push("hello")` | `['hello']` | |
+
+`Stack[int]` is only a promise to the type checker. At runtime `push("hello")` succeeds, and only mypy or your editor would flag it.
+
+**Q2.** Output:
+
+```python
+22.5
+22.5
+None
+```
+
+`22` is an `int`, and `case float()` does **not** match an `int` (`isinstance(22, float)` is `False`). No case matches, so the function falls off the end and returns `None`, even though it promises `float`. A type checker *accepts* the call, because the rule "`int` is acceptable where `float` is expected" lets `22` pass as `str | float`. That is why this bug slips through. Fix: add `case int() as i: return float(i)`, or use `case int() | float(): return float(raw)`.
+
+**Q3.** Output:
+
+```python
+{'len': 5}
+True
+False
+False
+```
+
+- `len("lidar")` is `5`.
+- `-50 <= -50 <= 200` is `True` (the bounds are inclusive).
+- $200.5 > 200$, so `False`.
+- `"X-9".startswith("S")` is `False`, so the `and` short-circuits to `False` without testing the temperature.
+
+**Q4.**
+
+| Line | Result |
+|------|--------|
+| `x = SensorData(id="S-001", temp=22.5)` and `print(...)` | prints `{'id': 'S-001', 'temp': 22.5} dict`. Calling a TypedDict with keywords just builds a plain `dict` |
+| `SensorData("S-001", 22.5)` | `TypeError: dict expected at most 1 argument, got 2` (this is Mistake 2) |
+| `y: SensorData = {"id": "S-2", "temp": "hot"}` | runs fine; only a type checker reports that `"hot"` is not a `float` |
+| `print(y["temp"])` | prints `hot` |
+
+A TypedDict adds no runtime checks at all. Runtime validation is Pydantic's job, which comes later.
+
+**Q5.** Accepted: `LidarAgent` and `VerboseAgent`. Rejected: `CountAgent` and `PlannerAgent`.
+
+| Class | Satisfies `Agent`? | Reason |
+|-------|--------------------|--------|
+| `LidarAgent` | yes | It has `run(str) -> str`. Extra methods like `reset` do not matter |
+| `CountAgent` | no | `run` returns `int`, but the protocol promises `str` |
+| `PlannerAgent` | no | It has no `run` method at all. The name matters, not just the shape |
+| `VerboseAgent` | yes | It can still be called as `run(query)`, because the extra parameter has a default |
+
+**E1 — reference solution**
+
+```python
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def last_or_default(items: list[T], default: T) -> T:
+    if not items:            # test the LIST, never the element
+        return default
+    return items[-1]
+```
+
+Writing `return items[-1] if items else default` is equivalent. Writing `return (items and items[-1]) or default` is **wrong**, because `last_or_default([0], 99)` would return `99`. Cost: $O(1)$.
+
+**E2 — reference solution**
+
+```python
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class RingBuffer(Generic[T]):
+    def __init__(self, capacity: int) -> None:
+        if capacity <= 0:
+            raise ValueError("capacity must be positive")
+        self._capacity = capacity
+        self._items: list[T] = []
+
+    def push(self, item: T) -> None:
+        self._items.append(item)
+        if len(self._items) > self._capacity:
+            self._items.pop(0)          # drop the oldest
+
+    def items(self) -> list[T]:
+        return list(self._items)        # a copy, so callers can't corrupt the buffer
+
+    def __len__(self) -> int:
+        return len(self._items)
+```
+
+Trace for capacity 3: after `1, 2, 3` the buffer is full. Pushing `4` drops `1`, and pushing `5` drops `2`, which leaves `[3.0, 4.0, 5.0]`. `pop(0)` costs $O(n)$. A production version would use `collections.deque(maxlen=capacity)` for $O(1)$ pushes (Phase 4 builds a real C++ ring buffer).
+
+**E3 — reference solution**
+
+```python
+from typing import Callable, Literal, TypedDict
+
+class LLMToolCall(TypedDict):
+    name: str
+    arguments: dict[str, str | int | float | bool]
+
+class AgentState(TypedDict):
+    status: Literal["idle", "gathering", "analyzing", "responding"]
+    tool_calls: list[LLMToolCall]
+    retries: int
+    error: str | None
+
+Tool = Callable[[dict[str, str | int | float | bool]], str]
+
+def execute_calls(state: AgentState, tools: dict[str, Tool]) -> list[str]:
+    state["status"] = "analyzing"
+    results: list[str] = []
+    for call in state["tool_calls"]:
+        tool = tools.get(call["name"])
+        if tool is None:
+            state["retries"] += 1
+            state["error"] = f"unknown tool: {call['name']}"
+            continue
+        results.append(tool(call["arguments"]))
+    state["status"] = "responding"
+    return results
+```
+
+Trace: `get_temp` returns `'TEMP-001=22.5C'`. `fly` is not in `tools`, so `retries` becomes 1 and `error` is set. `set_speed` returns `'speed set to 1.5 m/s'`. Because `status` is a `Literal`, a typo like `state["status"] = "respond"` would be caught by the type checker. Cost: $O(\text{number of calls})$ plus the tools' own work.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
