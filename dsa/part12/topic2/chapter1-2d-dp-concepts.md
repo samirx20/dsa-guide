@@ -337,6 +337,152 @@ Before writing code, answer these questions:
 
 ---
 
+## Practice & Self-Check
+
+Before answering, apply the 5-Step Framework: name the two dimensions, the meaning of `dp[i][j]`, the base row/column, the transition, and where the answer lives. Then fill the table by hand.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Unique Paths on a 3 x 4 grid.** Fill the full `dp` table for `uniquePaths(3, 4)` (3 rows, 4 columns). What is the answer?
+
+**Q2. The rolling row.** Run the space-optimized `uniquePaths` (Variation 2) with `m = 4`, `n = 3`. Write `row` after each value of `r`. Does the answer match Q1? Why should it?
+
+**Q3. LCS table.** Fill the LCS table for `A = "abac"` (rows) and `B = "cab"` (columns), using the Golden Template with the empty-string row and column. What is `dp[4][3]`, and what is one LCS?
+
+**Q4. A broken space optimization.** Someone applies the Section 4 "Optimization Pattern" to LCS and writes the match case as `dp[j] = dp[j-1] + 1` (the non-match case is `max(dp[j], dp[j-1])`). What does this return for `A = "a"`, `B = "aa"`? What is the correct LCS, and which value does the match case really need?
+
+**Q5. Edit Distance base cases and table.** Using the Edit Distance row of the Quick Reference (match: `dp[i-1][j-1]`; otherwise `1 + min(replace, delete, insert)` = `1 + min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1])`), with base cases `dp[i][0] = i` and `dp[0][j] = j`, fill the table for `word1 = "ab"`, `word2 = "ba"`. What is the edit distance?
+
+### Coding Exercises
+
+**E1 (Easy). Minimum Path Sum.** Moving only Down or Right, return the minimum sum of values along a path from top-left to bottom-right. Use an $O(N)$ rolling row.
+
+```cpp
+int minPathSum(const vector<vector<int>>& grid);
+// [[1,3,1],[1,5,1],[4,2,1]] -> 7    (1 -> 3 -> 1 -> 1 -> 1)
+// [[1,2,3],[4,5,6]]         -> 12   (1 -> 2 -> 3 -> 6)
+```
+
+**E2 (Easy–Medium). Unique Paths with Obstacles.** `grid[r][c] == 1` is a blocked cell. Count Down/Right paths from top-left to bottom-right. Note that the base row and column are no longer "all 1s".
+
+```cpp
+int uniquePathsWithObstacles(const vector<vector<int>>& grid);
+// [[0,0,0],[0,1,0],[0,0,0]] -> 2
+// [[0,1],[0,0]]             -> 1
+```
+
+**E3 (Medium). Longest Common Substring.** Unlike LCS, the common part must be **contiguous** in both strings. Return its length.
+
+```cpp
+int longestCommonSubstring(const string& a, const string& b);
+// "abcdxyz",   "xyzabcd"   -> 4   ("abcd")
+// "zxabcdezy", "yzabcdezx" -> 6   ("abcdez")
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Answer **10**. Base row and column are 1; every other cell is above + left.
+
+| r \ c | 0 | 1 | 2 | 3 |
+|-------|---|---|---|---|
+| 0 | 1 | 1 | 1 | 1 |
+| 1 | 1 | 2 | 3 | 4 |
+| 2 | 1 | 3 | 6 | 10 |
+
+As a check, a path is 2 Downs and 3 Rights in some order: $\binom{5}{2} = 10$.
+
+**Q2.** Yes, it returns **10**, matching Q1.
+
+| After r | row |
+|---------|-----|
+| initial | [1, 1, 1] |
+| 1 | [1, 2, 3] |
+| 2 | [1, 3, 6] |
+| 3 | [1, 4, 10] |
+
+A 4 x 3 grid is the transpose of a 3 x 4 grid: every path maps to one with Downs and Rights swapped, so the counts are equal ($\binom{5}{3} = \binom{5}{2} = 10$).
+
+**Q3.** `dp[4][3] = 2`; one LCS is `"ab"`.
+
+| | "" | c | a | b |
+|---|---|---|---|---|
+| **""** | 0 | 0 | 0 | 0 |
+| **a** | 0 | 0 | 1 | 1 |
+| **b** | 0 | 0 | 1 | 2 |
+| **a** | 0 | 0 | 1 | 2 |
+| **c** | 0 | 1 | 1 | 2 |
+
+Key cells: `dp[1][2]` (a == a) = diagonal 0 + 1 = 1; `dp[2][3]` (b == b) = `dp[1][2]` + 1 = 2; `dp[4][1]` (c == c) = `dp[3][0]` + 1 = 1. The "c" at the end of A matches the "c" at the start of B, but they cannot be chained with "ab", so the answer stays 2.
+
+**Q4.** It returns **2**; the correct LCS is **1** (`"a"` has only one character).
+Trace with `dp = [0, 0, 0]` and the single row `i = 1` (`'a'`): at j = 1, match → `dp[1] = dp[0] + 1 = 1`; at j = 2, match → `dp[2] = dp[1] + 1 = 2`. But `dp[1]` was **already overwritten** with the current row's value, so the one `'a'` of A got matched twice. The match case needs the **diagonal** `dp[i-1][j-1]`, i.e. the *old* `dp[j-1]` before this row overwrote it. The fix is to save it in a `prev` variable before each overwrite. (Unique Paths does not have this problem because it never reads the diagonal.)
+
+**Q5.** Edit distance **2** (for example, replace both characters).
+
+| | "" | b | a |
+|---|---|---|---|
+| **""** | 0 | 1 | 2 |
+| **a** | 1 | 1 + min(0, 1, 1) = 1 | match → dp[0][1] = 1 |
+| **b** | 2 | match → dp[1][0] = 1 | 1 + min(1, 1, 1) = 2 |
+
+**E1 — reference solution.** State: `dp[c]` = min sum to reach `(r, c)`. The first row can only come from the left, the first column only from above.
+
+```cpp
+int minPathSum(const vector<vector<int>>& grid) {
+    int m = grid.size(), n = grid[0].size();
+    vector<int> dp(n, 0);
+    for (int r = 0; r < m; r++) {
+        for (int c = 0; c < n; c++) {
+            if (r == 0 && c == 0) dp[c] = grid[0][0];
+            else if (r == 0)      dp[c] = dp[c - 1] + grid[r][c];             // only from left
+            else if (c == 0)      dp[c] = dp[c] + grid[r][c];                 // only from above
+            else                  dp[c] = min(dp[c], dp[c - 1]) + grid[r][c]; // above vs left
+        }
+    }
+    return dp[n - 1];
+}
+// [[1,3,1],[1,5,1],[4,2,1]]: rows [1,4,5] -> [2,7,6] -> [6,8,7] -> 7
+```
+Time $O(M \cdot N)$, space $O(N)$. Same rolling-row trick as Unique Paths, with `min` + cost instead of `+`.
+
+**E2 — reference solution.** A blocked cell has 0 paths. Starting from `dp[0] = 1` and adding left-to-right handles the first row and column automatically: once a 0 appears, it propagates.
+
+```cpp
+int uniquePathsWithObstacles(const vector<vector<int>>& grid) {
+    int m = grid.size(), n = grid[0].size();
+    vector<long long> dp(n, 0);
+    dp[0] = (grid[0][0] == 0) ? 1 : 0;
+    for (int r = 0; r < m; r++) {
+        for (int c = 0; c < n; c++) {
+            if (grid[r][c] == 1) dp[c] = 0;        // blocked: no paths through here
+            else if (c > 0)      dp[c] += dp[c - 1]; // above (old dp[c]) + left
+        }
+    }
+    return (int)dp[n - 1];
+}
+// [[0,0,0],[0,1,0],[0,0,0]]: rows [1,1,1] -> [1,0,1] -> [1,1,2] -> 2
+```
+Time $O(M \cdot N)$, space $O(N)$.
+
+**E3 — reference solution.** State: `dp[i][j]` = length of the longest common substring **ending exactly** at `a[i-1]` and `b[j-1]`. A mismatch resets it to 0 (it does not take a max), and the answer is the largest cell anywhere, not `dp[m][n]`.
+
+```cpp
+int longestCommonSubstring(const string& a, const string& b) {
+    int m = a.size(), n = b.size(), best = 0;
+    vector<vector<int>> dp(m + 1, vector<int>(n + 1, 0));
+    for (int i = 1; i <= m; i++)
+        for (int j = 1; j <= n; j++)
+            if (a[i - 1] == b[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1] + 1;   // extend the diagonal run
+                best = max(best, dp[i][j]);
+            }                                       // else stays 0: run broken
+    return best;
+}
+```
+Time $O(M \cdot N)$, space $O(M \cdot N)$. Compared with LCS, the transition differs only in the mismatch case, and that one change turns "subsequence" into "substring".
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

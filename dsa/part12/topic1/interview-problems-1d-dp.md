@@ -528,6 +528,158 @@ for (int num : nums) {
 
 ---
 
+## Practice & Self-Check
+
+Each question re-runs one of the seven solutions on a new input. Fill the `dp` row (or the rolling variables) by hand first.
+
+### Predict the Output / Trace by Hand
+
+**Q1. House Robber with rolling variables.** Run the $O(1)$-space `rob` from Problem 2 on `[2, 1, 1, 2]`. Give `(rob1, rob2)` after each house and the result. Which houses are robbed?
+
+**Q2. Same street, but circular.** The Problem 2 dry run on `[2, 7, 9, 3, 1]` gave 12. Run Problem 3's circular `rob` on the same array. What do the two `robRange` calls return, and what is the final answer? Why is 12 no longer allowed?
+
+**Q3. Coin Change vs greedy.** Fill the Coin Change table for `coins = [1, 3, 4]`, `amount = 6`. What does `coinChange` return? What would a greedy "always take the largest coin that fits" strategy return?
+
+**Q4. Word Break that fails.** Run Problem 5's `wordBreak` on `s = "catsandog"`, `wordDict = ["cats", "dog", "sand", "and", "cat"]`. List every index `i` with `dp[i] = true`, and the final answer.
+
+**Q5. Why iterate backwards?** Run Problem 7's `canPartition` on `[1, 2, 5]`.
+(a) With the correct **backwards** inner loop, what is `dp` after each number, and what is returned?
+(b) If the inner loop ran **forwards** (`for (int i = num; i <= target; i++)`), what would be returned, and why is that wrong?
+
+### Coding Exercises
+
+**E1 (Easy). Perfect Squares.** Return the fewest perfect squares (1, 4, 9, ...) that sum to `n`. Apply the Coin Change template.
+
+```cpp
+int numSquares(int n);
+// 12 -> 3   (4 + 4 + 4)
+// 13 -> 2   (4 + 9)
+```
+
+**E2 (Easy–Medium). Delete and Earn.** Picking value `x` earns `x` points for **every** copy of `x`, but deletes all copies of `x - 1` and `x + 1`. Return the maximum points. (Hint: reduce it to House Robber over values.)
+
+```cpp
+int deleteAndEarn(const vector<int>& nums);
+// [3, 4, 2]          -> 6   (take 4 and 2)
+// [2, 2, 3, 3, 3, 4] -> 9   (take all three 3s)
+```
+
+**E3 (Medium). Count Word Break Segmentations.** Instead of `true`/`false`, return the **number** of ways `s` can be split into dictionary words (words may be reused).
+
+```cpp
+long long countSegmentations(const string& s, const vector<string>& dict);
+// "catsanddog", ["cat","cats","and","sand","dog"] -> 2
+// "pineapplepenapple", ["apple","pen","applepen","pine","pineapple"] -> 3
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **4** by robbing houses 0 and 3 (2 + 2).
+
+| House value | temp = max(n + rob1, rob2) | rob1 | rob2 |
+|-------------|----------------------------|------|------|
+| init | - | 0 | 0 |
+| 2 | max(2 + 0, 0) = 2 | 0 | 2 |
+| 1 | max(1 + 0, 2) = 2 | 2 | 2 |
+| 1 | max(1 + 2, 2) = 3 | 2 | 3 |
+| 2 | max(2 + 2, 3) = 4 | 3 | 4 |
+
+A "rob every other house" guess gives only 3; DP finds that skipping **two** houses in a row is better.
+
+**Q2.** `robRange(0, 3)` on `[2, 7, 9, 3]` returns **11**; `robRange(1, 4)` on `[7, 9, 3, 1]` returns **10**. Answer **11**.
+
+| Range | Values | (rob1, rob2) after each house | Result |
+|-------|--------|-------------------------------|--------|
+| skip last | 2, 7, 9, 3 | (0,2) → (2,7) → (7,11) → (11,11) | 11 |
+| skip first | 7, 9, 3, 1 | (0,7) → (7,9) → (9,10) → (10,10) | 10 |
+
+The linear answer 12 robs houses 0, 2, 4 (2 + 9 + 1), but in a circle house 4 is adjacent to house 0.
+
+**Q3.** `coinChange` returns **2** (3 + 3). Greedy takes 4, then 1, then 1 → **3** coins, which is not optimal.
+
+| i | coin=1 | coin=3 | coin=4 | dp[i] |
+|---|--------|--------|--------|-------|
+| 0 | — | — | — | 0 |
+| 1 | 1+dp[0]=1 | — | — | 1 |
+| 2 | 1+dp[1]=2 | — | — | 2 |
+| 3 | 1+dp[2]=3 | 1+dp[0]=1 | — | 1 |
+| 4 | 1+dp[3]=2 | 1+dp[1]=2 | 1+dp[0]=1 | 1 |
+| 5 | 1+dp[4]=2 | 1+dp[2]=3 | 1+dp[1]=2 | 2 |
+| 6 | 1+dp[5]=3 | 1+dp[3]=2 | 1+dp[2]=3 | 2 |
+
+**Q4.** `dp[i]` is true only for **i = 0, 3, 4, 7**; the answer is **false**.
+- `dp[3]`: `"cat"` = s[0..3) and `dp[0]` is true.
+- `dp[4]`: `"cats"` = s[0..4) and `dp[0]` is true.
+- `dp[7]`: `"sand"` = s[3..7) with `dp[3]` true (and also `"and"` = s[4..7) with `dp[4]` true).
+- `dp[9]`: the only matching word is `"dog"` = s[6..9), but `dp[6]` is false. No dictionary word matches a substring ending at index 8 either, so `dp[8]` is false too.
+
+**Q5.** Total = 8, so target = 4.
+(a) Backwards: returns **false** (no subset of {1, 2, 5} sums to 4).
+
+| After num | True indices of dp[0..4] |
+|-----------|--------------------------|
+| init | {0} |
+| 1 | {0, 1} |
+| 2 | {0, 1, 2, 3} |
+| 5 | {0, 1, 2, 3} (loop `i = 4; i >= 5` never runs) |
+
+(b) Forwards: returns **true** (wrong). With `num = 1`, `dp[1] = dp[0]`, then `dp[2] = dp[1]` (just set in this same pass), `dp[3] = dp[2]`, `dp[4] = dp[3]` → all true. The single `1` was reused four times, turning 0/1 knapsack into unbounded knapsack. Going backwards guarantees `dp[i - num]` still holds the value from **before** this number was considered.
+
+**E1 — reference solution.** Coin Change where the "coins" are $1^2, 2^2, \dots$ up to $i$.
+
+```cpp
+int numSquares(int n) {
+    vector<int> dp(n + 1, n + 1);          // n + 1 acts as infinity
+    dp[0] = 0;
+    for (int i = 1; i <= n; i++)
+        for (int s = 1; s * s <= i; s++)
+            dp[i] = min(dp[i], 1 + dp[i - s * s]);
+    return dp[n];
+}
+// 12: dp[12] = 1 + dp[8] = 1 + (1 + dp[4]) = 1 + 1 + 1 = 3
+```
+Time $O(n\sqrt{n})$, space $O(n)$. An answer always exists because $1 = 1^2$.
+
+**E2 — reference solution.** Bucket the points by value; taking value `v` forbids `v - 1` and `v + 1`, which is exactly "no two adjacent houses".
+
+```cpp
+int deleteAndEarn(const vector<int>& nums) {
+    int maxVal = *max_element(nums.begin(), nums.end());
+    vector<int> points(maxVal + 1, 0);
+    for (int x : nums) points[x] += x;     // house v holds all copies of v
+    int rob1 = 0, rob2 = 0;
+    for (int v = 0; v <= maxVal; v++) {
+        int temp = max(points[v] + rob1, rob2);
+        rob1 = rob2;
+        rob2 = temp;
+    }
+    return rob2;
+}
+// [2,2,3,3,3,4]: points = [0,0,4,9,4] -> House Robber -> max(4+4, 9) = 9
+```
+Time $O(n + \text{maxVal})$, space $O(\text{maxVal})$.
+
+**E3 — reference solution.** Same state as Word Break, but `dp[i]` is a **count**, and every matching word adds its ways instead of `break`-ing on the first match.
+
+```cpp
+long long countSegmentations(const string& s, const vector<string>& dict) {
+    int n = s.size();
+    vector<long long> dp(n + 1, 0);
+    dp[0] = 1;                                          // one way to split ""
+    for (int i = 1; i <= n; i++)
+        for (const string& w : dict) {
+            int L = w.size();
+            if (i >= L && dp[i - L] > 0 && s.compare(i - L, L, w) == 0)
+                dp[i] += dp[i - L];
+        }
+    return dp[n];
+}
+// "catsanddog": dp[3]=1 (cat), dp[4]=1 (cats), dp[7]=1+1 (cat|sand, cats|and), dp[10]=dp[7]=2
+```
+Time $O(n \cdot |dict| \cdot L_{max})$, space $O(n)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

@@ -762,6 +762,157 @@ if (p[j - 1] == '*') {
 
 ---
 
+## Practice & Self-Check
+
+These questions re-run Problems 3–7 on new inputs (Problems 1–2 are drilled in the 2D DP Concepts chapter). Fill each table cell by cell before checking the answers.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Coin Change II and loop order.** Run Problem 3's `change(5, [1, 2, 5])`. Give `dp[0..5]` after each coin. Then: if the loops are swapped (amount outside, coins inside), what does the same call return, and what is it counting?
+
+**Q2. Target Sum conversion.** Run Problem 4's `findTargetSumWays` on `nums = [1, 2, 1]`, `target = 2`. What is `P`? Show `dp[0..P]` after each number and name the expressions that were counted. What does the function return for `target = 1`, and why?
+
+**Q3. Edit Distance table.** Fill Problem 5's `dp` table for `word1 = "abc"`, `word2 = "yabd"`. What is the minimum number of operations, and what are they?
+
+**Q4. Burst Balloons by hand.** Run Problem 6's `maxCoins` on `[1, 5]`. Give the padded array, `dp[1][1]`, `dp[2][2]`, and both candidates for `dp[1][2]`. Which balloon should burst **last**?
+
+**Q5. Regex with two stars.** Fill Problem 7's `dp` table for `s = "aab"`, `p = "c*a*b"` (start with the empty-string row). What is `dp[3][5]`?
+
+### Coding Exercises
+
+**E1 (Easy). Count Ordered Sequences (Combination Sum IV).** Count the **ordered** sequences of numbers from `nums` (reuse allowed) that sum to `target`. This is the "permutations" loop order from Problem 3.
+
+```cpp
+int combinationSum4(const vector<int>& nums, int target);
+// nums = [1, 2, 3], target = 4 -> 7
+// nums = [9],       target = 3 -> 0
+```
+
+**E2 (Easy–Medium). Minimum Deletions to Make Two Strings Equal.** Each step deletes one character from either string. Return the minimum number of steps. (Hint: reuse Problem 2.)
+
+```cpp
+int minDeleteToEqual(const string& a, const string& b);
+// "sea", "eat"       -> 2   (delete 's' and 't')
+// "leetcode", "etco" -> 4
+```
+
+**E3 (Medium). Longest Palindromic Subsequence.** Return the length of the longest subsequence of `s` that reads the same both ways. Fill by interval length, like Burst Balloons.
+
+```cpp
+int longestPalindromeSubseq(const string& s);
+// "bbbab" -> 4   ("bbbb")
+// "cbbd"  -> 2   ("bb")
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **4**. With swapped loops it returns **9**, which counts ordered sequences (permutations), not combinations.
+
+| After coin | dp[0..5] |
+|------------|----------|
+| init | [1, 0, 0, 0, 0, 0] |
+| 1 | [1, 1, 1, 1, 1, 1] |
+| 2 | [1, 1, 2, 2, 3, 3] |
+| 5 | [1, 1, 2, 2, 3, 4] |
+
+The 4 combinations: {5}, {2,2,1}, {2,1,1,1}, {1,1,1,1,1}. Swapped, `dp[i] = dp[i-1] + dp[i-2] + dp[i-5]` gives `[1, 1, 2, 3, 5, 9]`: for example, {2,2,1} is now counted 3 times (2+2+1, 2+1+2, 1+2+2).
+
+**Q2.** totalSum = 4, so $P = \frac{4 + 2}{2} = 3$; returns **2**.
+
+| After num | dp[0..3] |
+|-----------|----------|
+| init | [1, 0, 0, 0] |
+| 1 | [1, 1, 0, 0] |
+| 2 | [1, 1, 1, 1] |
+| 1 | [1, 2, 2, 2] |
+
+The two subsets summing to 3 are {first 1, 2} and {2, second 1}, i.e. the expressions `+1 +2 -1` and `-1 +2 +1`. For `target = 1`, $4 + 1 = 5$ is odd, so it returns **0** immediately: $P$ would have to be 2.5, and flipping any sign changes the total by an even amount.
+
+**Q3.** Edit distance **2**: insert `'y'` at the front and replace `'c'` with `'d'` (`"abc"` → `"yabc"` → `"yabd"`).
+
+| | "" | y | a | b | d |
+|---|---|---|---|---|---|
+| **""** | 0 | 1 | 2 | 3 | 4 |
+| **a** | 1 | 1 | 1 | 2 | 3 |
+| **b** | 2 | 2 | 2 | 1 | 2 |
+| **c** | 3 | 3 | 3 | 2 | 2 |
+
+Key cells: `dp[1][2]` (a == a) = `dp[0][1]` = 1; `dp[2][3]` (b == b) = `dp[1][2]` = 1; `dp[3][4]` (c != d) = 1 + min(`dp[2][3]` = 1, `dp[2][4]` = 2, `dp[3][3]` = 2) = 2, via the replace (diagonal) branch.
+
+**Q4.** Padded = `[1, 1, 5, 1]`. Answer **10**; balloon 5 should burst **last**.
+- `dp[1][1]` = padded[0] · padded[1] · padded[2] = 1 · 1 · 5 = 5
+- `dp[2][2]` = padded[1] · padded[2] · padded[3] = 1 · 5 · 1 = 5
+- `dp[1][2]`, k = 1 last: 1 · 1 · 1 + `dp[1][0]` (0) + `dp[2][2]` (5) = **6**
+- `dp[1][2]`, k = 2 last: 1 · 5 · 1 + `dp[1][1]` (5) + `dp[3][2]` (0) = **10**
+
+In real order: burst the 1 first (1 · 1 · 5 = 5), then the 5 alone (1 · 5 · 1 = 5).
+
+**Q5.** `dp[3][5]` = **true**.
+
+| | "" | c | * | a | * | b |
+|---|---|---|---|---|---|---|
+| **""** | T | F | T | F | T | F |
+| **a** | F | F | F | T | T | F |
+| **a** | F | F | F | F | T | F |
+| **b** | F | F | F | F | F | T |
+
+- Row 0: `dp[0][2] = dp[0][0]` (zero c's) = T; `dp[0][4] = dp[0][2]` (zero a's) = T.
+- `dp[1][3]`: `'a' == 'a'` → `dp[0][2]` = T.
+- `dp[2][4]`: zero a's gives `dp[2][2]` = F; `p[2] == 'a' == s[1]`, so also try `dp[1][4]` = T → T.
+- `dp[3][5]`: `'b' == 'b'` → `dp[2][4]` = T.
+
+**E1 — reference solution.** Amount on the outside, numbers on the inside, so every ordering is counted.
+
+```cpp
+int combinationSum4(const vector<int>& nums, int target) {
+    vector<unsigned long long> dp(target + 1, 0);   // unsigned: intermediates can be huge
+    dp[0] = 1;
+    for (int i = 1; i <= target; i++)               // amount OUTSIDE
+        for (int x : nums)                          // numbers INSIDE
+            if (i >= x) dp[i] += dp[i - x];
+    return (int)dp[target];
+}
+// [1,2,3], 4: dp = [1, 1, 2, 4, 7]
+```
+Time $O(\text{target} \cdot |nums|)$, space $O(\text{target})$.
+
+**E2 — reference solution.** Characters in the LCS are kept; every other character in either string must be deleted.
+
+```cpp
+int minDeleteToEqual(const string& a, const string& b) {
+    int m = a.size(), n = b.size();
+    vector<vector<int>> dp(m + 1, vector<int>(n + 1, 0));
+    for (int i = 1; i <= m; i++)
+        for (int j = 1; j <= n; j++)
+            dp[i][j] = (a[i - 1] == b[j - 1]) ? 1 + dp[i - 1][j - 1]
+                                             : max(dp[i - 1][j], dp[i][j - 1]);
+    return m + n - 2 * dp[m][n];
+}
+// "sea"/"eat": LCS = "ea" (2) -> 3 + 3 - 4 = 2
+```
+Time $O(M \cdot N)$, space $O(M \cdot N)$.
+
+**E3 — reference solution.** State: `dp[l][r]` = LPS length inside `s[l..r]`. Base: `dp[i][i] = 1`. If the ends match they wrap the inner answer; otherwise drop one end.
+
+```cpp
+int longestPalindromeSubseq(const string& s) {
+    int n = s.size();
+    vector<vector<int>> dp(n, vector<int>(n, 0));
+    for (int i = 0; i < n; i++) dp[i][i] = 1;
+    for (int len = 2; len <= n; len++) {                 // short intervals first
+        for (int l = 0; l + len - 1 < n; l++) {
+            int r = l + len - 1;
+            if (s[l] == s[r]) dp[l][r] = 2 + (len == 2 ? 0 : dp[l + 1][r - 1]);
+            else              dp[l][r] = max(dp[l + 1][r], dp[l][r - 1]);
+        }
+    }
+    return dp[0][n - 1];
+}
+```
+Time $O(N^2)$, space $O(N^2)$. Equivalent shortcut: LPS(s) = LCS(s, reverse(s)).
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
