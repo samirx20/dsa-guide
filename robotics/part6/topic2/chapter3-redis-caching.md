@@ -383,6 +383,167 @@ app.post('/auth/login', async (c) => {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Return values (Section 4, ioredis).** Starting from an empty Redis, what does each `await` return?
+
+```typescript
+await redis.set('user:42', JSON.stringify({ name: 'Alice' }))   // 1
+await redis.exists('user:42')                                   // 2
+await redis.incr('page_views:/home')                            // 3
+await redis.incr('page_views:/home')                            // 4
+await redis.set('lock:job:123', '1', 'EX', 30, 'NX')            // 5
+await redis.set('lock:job:123', '1', 'EX', 30, 'NX')            // 6
+await redis.del('user:42')                                      // 7
+await redis.del('user:42')                                      // 8
+await redis.get('user:42')                                      // 9
+```
+
+**Q2. Cache-aside timeline (Section 5).** `getProduct(7)` uses `EX 300`. The requests below arrive at the given second marks, and nothing else touches Redis. Mark each as HIT or MISS and count the database queries.
+
+| t (s) | request |
+|------:|---------|
+| 0 | `GET /products/7` |
+| 100 | `GET /products/7` |
+| 299 | `GET /products/7` |
+| 301 | `GET /products/7` |
+| 350 | `PUT /products/7` (Section 6 event-based handler) |
+| 360 | `GET /products/7` |
+
+**Q3. Rate limiter trace (Section 9).** `isRateLimited(key, 5, 900)` is called for the same IP at $t = 0, 1, 2, 3, 4, 5, 6$ s and again at $t = 901$ s. What does each call return? Then: the limiter claims "5 per 15 minutes". What is the **maximum** number of attempts an attacker can get through within a span of about 2 seconds?
+
+**Q4. Cache penetration.** A scraper requests `GET /products/999` 1,000 times per second, and product 999 does not exist. Using the chapter's `getProduct`, how many database queries per second does this cause, and why?
+
+**Q5. Stampede lock (Section 7).** Three requests (A, B, C) call `getWithLock('products:all', fetchFn, 300)` at $t = 0$ on a cold cache. A wins the lock. Ignore Redis latency.
+- (a) `fetchFn` takes 250 ms. How many times is `fetchFn` called, and roughly when do B and C return?
+- (b) `fetchFn` takes **12 s** (the lock TTL is 10 s). What goes wrong?
+
+### Coding Exercises
+
+**E1 (Easy).** The middleware's key is built from `c.req.url`, so `?limit=10&sort=price` and `?sort=price&limit=10` become two different cache entries. Write
+`cacheKeyFor(method: string, path: string, query: Record<string, string>): string`,
+which sorts the query keys and upper-cases the method.
+- `cacheKeyFor('get', '/products', { sort: 'price', limit: '10' })` returns `'cache:GET:/products?limit=10&sort=price'`
+- `cacheKeyFor('GET', '/products', {})` returns `'cache:GET:/products'`
+
+**E2 (Easy–Medium).** Fix Q4 with **negative caching**. Write `getProductCached(id: number)`, which caches found products for 300 s and caches a sentinel `'__missing__'` for 30 s when the product does not exist (returning `null`).
+- With only product 1 in the DB: `getProductCached(1)` twice uses 1 DB query in total. `getProductCached(999)` twice adds **1** more query (2 in total). After 31 s, `getProductCached(999)` queries again (3 in total).
+
+**E3 (Medium).** Rewrite the Section 9 limiter so that **a crash can never leave a key without a TTL**, and so it reports useful headers:
+
+```typescript
+async function rateLimit(key: string, limit: number, windowSeconds: number):
+    Promise<{ allowed: boolean; remaining: number; retryAfter: number }>
+```
+
+- With `limit = 3, window = 60`, four calls at $t = 0$ return `remaining` 2, 1, 0 (allowed) and then `{ allowed: false, remaining: 0, retryAfter: 60 }`.
+- A call at $t = 45$ returns `retryAfter: 15`. At $t = 60$ the window has reset, so the call is allowed with `remaining: 2`.
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| # | returns | why |
+|--:|---------|-----|
+| 1 | `'OK'` | |
+| 2 | `1` | `EXISTS` returns the **count** of existing keys, not a boolean |
+| 3 | `1` | a missing key counts as 0 before `INCR` |
+| 4 | `2` | |
+| 5 | `'OK'` | lock acquired |
+| 6 | `null` | `NX` and the key already exists, so it is not set |
+| 7 | `1` | one key deleted |
+| 8 | `0` | nothing left to delete |
+| 9 | `null` | |
+
+**Q2.**
+
+| t (s) | result | DB queries so far |
+|------:|--------|------------------:|
+| 0 | MISS: query, then `SET … EX 300` (expires at 300) | 1 |
+| 100 | HIT | 1 |
+| 299 | HIT | 1 |
+| 301 | MISS (expired at 300): query, re-cache until 601 | 2 |
+| 350 | `UPDATE` in DB, then `DEL product:7` and `DEL products:all` | 2 (+1 write) |
+| 360 | MISS (deleted): query, re-cache until 660 | 3 |
+
+That is **3** read queries. Without the event-based `DEL`, the request at 360 would have been a HIT serving the **stale** pre-update product until $t = 601$.
+
+**Q3.**
+
+| t | `INCR` result | returns |
+|--:|--------------:|---------|
+| 0 | 1 (and `EXPIRE 900`, so the key dies at 900) | `false` |
+| 1–4 | 2, 3, 4, 5 | `false` |
+| 5 | 6 | **`true`** |
+| 6 | 7 | `true` |
+| 901 | 1 (old key expired at 900, so a fresh window starts) | `false` |
+
+Fixed-window burst: **9**. An attacker makes 1 attempt at time $T$, which creates the key with a TTL that ends at $T + 900$. They save the other 4 attempts for $T + 899$ (counts 2–5, all allowed). The key expires at $T + 900$, and 5 more attempts are allowed immediately (a new window, counts 1–5). That is $4 + 5 = 9$ attempts within about 1 second, even though the limit says 5 per 15 minutes. A fixed window limits *per window*, not *per any 15-minute span*. With windows aligned to the clock instead of to the first request, the worst case reaches $2 \times$ the limit. Sliding-window algorithms fix this.
+
+**Q4.** **About 1,000 queries per second**, which is every single request. `getProduct` only caches when `if (product)` is truthy. A missing product is never cached, so every request misses Redis and goes to Postgres. Caching is useless against requests for keys that do not exist (see E2).
+
+**Q5.**
+- (a) **1 call.** A holds `lock:products:all` from 0 to 250 ms and writes the cache at about 250 ms. B and C find no cache, fail `SET NX`, and sleep 100 ms. They retry at 100 and 200 ms (still locked, no cache), and at about **300 ms** they find a cache HIT and return.
+- (b) The lock **expires at 10 s while A is still fetching**. The next retrying request (B, say) acquires a fresh lock and *also* calls `fetchFn`, so the database gets a second query. Worse, when A finishes at 12 s, its `finally` deletes `lock:products:all`, which is now **B's** lock, so C can start a third fetch. The fix is to make the lock TTL longer than the worst-case fetch time, and to store a unique token as the lock value so that you only delete your own lock (compare-and-delete).
+
+**E1 — reference solution**
+
+```typescript
+export function cacheKeyFor(method: string, path: string,
+                            query: Record<string, string>): string {
+    const qs = Object.keys(query)
+        .sort()
+        .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(query[k])}`)
+        .join('&')
+    return `cache:${method.toUpperCase()}:${path}${qs ? '?' + qs : ''}`
+}
+```
+
+Sorting makes the key **canonical**: equivalent requests map to one entry, so the hit rate goes up. `encodeURIComponent` keeps `&` or `=` inside values from producing ambiguous keys. The cost is $O(k \log k)$ for $k$ query parameters.
+
+**E2 — reference solution**
+
+```typescript
+const MISSING = '__missing__'
+
+export async function getProductCached(id: number) {
+    const key = `product:${id}`
+    const cached = await redis.get(key)
+    if (cached === MISSING) return null              // negative hit
+    if (cached !== null) return JSON.parse(cached)   // positive hit
+
+    const product = await findProduct(id)            // DB query
+    if (product) await redis.set(key, JSON.stringify(product), 'EX', 300)
+    else         await redis.set(key, MISSING, 'EX', 30)   // short TTL: it may be created soon
+    return product
+}
+```
+
+Trace: `get(1)` misses, so it queries (1). `get(1)` hits (1). `get(999)` misses, queries (2), and stores the sentinel. `get(999)` hits the sentinel (2). At 31 s the sentinel has expired, so it queries again (3). Compare against `null` explicitly rather than relying on truthiness, so that a cached empty string or sentinel cannot be confused with a miss. If product 999 is created later, also `DEL product:999` in the create handler.
+
+**E3 — reference solution**
+
+```typescript
+export async function rateLimit(key: string, limit: number, windowSeconds: number) {
+    // 1. Create the key WITH its TTL in one atomic command (no-op if it exists)
+    await redis.set(key, '0', 'EX', windowSeconds, 'NX')
+    // 2. INCR keeps the existing TTL
+    const count = await redis.incr(key)
+    const allowed = count <= limit
+    return {
+        allowed,
+        remaining: Math.max(0, limit - count),
+        retryAfter: allowed ? 0 : await redis.ttl(key),   // seconds until the window resets
+    }
+}
+```
+
+In the chapter's version, a crash between `INCR` and `EXPIRE` leaves a counter with **no TTL**, which locks that IP out forever. Here the TTL is attached when the key is created, so every key that exists already has an expiry. Trace (`limit = 3`): counts 1, 2, 3 are allowed with `remaining` 2, 1, 0. Count 4 is blocked with `TTL = 60`. At $t = 45$ the TTL is $60 - 45 = 15$. At $t = 60$ the key has expired, so `SET NX` recreates it, `INCR` gives 1, and `remaining` is 2. Send `retryAfter` as the `Retry-After` header with the `429`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

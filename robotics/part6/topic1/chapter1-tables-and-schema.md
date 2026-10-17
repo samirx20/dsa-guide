@@ -272,6 +272,173 @@ CREATE TABLE comments (
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+Assume PostgreSQL and the Section 6 `users` table (`id SERIAL PRIMARY KEY`, `username VARCHAR(50) NOT NULL UNIQUE`, `email VARCHAR(255) NOT NULL UNIQUE`, `is_active BOOLEAN DEFAULT true`, …), starting empty with a fresh sequence.
+
+**Q1. Constraint trace.** Run these statements one by one. For each, say "OK (id = ?)" or name the constraint that rejects it. Then give the result of the final `SELECT`.
+
+```sql
+INSERT INTO users (username, email) VALUES ('alice', 'alice@email.com');  -- 1
+INSERT INTO users (username, email) VALUES ('bob',   'alice@email.com');  -- 2
+INSERT INTO users (username, email) VALUES ('bob',   'bob@email.com');    -- 3
+INSERT INTO users (username)        VALUES ('carol');                     -- 4
+SELECT id, username, is_active FROM users ORDER BY id;                    -- 5
+```
+
+**Q2. Normalization count (Section 5).** In the **unnormalized** Orders table, how many cells contain `alice@email.com`? How many rows must an `UPDATE` touch when Alice changes her email, in the unnormalized design and in the normalized one? Now Bob buys a Laptop. List every row that gets **inserted** in each design.
+
+**Q3. Data types.** Using the Section 3 types, predict what PostgreSQL does for each insert. Is it stored as-is, stored as a changed value, or rejected?
+- (a) `'carol_the_robot_arm'` into a `VARCHAR(10)` column
+- (b) `1234.567` into a `DECIMAL(10, 2)` column
+- (c) `123456789.5` into a `DECIMAL(10, 2)` column
+- (d) `3000000000` into an `INTEGER` column
+
+**Q4. CHECK and DEFAULT gotchas.** Given
+
+```sql
+CREATE TABLE parts (
+    id SERIAL PRIMARY KEY,
+    price INTEGER CHECK (price > 0),
+    is_active BOOLEAN DEFAULT true
+);
+```
+
+what happens with each of these, and what value ends up in `is_active`?
+
+```sql
+INSERT INTO parts (price) VALUES (0);                       -- a
+INSERT INTO parts (price) VALUES (NULL);                    -- b
+INSERT INTO parts (price, is_active) VALUES (10, NULL);     -- c
+INSERT INTO parts (price) VALUES (10);                      -- d
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Write `CREATE TABLE sensors` for a robot cell with:
+- an auto-increment primary key `id`;
+- `serial_number`, at most 32 characters, required and unique;
+- `kind`, at most 20 characters, required;
+- `location`, optional text up to 100 characters;
+- `is_active`, required and defaulting to `true`;
+- `installed_at`, defaulting to the current timestamp.
+
+`INSERT INTO sensors (serial_number, kind) VALUES ('IMU-0001', 'imu');` must succeed and produce `is_active = true`. Inserting `'IMU-0001'` again must fail.
+
+**E2 (Easy–Medium).** A logger currently writes one flat table:
+
+```text
+readings_flat:
+| sensor_serial | sensor_kind | sensor_location | recorded_at       | value |
+| IMU-0001      | imu         | arm-1 wrist     | 2024-01-15 10:30  | 0.98  |
+| IMU-0001      | imu         | arm-1 wrist     | 2024-01-15 10:31  | 1.02  |
+| TMP-0007      | temperature | motor bay       | 2024-01-15 10:30  | 41.5  |
+```
+
+Normalize it into `sensors` (reuse E1) plus a `readings` table. A reading stores a link to its sensor, a required timestamp, and a required `DECIMAL(10, 3)` value. Then write the `INSERT`s that reproduce the three rows above. (Plain integer link columns are fine. `REFERENCES` arrives in Chapter 3.)
+
+**E3 (Medium).** Robots can be assigned to many missions and a mission uses many robots. Design `robots`, `missions`, and a junction table `robot_missions`, where each robot appears **at most once per mission**, has a `role` that must be one of `'leader'`, `'follower'`, `'observer'`, and gets an `assigned_at` timestamp. Use a composite primary key on the junction table.
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| # | Result | Why |
+|--:|--------|-----|
+| 1 | OK, `id = 1` | |
+| 2 | **rejected**: `UNIQUE` violation on `email` (`duplicate key value violates unique constraint`) | `alice@email.com` already exists |
+| 3 | OK, **`id = 3`** | statement 2 already called `nextval()` for its default (value 2) before the constraint check failed, and sequences never roll back |
+| 4 | **rejected**: `NOT NULL` violation on `email` | no default exists, so `email` would be `NULL` |
+| 5 | `(1, 'alice', true)`, `(3, 'bob', true)` | `is_active` took its `DEFAULT true` |
+
+`SERIAL` ids are unique, but they are **not guaranteed to be gap-free**.
+
+**Q2.** Unnormalized: `alice@email.com` appears in **2** cells, so the email change must update **2 rows** (and missing one leaves the data inconsistent). Normalized: **1** row (`UPDATE users SET email = … WHERE id = 101`). For "Bob buys a Laptop":
+- Unnormalized: one new row `(4, 'Bob', 'bob@email.com', 'Laptop', 1000)`, which copies Bob's email and the laptop price yet again.
+- Normalized: one new row in Orders only, `(4, 102, 901)`. Users and Products are unchanged.
+
+**Q3.**
+- (a) **Rejected**: `value too long for type character varying(10)`. The string has 19 characters. PostgreSQL does not silently truncate on insert.
+- (b) Stored as **`1234.57`**. `DECIMAL(10, 2)` keeps 2 fractional digits and rounds the rest.
+- (c) **Rejected**: numeric field overflow. Precision 10 with scale 2 leaves $10 - 2 = 8$ digits before the decimal point (max `99999999.99`), and `123456789` has 9.
+- (d) **Rejected**: `integer out of range`. `INTEGER` is 32-bit signed, max $2^{31} - 1 = 2\,147\,483\,647$. Use `BIGINT`.
+
+**Q4.**
+- (a) Rejected, because the check constraint fails ($0 > 0$ is false).
+- (b) **Accepted** with `price = NULL`. A `CHECK` only rejects rows where the expression is **false**. `NULL > 0` is `NULL` (unknown), which passes. Add `NOT NULL` if price is mandatory. `is_active = true`.
+- (c) Accepted with `is_active = NULL`. An explicit `NULL` is a value, so the `DEFAULT` only applies when the column is **omitted** (or written as `DEFAULT`).
+- (d) Accepted, with `price = 10` and `is_active = true`.
+
+**E1 — reference solution**
+
+```sql
+CREATE TABLE sensors (
+    id            SERIAL PRIMARY KEY,
+    serial_number VARCHAR(32)  NOT NULL UNIQUE,
+    kind          VARCHAR(20)  NOT NULL,
+    location      VARCHAR(100),
+    is_active     BOOLEAN      NOT NULL DEFAULT true,
+    installed_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO sensors (serial_number, kind) VALUES ('IMU-0001', 'imu');  -- id 1, is_active true
+INSERT INTO sensors (serial_number, kind) VALUES ('IMU-0001', 'imu');  -- ERROR: unique violation
+```
+
+`NOT NULL DEFAULT true` closes the Q4(c) loophole: an explicit `NULL` is now rejected instead of stored. `UNIQUE` creates an index, so lookups by serial number are fast.
+
+**E2 — reference solution**
+
+```sql
+CREATE TABLE readings (
+    id          SERIAL PRIMARY KEY,
+    sensor_id   INTEGER        NOT NULL,          -- link to sensors.id
+    recorded_at TIMESTAMP      NOT NULL,
+    value       DECIMAL(10, 3) NOT NULL
+);
+
+INSERT INTO sensors (serial_number, kind, location) VALUES
+    ('IMU-0001', 'imu',         'arm-1 wrist'),   -- id 1
+    ('TMP-0007', 'temperature', 'motor bay');     -- id 2
+
+INSERT INTO readings (sensor_id, recorded_at, value) VALUES
+    (1, '2024-01-15 10:30', 0.98),
+    (1, '2024-01-15 10:31', 1.02),
+    (2, '2024-01-15 10:30', 41.5);
+```
+
+Sensor facts (`kind`, `location`) are now stored once per sensor instead of once per reading. Moving `IMU-0001` to a new location is a one-row `UPDATE`, however many readings it has. (The ids 1 and 2 assume a freshly created `sensors` table. In real code, look them up or use `RETURNING id`.)
+
+**E3 — reference solution**
+
+```sql
+CREATE TABLE robots (
+    id   SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE missions (
+    id         SERIAL PRIMARY KEY,
+    title      VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE robot_missions (
+    robot_id    INTEGER     NOT NULL,
+    mission_id  INTEGER     NOT NULL,
+    role        VARCHAR(10) NOT NULL
+                CHECK (role IN ('leader', 'follower', 'observer')),
+    assigned_at TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (robot_id, mission_id)            -- one row per (robot, mission)
+);
+```
+
+The composite primary key makes a second `(robot 1, mission 7)` row a duplicate-key error, while robot 1 can still join mission 8 and mission 7 can still add robot 2. That is exactly "many-to-many, at most once per pair". The `role` column lives on the junction table because it describes the *pairing*, not the robot or the mission alone.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

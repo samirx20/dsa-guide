@@ -293,6 +293,164 @@ Don't index:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Constraint trace on `products` (Section 2).** Starting from an empty table, run these in order. For each, say OK or name the constraint that rejects it.
+
+```sql
+INSERT INTO products (name, sku, price) VALUES ('Gripper', 'GR-01', 0);     -- 1
+INSERT INTO products (name, sku, price) VALUES ('Arm',     'GR-01', 500);   -- 2
+INSERT INTO products (name, sku, price) VALUES ('Wrist',   'WR-01', -5);    -- 3
+INSERT INTO products (name, sku, price) VALUES ('Wrist',   'WR-01', NULL);  -- 4
+INSERT INTO products (sku, price)       VALUES ('WR-01', 120);              -- 5
+```
+
+**Q2. Two-level cascade.** Use this schema and data:
+
+```sql
+CREATE TABLE posts (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    author_id INTEGER NOT NULL,
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE TABLE comments (
+    id SERIAL PRIMARY KEY,
+    body TEXT,
+    post_id   INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    author_id INTEGER NOT NULL REFERENCES users(id)          -- default: block
+);
+-- users:    (1, Alice), (2, Bob)
+-- posts:    (1, 'Hello', 1), (2, 'World', 1), (3, 'Gripper', 2)
+-- comments: (1, 'nice', post 1, by Bob), (2, '+1', post 2, by Bob)
+```
+
+- (a) What is left in each table after `DELETE FROM users WHERE id = 1;`?
+- (b) Start over, but first add comment `(3, 'cool', post 3, by Alice)`. What happens now when you run the same `DELETE`? How many posts and comments exist afterwards?
+
+**Q3. SET NULL meets NOT NULL.** Someone writes `author_id INTEGER NOT NULL` **and** `ON DELETE SET NULL` on the same column. What happens when a user who has posts is deleted?
+
+**Q4. Index math and the composite index (Section 5).** The `users` table has $1{,}000{,}000$ rows.
+- (a) Roughly how many comparisons does a full scan need in the worst case, compared with a balanced B-tree lookup (count it like a binary search)?
+- (b) With `idx_posts_author_created ON posts(author_id, created_at)`, which of these filters can use the index **efficiently**?
+  1. `WHERE author_id = 5`
+  2. `WHERE author_id = 5 ORDER BY created_at DESC`
+  3. `WHERE created_at > '2024-01-01'`
+
+### Coding Exercises
+
+**E1 (Easy).** Create `robots(id, name UNIQUE NOT NULL)` and `telemetry(id, robot_id, battery_pct, recorded_at)` where:
+- every telemetry row must belong to an existing robot;
+- deleting a robot deletes its telemetry;
+- `battery_pct` is required and between 0 and 100 inclusive;
+- lookups by `robot_id` are indexed.
+
+With robot 1 present: `(robot_id=1, battery_pct=87)` succeeds, `(1, 101)` fails the CHECK, `(2, 50)` fails the FK, and `DELETE FROM robots WHERE id = 1` leaves `telemetry` empty.
+
+**E2 (Easy–Medium).** A `missions` table has an optional `assigned_robot_id`. When a robot is scrapped, its missions must **stay** but become unassigned. Write the `missions` table and predict the result of deleting the assigned robot.
+
+**E3 (Medium).** Build the many-to-many `robot_missions(robot_id, mission_id, role)` junction with:
+- a composite primary key;
+- `role IN ('leader', 'follower', 'observer')`;
+- deleting a robot removes its assignments;
+- a mission **cannot** be deleted while robots are still assigned to it;
+- an index that supports "which robots are on mission X?".
+
+Given robots `(1, 'atlas')`, `(2, 'spot')`, mission `7`, and assignments `(1, 7, 'leader')`, `(2, 7, 'follower')`, predict the outcome of: `INSERT (1, 7, 'observer')`, `INSERT (3, 7, 'observer')`, `INSERT (2, 7, 'pilot')`, `DELETE mission 7`, `DELETE robot 2`.
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| # | Result | Reason |
+|--:|--------|--------|
+| 1 | OK | `CHECK (price >= 0)` allows 0 |
+| 2 | rejected, `UNIQUE (sku)` | `GR-01` is taken |
+| 3 | rejected, `CHECK (price >= 0)` | $-5 < 0$ |
+| 4 | rejected, `NOT NULL (price)` | the CHECK alone would have let `NULL` through, but `NOT NULL` stops it |
+| 5 | rejected, `NOT NULL (name)` | `name` was omitted and has no default |
+
+**Q2.**
+- (a) `users`: only `(2, Bob)`. `posts`: only `(3, 'Gripper', 2)`. `comments`: **empty**. Deleting Alice cascades to her posts 1 and 2, and deleting those posts cascades to comments 1 and 2 (both on Alice's posts, even though Bob wrote them).
+- (b) The `DELETE` **fails**, and nothing is deleted. Comment 3 references Alice through `comments.author_id`, which has no `ON DELETE` action (the default blocks the delete). PostgreSQL raises `update or delete on table "users" violates foreign key constraint … on table "comments"`, and because a statement is atomic the cascaded deletes are rolled back too. Afterwards there are still **3 posts** and **3 comments**.
+
+**Q3.** The delete fails. The `SET NULL` action tries to write `NULL` into `author_id`, which violates `NOT NULL` (`null value in column "author_id" … violates not-null constraint`), so the whole `DELETE` is rolled back. `SET NULL` only makes sense on a **nullable** column, as in the chapter's Option 2.
+
+**Q4.**
+- (a) Full scan: up to $1{,}000{,}000$ comparisons. B-tree lookup: about $\lceil \log_2 10^6 \rceil = 20$ comparisons (real B-trees have high fan-out, so only 3–4 page reads). That is about $50{,}000\times$ fewer comparisons.
+- (b) 1 **yes**, because it uses the leftmost column. 2 **yes**: inside one `author_id`, entries are already sorted by `created_at`, so the index serves both the filter and the sort (scanning backwards for `DESC`). 3 **no, not efficiently**: `created_at` is the *second* column, so matching rows are spread across every `author_id` (the leftmost-prefix rule). Give it its own index if you query it alone.
+
+**E1 — reference solution**
+
+```sql
+CREATE TABLE robots (
+    id   SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE
+);
+
+CREATE TABLE telemetry (
+    id          SERIAL PRIMARY KEY,
+    robot_id    INTEGER NOT NULL,
+    battery_pct INTEGER NOT NULL CHECK (battery_pct BETWEEN 0 AND 100),
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (robot_id) REFERENCES robots(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_telemetry_robot_id ON telemetry(robot_id);
+```
+
+PostgreSQL does **not** index the referencing column automatically. Without the index, every `DELETE FROM robots` has to scan all of `telemetry` to find the rows to cascade. `BETWEEN 0 AND 100` is inclusive at both ends.
+
+**E2 — reference solution**
+
+```sql
+CREATE TABLE missions (
+    id                SERIAL PRIMARY KEY,
+    title             VARCHAR(255) NOT NULL,
+    assigned_robot_id INTEGER,                        -- nullable on purpose
+    FOREIGN KEY (assigned_robot_id) REFERENCES robots(id) ON DELETE SET NULL
+);
+CREATE INDEX idx_missions_robot ON missions(assigned_robot_id);
+
+-- robots: (1, 'atlas');  missions: (7, 'inspect bay 3', 1)
+DELETE FROM robots WHERE id = 1;
+-- missions now: (7, 'inspect bay 3', NULL)   ← mission kept, unassigned
+```
+
+Unassigned missions can then be found with `WHERE assigned_robot_id IS NULL`. Note that `= NULL` never matches.
+
+**E3 — reference solution**
+
+```sql
+CREATE TABLE robot_missions (
+    robot_id   INTEGER     NOT NULL,
+    mission_id INTEGER     NOT NULL,
+    role       VARCHAR(10) NOT NULL
+               CHECK (role IN ('leader', 'follower', 'observer')),
+    PRIMARY KEY (robot_id, mission_id),
+    FOREIGN KEY (robot_id)   REFERENCES robots(id)   ON DELETE CASCADE,
+    FOREIGN KEY (mission_id) REFERENCES missions(id) ON DELETE RESTRICT
+);
+
+-- PK (robot_id, mission_id) already serves "missions of robot R";
+-- "robots on mission M" needs mission_id as a leading column:
+CREATE INDEX idx_robot_missions_mission ON robot_missions(mission_id);
+```
+
+| Statement | Outcome |
+|-----------|---------|
+| `INSERT (1, 7, 'observer')` | rejected: duplicate primary key `(1, 7)` |
+| `INSERT (3, 7, 'observer')` | rejected: FK, robot 3 does not exist |
+| `INSERT (2, 7, 'pilot')` | rejected: CHECK on `role` (it would also duplicate `(2, 7)`, but the CHECK is evaluated first) |
+| `DELETE mission 7` | rejected: RESTRICT, two assignments still reference it |
+| `DELETE robot 2` | OK: cascade removes `(2, 7, 'follower')`, leaving `(1, 7, 'leader')` |
+
+This reuses Q4's leftmost-prefix rule. The composite PK index cannot efficiently answer `WHERE mission_id = 7`, which is why the second index exists.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

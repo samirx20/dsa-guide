@@ -247,6 +247,153 @@ await videoQueue.add('normal-task', { videoId }, { priority: 5 })
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Retries and backoff (Section 6).** A job is added with `{ attempts: 3, backoff: { type: 'exponential', delay: 1000 } }`, and `processVideo` throws **every** time. How many times does the processor run? How long does BullMQ wait before each retry? (BullMQ's exponential backoff waits $\text{delay} \cdot 2^{\,\text{attemptsMade} - 1}$.) Which worker event fires, and how often? Compare your answer with the comment `// 1s, 2s, 4s` in the chapter.
+
+**Q2. Priority order.** With **no worker running**, the API adds these jobs in this order. Then one worker with concurrency 1 starts. In what order are they processed?
+
+```typescript
+await videoQueue.add('A', { videoId: 'a' }, { priority: 5 })
+await videoQueue.add('B', { videoId: 'b' }, { priority: 1 })
+await videoQueue.add('C', { videoId: 'c' }, { priority: 5 })
+await videoQueue.add('D', { videoId: 'd' })               // no priority
+```
+
+**Q3. Scaling math (Section 5).** 20 videos are queued at once, each takes exactly 5 minutes, and each worker processes one job at a time. How long until the last one finishes with 1 worker, 5 workers, and 3 workers?
+
+**Q4. Delays are a minimum.** At 12:00:00 a job is added with `delay: 5 * 60 * 1000`. The only worker is busy with a 7-minute job that started at 12:00:00. When does the delayed job **start**?
+
+**Q5. Compose wiring (Section 4).** You run the chapter's compose file with `docker compose up -d --scale worker=5`.
+- (a) How many containers are running in total?
+- (b) The worker logs `connect ECONNREFUSED 127.0.0.1:6379`. Which line of `worker.ts` is wrong, and what should it say?
+
+### Coding Exercises
+
+**E1 (Easy).** Write `backoffDelays(attempts: number, baseMs: number): number[]` that returns the waits BullMQ's exponential backoff performs if **every** attempt fails.
+- `backoffDelays(3, 1000)` returns `[1000, 2000]`
+- `backoffDelays(5, 500)` returns `[500, 1000, 2000, 4000]`
+- `backoffDelays(1, 1000)` returns `[]`
+
+**E2 (Easy–Medium).** Write `makespan(durations: number[], workers: number): number`, the time at which the last job finishes when jobs are taken **in queue order** and each job goes to whichever worker is free earliest.
+- `makespan([5, 5, 5, 5, 5], 2)` returns `15`
+- `makespan([10, 1, 1, 1], 2)` returns `10`
+- `makespan(Array(20).fill(5), 3)` returns `35`. `makespan([], 4)` returns `0`.
+
+**E3 (Medium).** Write an in-memory retry runner that mimics a BullMQ worker with `attempts` and exponential `backoff`:
+
+```typescript
+type Result = { status: 'completed' | 'failed'; attemptsMade: number;
+                waits: number[]; value?: unknown; error?: string }
+
+async function runWithRetry(
+    processor: (attempt: number) => Promise<unknown>,
+    attempts: number,
+    baseMs: number,
+    sleep?: (ms: number) => Promise<void>,   // injectable so tests don't really wait
+): Promise<Result>
+```
+
+- A processor that throws on attempts 1 and 2 and returns `'ok'` on attempt 3, with `(attempts=3, baseMs=1000)`, gives `{ status: 'completed', attemptsMade: 3, waits: [1000, 2000], value: 'ok' }`.
+- A processor that always throws `'ffmpeg crashed'` gives `{ status: 'failed', attemptsMade: 3, waits: [1000, 2000], error: 'ffmpeg crashed' }`.
+
+#### Dry-Run: Answers
+
+**Q1.** The processor runs **3 times** in total (`attempts` counts the first try, not just the retries).
+
+| attempt | outcome | attemptsMade | wait before next |
+|--------:|---------|-------------:|-----------------:|
+| 1 | throws | 1 | $1000 \cdot 2^0 = 1000$ ms |
+| 2 | throws | 2 | $1000 \cdot 2^1 = 2000$ ms |
+| 3 | throws | 3 | — (no attempts left) |
+
+There are only **two** waits (1 s, 2 s), so the chapter's `1s, 2s, 4s` would need `attempts: 4`. The worker's `'failed'` event fires on **every** failed attempt (3 times, with `attemptsMade` 1, 2, 3). After the third, the job moves to the *failed* set for good, and `'completed'` never fires.
+
+**Q2.** **D, B, A, C.** In BullMQ, a job **without** a priority goes to the normal wait list and is picked before any prioritized job. Among prioritized jobs, a lower number means more urgent ($1$ before $5$). Equal priorities keep insertion order, so A comes before C.
+
+**Q3.** The finish time is $\lceil \tfrac{\text{jobs}}{\text{workers}} \rceil \times 5$ minutes:
+- 1 worker: $20 \times 5 = 100$ min
+- 5 workers: $\lceil 20/5 \rceil = 4$ rounds, so **20 min**
+- 3 workers: $\lceil 20/3 \rceil = 7$ rounds, so **35 min**. The last round has only 2 jobs, so one worker sits idle.
+
+**Q4.** At **12:07:00**. The job becomes *eligible* at 12:05:00, but the only worker is still busy until 12:07:00. `delay` is the earliest start time, not a guaranteed start time.
+
+**Q5.**
+- (a) **7**: 1 `api` + 5 `worker` + 1 `redis`. Every worker container runs the same image with `command: npm run worker`, and they all pull from the same Redis list, so each job goes to exactly one worker.
+- (b) `connection: { host: 'localhost', port: 6379 }`. Inside a container, `localhost` is the worker container itself. It should be `host: 'redis'` (the Compose service name), ideally read from an env var such as `process.env.REDIS_HOST`. The same fix applies to `queue.ts` in the API.
+
+**E1 — reference solution**
+
+```typescript
+export function backoffDelays(attempts: number, baseMs: number): number[] {
+    const waits: number[] = []
+    // a wait happens after every failed attempt except the last one
+    for (let attemptsMade = 1; attemptsMade < attempts; attemptsMade++) {
+        waits.push(baseMs * 2 ** (attemptsMade - 1))
+    }
+    return waits
+}
+```
+
+There are $\max(0, n - 1)$ waits. Their sum is $\text{base} \cdot (2^{n-1} - 1)$, so `(3, 1000)` waits $1000 \cdot 3 = 3000$ ms in total.
+
+**E2 — reference solution**
+
+```typescript
+export function makespan(durations: number[], workers: number): number {
+    const freeAt: number[] = new Array(workers).fill(0)   // when each worker is next free
+    for (const d of durations) {
+        let idx = 0
+        for (let i = 1; i < workers; i++) if (freeAt[i] < freeAt[idx]) idx = i
+        freeAt[idx] += d                                   // job runs on earliest-free worker
+    }
+    return Math.max(0, ...freeAt)
+}
+```
+
+Trace for `[10, 1, 1, 1]` with 2 workers: `freeAt` goes $[0,0] \to [10,0] \to [10,1] \to [10,2] \to [10,3]$, so the answer is $\max = 10$. One long job dominates, and adding workers cannot beat the longest single job. The loop is $O(n \cdot w)$. A min-heap would make it $O(n \log w)$.
+
+**E3 — reference solution**
+
+```typescript
+type Result = { status: 'completed' | 'failed'; attemptsMade: number;
+                waits: number[]; value?: unknown; error?: string }
+
+export async function runWithRetry(
+    processor: (attempt: number) => Promise<unknown>,
+    attempts: number,
+    baseMs: number,
+    sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<Result> {
+    const waits: number[] = []
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+            const value = await processor(attempt)
+            return { status: 'completed', attemptsMade: attempt, waits, value }
+        } catch (err) {
+            if (attempt === attempts) {
+                return { status: 'failed', attemptsMade: attempt, waits,
+                         error: (err as Error).message }
+            }
+            const wait = baseMs * 2 ** (attempt - 1)
+            waits.push(wait)
+            await sleep(wait)
+        }
+    }
+    throw new Error('unreachable')
+}
+
+// test without real waiting:
+// await runWithRetry(async (a) => { if (a < 3) throw new Error('x'); return 'ok' },
+//                    3, 1000, async () => {})
+```
+
+This is Q1's trace in code. Injecting `sleep` makes the test instant and deterministic, the same idea as overriding a dependency. Because the processor receives `attempt`, it can behave differently on retries, for example to skip work that already succeeded, so retries stay **idempotent**.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

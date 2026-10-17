@@ -343,6 +343,177 @@ ORDER BY posts.created_at DESC;
 
 ---
 
+## Practice & Self-Check
+
+All questions use this small dataset, which extends the chapter's Alice/Bob/Carol example (post 3 still points at the non-existent user 999):
+
+```sql
+-- users
+-- id  | username | email            | is_active
+-- 101 | alice    | alice@email.com  | true
+-- 102 | bob      | bob@gmail.com    | true
+-- 103 | carol    | carol@gmail.com  | false
+-- 104 | dave     | dave@email.com   | true
+
+-- posts
+-- id | title   | author_id | is_published
+-- 1  | Hello   | 101       | true
+-- 2  | World   | 102       | true
+-- 3  | Orphan  | 999       | false
+-- 4  | Again   | 101       | false
+-- 5  | Gripper | 101       | true
+
+-- comments
+-- id | post_id | author_id
+-- 1  | 1       | 102
+-- 2  | 1       | 103
+-- 3  | 2       | 101
+-- 4  | 5       | 102
+```
+
+### Predict the Output / Trace by Hand
+
+**Q1. INNER JOIN.** Which rows come back, in order?
+
+```sql
+SELECT posts.title, users.username
+FROM posts
+INNER JOIN users ON posts.author_id = users.id
+ORDER BY posts.id;
+```
+
+**Q2. `COUNT(*)` vs `COUNT(column)` after a LEFT JOIN.** Fill in both count columns.
+
+```sql
+SELECT users.username,
+       COUNT(*)        AS c_star,
+       COUNT(posts.id) AS c_posts
+FROM users
+LEFT JOIN posts ON users.id = posts.author_id
+GROUP BY users.id, users.username
+ORDER BY users.id;
+```
+
+**Q3. WHERE vs ON in a LEFT JOIN.** How many rows does each query return, and do Carol and Dave appear?
+
+```sql
+-- (a)
+SELECT users.username, posts.title
+FROM users LEFT JOIN posts ON users.id = posts.author_id
+WHERE posts.is_published = true;
+
+-- (b)
+SELECT users.username, posts.title
+FROM users LEFT JOIN posts ON users.id = posts.author_id
+                          AND posts.is_published = true;
+```
+
+**Q4. Sorting and paging.** What does this return?
+
+```sql
+SELECT username FROM users
+ORDER BY is_active DESC, username DESC
+LIMIT 2 OFFSET 1;
+```
+
+**Q5. The chapter's "Real-World Example" on this data.** Run Section 4's query (posts by `author_id = 101` with comment counts), but with `ORDER BY posts.id DESC`. Fill in the result table.
+
+| id | title | comment_count |
+|---:|-------|--------------:|
+| ? | ? | ? |
+
+### Coding Exercises
+
+**E1 (Easy).** Return `username, email` for **active** users whose email ends in `@gmail.com`, sorted by username.
+Expected output: `('bob', 'bob@gmail.com')`. Carol has a gmail address but is inactive.
+
+**E2 (Easy–Medium).** For **every** user, return `username` and `published`, the number of **published** posts they wrote. Users with zero must still appear. Sort by `published` descending, then `username` ascending.
+Expected: `alice 2`, `bob 1`, `carol 0`, `dave 0`.
+
+**E3 (Medium).** Return each author who has received **at least 2 comments in total across all of their posts**, with the total as `comments_received`.
+Expected: `alice 3` (posts 1 and 5 have $2 + 1$ comments). Bob's single comment does not qualify.
+
+#### Dry-Run: Answers
+
+**Q1.** Four rows: `('Hello', 'alice')`, `('World', 'bob')`, `('Again', 'alice')`, `('Gripper', 'alice')`. Post 3 (`Orphan`, author 999) has no matching user, so INNER JOIN drops it. Carol and Dave have no posts, so they never appear.
+
+**Q2.**
+
+| username | c_star | c_posts | why |
+|----------|-------:|--------:|-----|
+| alice | 3 | 3 | posts 1, 4, 5 |
+| bob | 1 | 1 | post 2 |
+| carol | **1** | **0** | the LEFT JOIN emits one row with `posts.*` all `NULL`, which `COUNT(*)` counts and `COUNT(posts.id)` skips |
+| dave | **1** | **0** | same |
+
+Always count a column from the right-hand table when you mean "how many matches".
+
+**Q3.**
+- (a) **3 rows**: `alice/Hello`, `alice/Gripper`, `bob/World`. Carol and Dave's rows have `posts.is_published = NULL`, and `NULL = true` is not true, so the `WHERE` removes them. The LEFT JOIN has effectively become an INNER JOIN.
+- (b) **5 rows**: the same 3, plus `carol/NULL` and `dave/NULL`. A condition in `ON` only decides which posts *match*. Every left-side user is still kept.
+
+**Q4.** The sort order is: active users first (`true` sorts above `false` in `DESC`), and within each group usernames go Z→A. That gives `dave, bob, alice, carol`. `OFFSET 1` skips `dave`, and `LIMIT 2` keeps `bob` and `alice`. Result: `bob`, `alice`.
+
+**Q5.**
+
+| id | title | comment_count |
+|---:|-------|--------------:|
+| 5 | Gripper | 1 |
+| 4 | Again | 0 |
+| 1 | Hello | 2 |
+
+Alice's posts are 1, 4, and 5. Comments 1 and 2 belong to post 1, comment 4 to post 5, and none to post 4. Post 4 still appears with `0` because of the LEFT JOIN plus `COUNT(comments.id)`.
+
+**E1 — reference solution**
+
+```sql
+SELECT username, email
+FROM users
+WHERE is_active = true
+  AND email LIKE '%@gmail.com'
+ORDER BY username;
+```
+
+`%` matches any prefix. Both conditions must hold, so `carol` (`is_active = false`) is excluded.
+
+**E2 — reference solution**
+
+```sql
+SELECT users.username,
+       COUNT(posts.id) AS published
+FROM users
+LEFT JOIN posts
+       ON posts.author_id = users.id
+      AND posts.is_published = true          -- filter in ON, not WHERE (see Q3)
+GROUP BY users.id, users.username
+ORDER BY published DESC, users.username ASC;
+```
+
+Putting the published filter in `ON` keeps users with no published posts, and `COUNT(posts.id)` turns their NULL row into `0` (see Q2). Alice's unpublished post 4 is excluded from her count, so she has 2.
+
+**E3 — reference solution**
+
+```sql
+SELECT users.username,
+       COUNT(comments.id) AS comments_received
+FROM users
+JOIN posts    ON posts.author_id = users.id
+JOIN comments ON comments.post_id = posts.id
+GROUP BY users.id, users.username
+HAVING COUNT(comments.id) >= 2;
+```
+
+Trace before `HAVING`:
+
+| author | (post, comment) pairs | count |
+|--------|-----------------------|------:|
+| alice | (1, 1), (1, 2), (5, 4) | 3 |
+| bob | (2, 3) | 1 |
+
+`HAVING` filters groups *after* aggregation (`WHERE COUNT(...) >= 2` fails with "aggregate functions are not allowed in WHERE"), which leaves `alice | 3`. Inner joins are fine here because authors with zero comments cannot reach 2 anyway.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
