@@ -481,6 +481,184 @@ Look closely at **Scenario 2**:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Radians do the unit work for you.** Use $s = r\theta$ and $v = r\omega$.
+1. A wheel of radius $r = 0.1\text{ m}$ rotates $45^\circ$. How far does the robot roll?
+2. The same wheel spins at one revolution per second. What is $\omega$ in rad/s, and what is $v$?
+3. A gyro integrator reports a heading of $3.0\text{ rad}$. What is that in degrees (2 decimals)?
+
+**Q2. Polar to Cartesian.** A LiDAR at the origin of the robot frame measures range $r = 2.0\text{ m}$. Where is the hit point $(x, y)$ (3 decimals), and which side of the robot is it on, for beam angle
+1. $\theta = 150^\circ$
+2. $\theta = -90^\circ$
+3. $\theta = 210^\circ$?
+
+**Q3. `atan` vs. `atan2`.** Fill in the table (degrees). Write "error" where `math.atan(y / x)` would crash.
+
+| Target $(x, y)$ | `math.degrees(math.atan(y / x))` | `math.degrees(math.atan2(y, x))` |
+|-----------------|----------------------------------|----------------------------------|
+| $(0, 5)$ | ? | ? |
+| $(-4, 0)$ | ? | ? |
+| $(3, -3)$ | ? | ? |
+| $(-1, \sqrt{3})$ | ? | ? |
+
+**Q4. Extend the Section 7 dry run.** Using `shortest_angular_distance(current, target) = wrap_to_pi(target - current)`, fill in the missing rows (degrees) and say which way the robot turns:
+
+| Scenario | `current` | `target` | Raw $\Delta\theta$ | Wrapped output | Action |
+|----------|-----------|----------|--------------------|----------------|--------|
+| A | $170^\circ$ | $-100^\circ$ | ? | ? | ? |
+| B | $-90^\circ$ | $100^\circ$ | ? | ? | ? |
+| C | $30^\circ$ | $1110^\circ$ | ? | ? | ? |
+
+**Q5. Re-run the C++ program.** In the chapter's C++17 `main()`, change only the inputs: the robot is at $(0.0, 0.0)$ with `robot_yaw = deg_to_rad(-170.0)`, and the target is at $(-2.0, -2.0)$. Predict the three lines printed with `std::setprecision(2)`.
+
+### Coding Exercises
+
+**E1 (Easy). LiDAR scan to points.** Write `scan_to_points(ranges: list[float], angle_min: float, angle_increment: float, range_max: float = float("inf")) -> list[tuple[float, float]]`. Beam $i$ points at $\theta_i = \text{angle\_min} + i \cdot \text{angle\_increment}$. Convert each valid range to $(x, y)$ in the robot frame. Skip readings that are not finite, $\le 0$, or $>$ `range_max` (drivers report "no return" as `inf` or `0.0`).
+
+```python
+scan_to_points([1.0, 2.0, float("inf"), 1.0], -math.pi / 2, math.pi / 2)
+# ≈ [(0.0, -1.0), (2.0, 0.0), (-1.0, 0.0)]     (beam 2 at +90° skipped)
+```
+
+**E2 (Easy–Medium). Circular mean.** Write `circular_mean(angles: list[float]) -> float` (radians in, radians out, result in $[-\pi, \pi]$) using the unit-vector method from Mistake 2. Raise `ValueError` for an empty list, and also when the mean direction is undefined (the summed vector has length $< 10^{-12}$, for example $[0, \pi]$).
+
+```python
+math.degrees(circular_mean([math.radians(179), math.radians(-179)]))   # 180.0
+math.degrees(circular_mean([math.radians(10), math.radians(20), math.radians(30)]))   # ≈ 20.0
+circular_mean([0.0, math.pi])    # ValueError
+```
+
+**E3 (Medium). Rate-limited turn in place.** A robot can rotate at most `max_step` radians per control tick. Write `steps_to_align(current: float, target: float, max_step: float, tol: float = 1e-9) -> int`. Each tick, compute the error with `shortest_angular_distance`, clamp it to $[-\text{max\_step}, +\text{max\_step}]$, add it to `current`, and wrap. Return the number of ticks until $|\text{error}| \le \text{tol}$.
+
+```python
+r = math.radians
+steps_to_align(r(170), r(-170), r(5))   # 4   (a naive unwrapped controller would need 68)
+steps_to_align(r(10), r(50), r(5))      # 8
+steps_to_align(r(0), r(12), r(5))       # 3   (5° + 5° + 2°)
+```
+
+#### Dry-Run: Answers
+
+**Q1.**
+1. $\theta = 45^\circ \cdot \frac{\pi}{180^\circ} = \frac{\pi}{4} = 0.7854\text{ rad}$, so $s = 0.1 \times 0.7854 = 0.0785\text{ m}$ (7.85 cm). Do **not** compute $0.1 \times 45 = 4.5\text{ m}$.
+2. One revolution per second is $\omega = 2\pi = 6.2832\text{ rad/s}$, so $v = 0.1 \times 6.2832 = 0.6283\text{ m/s}$.
+3. $3.0 \times \frac{180^\circ}{\pi} = 171.89^\circ$.
+
+**Q2.**
+
+| $\theta$ | $\cos\theta$ | $\sin\theta$ | $(x, y) = (2\cos\theta, 2\sin\theta)$ | Where |
+|----------|--------------|--------------|----------------------------------------|-------|
+| $150^\circ$ | $-0.8660$ | $+0.5$ | $(-1.732, 1.000)$ | behind and to the left (Quadrant II) |
+| $-90^\circ$ | $0$ | $-1$ | $(0.000, -2.000)$ | directly to the right (in code, $x$ comes out as about $1.2\times10^{-16}$, which is rounding noise) |
+| $210^\circ$ | $-0.8660$ | $-0.5$ | $(-1.732, -1.000)$ | behind and to the right (Quadrant III). $210^\circ$ is the same direction as $-150^\circ$ |
+
+**Q3.**
+
+| Target $(x, y)$ | `atan(y / x)` | `atan2(y, x)` | Comment |
+|-----------------|---------------|---------------|---------|
+| $(0, 5)$ | **error** (`ZeroDivisionError`) | $90.0$ | directly left |
+| $(-4, 0)$ | $-0.0$ | $180.0$ | `atan` says "straight ahead", but the target is directly **behind** |
+| $(3, -3)$ | $-45.0$ | $-45.0$ | Quadrant IV: both agree when $x > 0$ |
+| $(-1, \sqrt{3})$ | $-60.0$ | $120.0$ | Quadrant II: `atan` is off by $180^\circ$; `atan2` adds $\pi$ (row 2 of the case formula: $-60^\circ + 180^\circ$) |
+
+**Q4.**
+
+| Scenario | `current` | `target` | Raw $\Delta\theta$ | Wrapped output | Action |
+|----------|-----------|----------|--------------------|----------------|--------|
+| A | $170^\circ$ | $-100^\circ$ | $-270^\circ$ | $+90^\circ$ | turn $90^\circ$ CCW (left) across the seam |
+| B | $-90^\circ$ | $100^\circ$ | $+190^\circ$ | $-170^\circ$ | turn $170^\circ$ CW (right) |
+| C | $30^\circ$ | $1110^\circ$ | $+1080^\circ$ | $0^\circ$ (code prints about $-4\times10^{-14}$) | none: $1110^\circ = 3 \times 360^\circ + 30^\circ$ |
+
+Check A: $-270^\circ + 360^\circ = +90^\circ$. Check B: $190^\circ - 360^\circ = -170^\circ$. Bonus subtlety: for a raw difference of *exactly* $\pm 180^\circ$, `atan2(sin, cos)` returns $+180^\circ$ for $+\pi$ but $-180^\circ$ for $-\pi$ (the sign of the tiny rounding error in $\sin(\pm\pi)$ decides it). Both are correct "U-turn" answers, but do not write tests that expect one specific sign there.
+
+**Q5.** Output:
+
+```cpp
+Distance to target : 2.83 m
+Desired heading    : -135.00 deg
+Shortest turn      : 35.00 deg
+```
+
+| Quantity | Computation |
+|----------|-------------|
+| `dx, dy` | $(-2 - 0,\ -2 - 0) = (-2, -2)$, Quadrant III |
+| `distance` | $\sqrt{4 + 4} = 2\sqrt{2} = 2.828$, printed as `2.83` |
+| `desired_yaw` | `atan2(-2, -2)` $= \arctan(1) - \pi = 45^\circ - 180^\circ = -135^\circ$ |
+| raw error | $-135^\circ - (-170^\circ) = +35^\circ$, already in range, so the wrap changes nothing |
+
+The robot turns $35^\circ$ **left** (CCW). Naive `atan(dy/dx)` would have aimed it at $+45^\circ$, which is exactly the wrong way.
+
+**E1 — reference solution**
+
+```python
+import math
+
+def scan_to_points(ranges: list[float], angle_min: float, angle_increment: float,
+                   range_max: float = float("inf")) -> list[tuple[float, float]]:
+    points: list[tuple[float, float]] = []
+    for i, r in enumerate(ranges):
+        if not math.isfinite(r) or r <= 0.0 or r > range_max:
+            continue                                   # no return / invalid beam
+        theta = angle_min + i * angle_increment        # beam angle in radians
+        points.append((r * math.cos(theta), r * math.sin(theta)))
+    return points
+```
+
+Beam angles: $-90^\circ, 0^\circ, +90^\circ, +180^\circ$, giving $(0, -1)$, $(2, 0)$, skipped, and $(-1, 0)$. Cost: $O(n)$ for $n$ beams. Note that the index `i` still advances for skipped beams. Computing $\theta$ from a separate counter of *kept* points would shift every later point.
+
+**E2 — reference solution**
+
+```python
+import math
+
+def circular_mean(angles: list[float]) -> float:
+    if not angles:
+        raise ValueError("circular_mean() of empty list")
+    s = sum(math.sin(a) for a in angles)     # sum of unit-vector y components
+    c = sum(math.cos(a) for a in angles)     # sum of unit-vector x components
+    if math.hypot(s, c) < 1e-12:
+        raise ValueError("mean direction is undefined")
+    return math.atan2(s, c)
+```
+
+Trace for $[179^\circ, -179^\circ]$: $\sum\sin = 0.01745 - 0.01745 = 0$ and $\sum\cos = -0.99985 \cdot 2 = -1.9997$, so `atan2(0, -1.9997)` $= \pi$, which is $180^\circ$ (facing backward, as it should be). For $[0, \pi]$ the two unit vectors cancel to $(0, 0)$, so no direction exists. Dividing $s$ and $c$ by $n$ is unnecessary, because `atan2` only cares about the direction.
+
+**E3 — reference solution**
+
+```python
+import math
+
+def wrap_to_pi(a: float) -> float:
+    return math.atan2(math.sin(a), math.cos(a))
+
+def shortest_angular_distance(current: float, target: float) -> float:
+    return wrap_to_pi(target - current)
+
+def steps_to_align(current: float, target: float, max_step: float, tol: float = 1e-9) -> int:
+    steps = 0
+    while abs(shortest_angular_distance(current, target)) > tol:
+        err = shortest_angular_distance(current, target)
+        step = max(-max_step, min(max_step, err))   # clamp to the rate limit
+        current = wrap_to_pi(current + step)        # keep the state in [-pi, pi]
+        steps += 1
+    return steps
+```
+
+| Tick | `current` (deg) | wrapped error (deg) | step (deg) |
+|------|-----------------|---------------------|------------|
+| 0 | $170$ | $+20$ | $+5$ |
+| 1 | $175$ | $+15$ | $+5$ |
+| 2 | $\pm 180$ | $+10$ | $+5$ |
+| 3 | $-175$ | $+5$ | $+5$ |
+| 4 | $-170$ | $0$ | stop: **4 ticks** |
+
+A controller that used the raw difference $-340^\circ$ would grind through $340 / 5 = 68$ ticks the long way around. Cost: $O(\lvert\text{error}\rvert / \text{max\_step})$ ticks. (A real system should also cap the number of iterations.)
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification
 
 > **For Claude (Interactive Artifact Builder):** Build an interactive, split-screen pedagogical visualization for this chapter using **`shadcn/ui` components** (`<Card>`, `<Tabs>`, `<Slider>`, `<Switch>`, `<Select>`, `<Button>`, `<Badge>`, `<Table>`, `<Tooltip>`) and Tailwind CSS—**no raw unstyled HTML `<input>` or `<select>` elements**.

@@ -396,6 +396,184 @@ if __name__ == "__main__":
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Invert by hand.** Using the closed-form `inverse()` (x' $= -(c\,x + s\,y)$, y' $= -(-s\,x + c\,y)$, $\theta' = -\theta$), compute the inverse of $^{\text{world}}_{\text{base}}\mathbf{T} = (3.0, 2.0, +90^\circ)$. Then verify that `T.compose(T.inverse())` gives the identity.
+
+**Q2. Add the missing `rear_camera`.** The architecture diagram shows `rear_camera` at $(-0.4, 0.0, +180^\circ)$ under `base_link`, but `main()` never adds it. After
+
+```python
+tree.set_transform("base_link", "rear_camera", SE2Transform(-0.4, 0.0, math.pi))
+```
+
+predict:
+1. `tree.lookup_transform("world", "rear_camera")` as $(x, y, \theta_{\text{deg}})$
+2. a point at $(1.0, 0.5)$ in `rear_camera`, expressed in `base_link` and then in `world`.
+
+**Q3. Trace `_chain_to_root("gripper")`.** Fill in `T_curr_frame` after each loop iteration (3 decimals, degrees):
+
+| Iteration | `curr` before | `parent` | `T_curr_frame` after `T_parent_curr.compose(T_curr_frame)` |
+|-----------|---------------|----------|-------------------------------------------------------------|
+| 1 | `gripper` | `arm_base` | ? |
+| 2 | `arm_base` | `base_link` | ? |
+| 3 | `base_link` | `world` | ? |
+
+What root frame is returned?
+
+**Q4. Which calls raise?** On the chapter's 4-edge tree (`world`, `base_link`, `front_lidar`, `arm_base`, `gripper`), predict the outcome of each call **independently**: the exception type and message, or the returned value.
+
+```python
+tree.set_transform("arm_base", "base_link", SE2Transform())   # (a)
+tree.set_transform("front_lidar", "front_lidar", SE2Transform())   # (b)
+tree.lookup_transform("world", "camera_typo")   # (c)
+tree.lookup_transform("camera_typo", "camera_typo")   # (d)
+```
+
+**Q5. The order of composition matters.** Suppose someone "simplifies" the loop in `_chain_to_root` to `T_curr_frame = T_curr_frame.compose(T_parent_curr)` (right-multiply instead of left-multiply). What does `_chain_to_root("gripper")` now return, compared with the correct $(3.800, 2.000, 45.0^\circ)$? Which part is still right, and why?
+
+### Coding Exercises
+
+**E1 (Easy). `transform_vector` ($w = 0$).** Milestone 1 lists `transform_vector(vx, vy)`, but the reference code only has `transform_point`. Write `transform_vector(T: SE2Transform, vx: float, vy: float) -> tuple[float, float]` that rotates a direction (a velocity or a LiDAR beam direction) **without** translating it.
+
+```python
+T = SE2Transform(3.0, 2.0, math.pi / 2)
+T.transform_point(1.0, 0.0)        # (3.0, 3.0)
+transform_vector(T, 1.0, 0.0)      # ≈ (0.0, 1.0)   (no +[3, 2] offset)
+```
+
+**E2 (Easy–Medium). Which frames does a lookup pass through?** Write `frame_path(tree: TransformTree2D, target: str, source: str) -> list[str]` that returns the frames from `source` up to the **Lowest Common Ancestor** and back down to `target` (both ends included). Raise `LookupError` if the frames are disconnected. Write a helper `lowest_common_ancestor(tree, a, b) -> str` (you may read `tree._edges`).
+
+```python
+frame_path(tree, "gripper", "front_lidar")   # ['front_lidar', 'base_link', 'arm_base', 'gripper']
+frame_path(tree, "gripper", "world")         # ['world', 'base_link', 'arm_base', 'gripper']
+frame_path(tree, "arm_base", "arm_base")     # ['arm_base']
+lowest_common_ancestor(tree, "front_lidar", "gripper")   # 'base_link'
+```
+
+**E3 (Medium). Stop at the LCA.** Implement the faster variant hinted at in Section 1: `lookup_via_lca(tree, target, source) -> SE2Transform` that accumulates $^{\text{LCA}}_{\text{source}}\mathbf{T}$ and $^{\text{LCA}}_{\text{target}}\mathbf{T}$ **only up to the LCA** (not the root) and returns $\left(^{\text{LCA}}_{\text{target}}\mathbf{T}\right)^{-1}\,^{\text{LCA}}_{\text{source}}\mathbf{T}$. It must agree with `lookup_transform` on every test in Section 4.
+
+```python
+lookup_via_lca(tree, "gripper", "front_lidar")   # ≈ (-0.354, 1.061, 45.0°)  (Test 5)
+lookup_via_lca(tree, "front_lidar", "world")     # ≈ (-2.500, 2.800, -90.0°) (Test 4)
+lookup_via_lca(tree, "gripper", "arm_base")      # ≈ (-0.566, 0.566, -45.0°)
+```
+
+#### Dry-Run: Answers
+
+**Q1.** With $\theta = 90^\circ$, $c = 0$ and $s = 1$:
+- $x' = -(0 \cdot 3 + 1 \cdot 2) = -2$
+- $y' = -(-1 \cdot 3 + 0 \cdot 2) = 3$
+- $\theta' = -90^\circ$
+
+So $^{\text{base}}_{\text{world}}\mathbf{T} = (-2.0, 3.0, -90^\circ)$. Check with `compose`, using $\mathbf{T} = (3, 2, 90^\circ)$ on the left: $x = 0 \cdot (-2) - 1 \cdot 3 + 3 = 0$, $y = 1 \cdot (-2) + 0 \cdot 3 + 2 = 0$, $\theta = 90^\circ - 90^\circ = 0$. That is the identity. Physically, the world origin sits 2 m *behind* and 3 m to the *left* of the robot, which is facing world $+Y$.
+
+**Q2.**
+1. $^{\text{world}}_{\text{rear}}\mathbf{T} = {}^{\text{world}}_{\text{base}}\mathbf{T}\;{}^{\text{base}}_{\text{rear}}\mathbf{T}$:
+   $x = 0 \cdot (-0.4) - 1 \cdot 0 + 3 = 3.0$, $y = 1 \cdot (-0.4) + 0 \cdot 0 + 2 = 1.6$, $\theta = 90^\circ + 180^\circ = 270^\circ$, which wraps to $-90^\circ$. **Result: $(3.000, 1.600, -90.0^\circ)$.**
+2. The point $(1.0, 0.5)$:
+
+| Frame | Computation | Point |
+|-------|-------------|-------|
+| `rear_camera` | given | $(1.0, 0.5)$ |
+| `base_link` | $\mathbf{R}(180^\circ)(1, 0.5) + (-0.4, 0) = (-1, -0.5) + (-0.4, 0)$ | $(-1.4, -0.5)$ |
+| `world` | $\mathbf{R}(90^\circ)(-1.4, -0.5) + (3, 2) = (0.5, -1.4) + (3, 2)$ | $(3.5, 0.6)$ |
+
+Cross-check using the direct transform: $\mathbf{R}(-90^\circ)(1, 0.5) + (3, 1.6) = (0.5, -1) + (3, 1.6) = (3.5, 0.6)$. A point 1 m in front of the rear camera is 1.4 m *behind* the axle, as expected for a camera that looks backward.
+
+**Q3.**
+
+| Iteration | `parent` | `T_curr_frame` after the update | Computation |
+|-----------|----------|----------------------------------|-------------|
+| 1 | `arm_base` | $(0.800, 0.000, 45.0^\circ)$ | $^{\text{arm}}_{\text{grip}}\mathbf{T} \cdot \mathbf{I}$ |
+| 2 | `base_link` | $(0.000, -0.800, -45.0^\circ)$ | $(0,0,-90^\circ) \cdot (0.8,0,45^\circ)$: $x = 0 \cdot 0.8 = 0$, $y = -1 \cdot 0.8 = -0.8$, $\theta = -45^\circ$ |
+| 3 | `world` | $(3.800, 2.000, 45.0^\circ)$ | $(3,2,90^\circ) \cdot (0,-0.8,-45^\circ)$: $x = 0 - 1 \cdot (-0.8) + 3 = 3.8$, $y = 0 + 0 + 2 = 2$, $\theta = 45^\circ$ |
+
+The loop stops because `world` has no parent, so it returns `("world", (3.8, 2.0, 45°))`. Iteration 2 matches step 2 of the Test 5 walkthrough: the gripper is at $(0, -0.8, -45^\circ)$ in `base_link`.
+
+**Q4.**
+
+| Call | Outcome | Why |
+|------|---------|-----|
+| (a) | `ValueError: Cycle detected linking arm_base -> base_link.` | Walking up from `arm_base` reaches `base_link`, which is the requested child |
+| (b) | `ValueError: Frame 'front_lidar' cannot be its own parent.` | The `parent == child` guard |
+| (c) | `LookupError: Frames 'world' and 'camera_typo' are disconnected.` | `camera_typo` has no edge, so its "root" is itself, and `"camera_typo" != "world"` |
+| (d) | returns the identity `SE2Transform(0, 0, 0)` | The `target == source` shortcut runs **before** any existence check |
+
+(c) and (d) show a real usability gap: a misspelled frame is reported as "disconnected" or silently accepted. Production `tf2` reports "frame does not exist". A good fix is a `known_frames` set (every parent and child seen so far), checked at the top of `lookup_transform`. Also note that `set_transform` silently **re-parents** a child that already has a parent, because `self._edges[child]` is simply overwritten.
+
+**Q5.** The modified loop returns $(4.336, -0.707, 45.0^\circ)$ instead of $(3.800, 2.000, 45.0^\circ)$.
+
+| Iteration | Wrong product | Result |
+|-----------|---------------|--------|
+| 1 | $\mathbf{I} \cdot (0.8, 0, 45^\circ)$ | $(0.8, 0, 45^\circ)$ |
+| 2 | $(0.8, 0, 45^\circ) \cdot (0, 0, -90^\circ)$ | $(0.8, 0, -45^\circ)$ |
+| 3 | $(0.8, 0, -45^\circ) \cdot (3, 2, 90^\circ)$: $x = 0.7071 \cdot 3 + 0.7071 \cdot 2 + 0.8$, $y = -0.7071 \cdot 3 + 0.7071 \cdot 2$ | $(4.336, -0.707, 45^\circ)$ |
+
+The **angle is still right**, because 2D rotations commute ($45^\circ - 90^\circ + 90^\circ$ in any order). The **translation is wrong**, because $SE(2)$ composition does not commute: each translation must be rotated by every frame *above* it in the tree. Climbing toward the root means each new parent transform goes on the **left**, which is the subscript-cancellation rule $^{\text{world}}_{\text{grip}}\mathbf{T} = {}^{\text{world}}_{\text{base}}\mathbf{T}\,{}^{\text{base}}_{\text{arm}}\mathbf{T}\,{}^{\text{arm}}_{\text{grip}}\mathbf{T}$.
+
+**E1 — reference solution**
+
+```python
+import math
+
+def transform_vector(T: SE2Transform, vx: float, vy: float) -> tuple[float, float]:
+    c, s = math.cos(T.theta), math.sin(T.theta)
+    return (c * vx - s * vy, s * vx + c * vy)     # R * v, with no "+ t" because w = 0
+```
+
+In homogeneous form, $[v_x, v_y, 0]^T$ has a zero third component, so it multiplies the translation column by $0$. Directions and velocities must never pick up the frame offset. Otherwise a robot driving at 1 m/s would appear to be "at" $(3, 3)$. The code gives $\cos 90^\circ \approx 6.1\times10^{-17}$ for the $x$ part, which is rounding noise for $0$.
+
+**E2 — reference solution**
+
+```python
+def _ancestors(tree: TransformTree2D, frame: str) -> list[str]:
+    chain = [frame]
+    while chain[-1] in tree._edges:
+        chain.append(tree._edges[chain[-1]][0])     # step to the parent
+    return chain                                    # [frame, parent, ..., root]
+
+def lowest_common_ancestor(tree: TransformTree2D, a: str, b: str) -> str:
+    b_chain = set(_ancestors(tree, b))
+    for frame in _ancestors(tree, a):               # first hit walking up from a
+        if frame in b_chain:
+            return frame
+    raise LookupError(f"Frames '{a}' and '{b}' are disconnected.")
+
+def frame_path(tree: TransformTree2D, target: str, source: str) -> list[str]:
+    lca = lowest_common_ancestor(tree, source, target)
+    up_src = _ancestors(tree, source)
+    up_tgt = _ancestors(tree, target)
+    # source ... lca  +  (frames below lca on the target side, top-down)
+    return up_src[: up_src.index(lca) + 1] + list(reversed(up_tgt[: up_tgt.index(lca)]))
+```
+
+Trace for `("gripper", "front_lidar")`: `up_src = [front_lidar, base_link, world]` and `up_tgt = [gripper, arm_base, base_link, world]`. The first frame of `up_src` that is also in `up_tgt` is `base_link`. The result is `[front_lidar, base_link]` + `reversed([gripper, arm_base])`, which is `['front_lidar', 'base_link', 'arm_base', 'gripper']`. Cost: $O(d)$ for tree depth $d$.
+
+**E3 — reference solution**
+
+```python
+def _transform_up_to(tree: TransformTree2D, frame: str, ancestor: str) -> SE2Transform:
+    T = SE2Transform()                                # ^frame_frame T = identity
+    curr = frame
+    while curr != ancestor:
+        parent, T_parent_curr = tree._edges[curr]
+        T = T_parent_curr.compose(T)                  # left-multiply while climbing (see Q5)
+        curr = parent
+    return T                                          # ^ancestor_frame T
+
+def lookup_via_lca(tree: TransformTree2D, target: str, source: str) -> SE2Transform:
+    lca = lowest_common_ancestor(tree, source, target)   # raises LookupError if disconnected
+    T_lca_source = _transform_up_to(tree, source, lca)
+    T_lca_target = _transform_up_to(tree, target, lca)
+    return T_lca_target.inverse().compose(T_lca_source)
+```
+
+Test 5 check: the LCA is `base_link`. $^{\text{base}}_{\text{lidar}}\mathbf{T} = (0.5, 0.2, 0^\circ)$ and $^{\text{base}}_{\text{grip}}\mathbf{T} = (0, -0.8, -45^\circ)$ (from Q3, iteration 2). With $c = 0.7071$ and $s = -0.7071$, its inverse is $x' = -(c \cdot 0 + s \cdot (-0.8)) = -0.566$, $y' = -(-s \cdot 0 + c \cdot (-0.8)) = 0.566$, $\theta' = 45^\circ$. Composing $(-0.566, 0.566, 45^\circ) \cdot (0.5, 0.2, 0^\circ)$ gives $x = 0.7071(0.5) - 0.7071(0.2) - 0.566 = -0.354$, $y = 0.7071(0.5) + 0.7071(0.2) + 0.566 = 1.061$, $\theta = 45^\circ$, which matches Section 4. The world edge $(3, 2, 90^\circ)$ is never touched, which saves two compositions and avoids the rounding error of multiplying by a transform and then by its inverse. For `("gripper", "arm_base")`, the LCA is `arm_base` itself, so the answer is just $\left(^{\text{arm}}_{\text{grip}}\mathbf{T}\right)^{-1} = (-0.566, 0.566, -45^\circ)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification
 
 > **For Claude (Interactive Artifact Builder):** Build an interactive **ROS `tf2` Tree Explorer & Frame Query Visualizer** using **`shadcn/ui` components** (`<Card>`, `<Tabs>`, `<Slider>`, `<Switch>`, `<Select>`, `<Button>`, `<Badge>`, `<Table>`, `<Tooltip>`) and Tailwind CSS.
