@@ -264,7 +264,7 @@ embedding_cache = {}
 def get_embedding(text, model="text-embedding-3-small"):
     # 1. Create a unique fingerprint (hash) for the text
     encoded_text = text.encode()
-    cache_key = hashlib.sha256(encoded_key).hexdigest()
+    cache_key = hashlib.sha256(encoded_text).hexdigest()
     
     # 2. Check if we already have this text in our cache
     if cache_key in embedding_cache:

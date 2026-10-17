@@ -166,7 +166,7 @@ All 3 elements after the erased one had to move. That's O(N).
 Before insert: nums = {1, 2, 3, 4, 5}
                     ^-- insert 99 at this position (index 0)
 
-Step 1: 5, 4, 3, 2 shift RIGHT by one position to make room
+Step 1: 5, 4, 3, 2, 1 shift RIGHT by one position to make room
 Step 2: 99 is placed at index 0
 
 After insert:  nums = {99, 1, 2, 3, 4, 5}
@@ -251,7 +251,7 @@ Step 1 — remove(2) rearranges elements:
           ^  ^  ^  ^  ^  ^  ^
           keep skip keep skip keep skip keep
 
- After:  {1, 3, 4, 5, 2, 2, 5}  ← garbage at the end
+ After:  {1, 3, 4, 5, 4, 2, 5}  ← garbage at the end
           ^
           iterator returned by remove()
 

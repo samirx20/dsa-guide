@@ -349,7 +349,7 @@ data["sensors"][0]["readings"][0]
 #    ^^^^^^^^^^  ^  ^^^^^^^^  ^
 #    |           |  |         └── Index 0 — first reading
 #    |           |  └── Key "readings" — value is a list of floats
-#    |           └── Key "id" — first sensor
+#    |           └── Index 0 — first sensor
 #    └── Key "sensors"
 #
 # This is "chained indexing" — navigating deep into nested structures
@@ -458,7 +458,7 @@ import json
 
 # MISTAKE 1: Forgetting that JSON keys must be strings
 data = {123: "value"}           # Valid Python dict
-json.dumps(data)                # TypeError: keys must be strings!
+json.dumps(data)                # No error, but the key silently becomes the string "123" → '{"123": "value"}' (tuple keys raise TypeError)
 
 # FIX: Use string keys
 data = {"123": "value"}         # Valid JSON
@@ -467,7 +467,7 @@ data = {"123": "value"}         # Valid JSON
 json_str = '{"key": "value"}'
 
 # WRONG: load() expects a file object, not a string
-# json.load(json_str)  # TypeError!
+# json.load(json_str)  # AttributeError: 'str' object has no attribute 'read'
 
 # RIGHT: loads() works with strings
 data = json.loads(json_str)

@@ -181,7 +181,7 @@ Step 3: If violation found, add to errors list
 Step 4: Always keep item in validated list (even with errors)
 
 Output: validated = [same items as input]
-        errors = ["Temperature 96.5C exceeds 95.0C limit"]
+        errors = []  (87.3C, 142.1PSI and 4.2mm/s are all within limits)
 ```
 
 #### Stage 5 — Synthesizer (LLM)

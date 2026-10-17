@@ -283,8 +283,8 @@ ITERATION 2:
     prev = curr             (prev moves to node 2)
     curr = next_node        (curr moves to node 3)
 
-    nullptr <-- [2] <-- [1]    curr --> nullptr
-              prev
+    nullptr <-- [1] <-- [2]    curr --> nullptr
+                        prev
                        |
                       [3]
 
@@ -294,8 +294,8 @@ ITERATION 3:
     prev = curr             (prev moves to node 3)
     curr = next_node        (curr moves to nullptr)
 
-    nullptr <-- [3] <-- [2] <-- [1]    curr = nullptr
-              prev
+    nullptr <-- [1] <-- [2] <-- [3]    curr = nullptr
+                                prev
 
 LOOP ENDS: curr == nullptr
     return prev  (which is node 3, the new head)
@@ -347,7 +347,7 @@ ListNode* reverseListRecursive(ListNode* head) {
 Given list: 1 -> 2 -> 3 -> nullptr
 
 RECURSIVE CALLS (building up the call stack):
-    reverseList(1) calls reverseList(2) calls reverseList(2) calls reverseList(3)
+    reverseList(1) calls reverseList(2) calls reverseList(3)
                                                               returns node(3) (base case)
 
 UNWINDING THE CALL STACK:

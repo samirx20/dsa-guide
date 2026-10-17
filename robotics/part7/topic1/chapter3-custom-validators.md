@@ -199,7 +199,7 @@ Result: 25.5
 |------|-------------|-----------|----------|
 | `before` | Before type coercion | Anything | Clean/transform messy input |
 | `after` (default) | After type coercion | Typed Python | Domain logic checks |
-| `wrap` | Wraps Pydantic's check | Typed Python | Error framing |
+| `wrap` | Wraps Pydantic's check | Anything (raw input) | Error framing |
 
 ---
 
@@ -294,7 +294,7 @@ except Exception as e:
 
 Output:
 ```
-Differential: 5.0
+Differential: 5.0C
 Rejected: 1 validation error for SensorPair
   Value error, Differential 75.0C exceeds max 50.0C
 ```
@@ -350,12 +350,9 @@ def wrap_flow_check(cls, v, handler):
 
 Output:
 ```
-CoolantSystem
-  1 validation error for CoolantSystem
+1 validation error for CoolantSystem
 flow_rate
-  Value error, Coolant flow validation failed for system '<class '__main__.CoolantSystem'>' — received 'not_a_number'. Original: 1 validation error for CoolantSystem
-flow_rate
-  Input should be a valid number, unable to parse string as a number [type=number_parsing, input...
+  Value error, Coolant flow validation failed for system '<class '__main__.CoolantSystem'>' — received 'not_a_number'. Original: 1 validation error for V
 ```
 
 Wrap validators let you add domain-specific context to generic Pydantic errors, which is critical when errors surface in LLM debugging logs.

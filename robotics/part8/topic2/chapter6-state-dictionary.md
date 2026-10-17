@@ -412,7 +412,7 @@ def gather_input_broken(state, user_input):
     # Forgot to return state!
 
 state = gather_input_broken(state, "Pump issue")
-print(state["phase"])  # Still "idle" - nothing changed
+print(state["phase"])  # TypeError: 'NoneType' object is not subscriptable - state is now None
 
 # RIGHT - Always return the modified state
 def gather_input_correct(state, user_input):

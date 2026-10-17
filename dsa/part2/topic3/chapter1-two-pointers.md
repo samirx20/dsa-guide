@@ -243,7 +243,7 @@ Return slow+1 = 3 (three unique elements: 1, 2, 3)
 int removeDuplicates(vector<int>& nums) {
     int slow = 0;
     for (int fast = 1; fast < nums.size(); fast++) {
-        // If nums is empty, nums[0] is out of bounds!
+        // If nums is empty, the loop is skipped and slow + 1 = 1 is returned (should be 0)!
     }
 }
 ```

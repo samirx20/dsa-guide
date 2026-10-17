@@ -53,8 +53,8 @@ print(f"Tokens: {tokens}")
 Output:
 ```
 Text: The industrial oven reached a temperature of 450°C during the bake cycle.
-Token count: 17
-Tokens: [4785, 20577, 27688, 10919, 324, 264, 9245, 315, 5334, 450, 33742, 311, 279, 32480, 11061, 13]
+Token count: 15
+Tokens: [976, 14144, 24722, 15237, 261, 12088, 328, 220, 14869, 26557, 3354, 290, 52853, 15839, 13]
 ```
 
 **What's happening:**
@@ -75,7 +75,7 @@ tokens = encoding.encode(text)
 #        Convert string → list of integers
 #        Each integer is a token ID
 
-len(tokens)  # 17 tokens for 71 characters
+len(tokens)  # 15 tokens for 73 characters
 # Token efficiency: ~4 characters per token (English)
 ```
 
@@ -84,9 +84,9 @@ len(tokens)  # 17 tokens for 71 characters
 | Input | Characters | Tokens | Ratio |
 |-------|------------|--------|-------|
 | "Hello" | 5 | 1 | 5:1 |
-| "temperature" | 11 | 3 | 3.7:1 |
+| "temperature" | 11 | 1 | 11:1 |
 | "sensor_id" | 9 | 2 | 4.5:1 |
-| "450°C" | 5 | 3 | 1.7:1 |
+| "450°C" | 5 | 2 | 2.5:1 |
 | Python code | varies | varies | ~3-5:1 |
 
 ### Common Mistake: Counting Words Instead of Tokens
@@ -99,7 +99,7 @@ print(f"Words: {word_count}")  # 8 words
 
 # RIGHT - Counting tokens
 token_count = len(encoding.encode(text))
-print(f"Tokens: {token_count}")  # 14 tokens
+print(f"Tokens: {token_count}")  # 10 tokens
 
 # Why it matters:
 # - API billing is based on TOKENS, not words
@@ -143,9 +143,8 @@ print(f"Estimated tokens: {total_tokens}")
 
 Output:
 ```
-Warning at message 2: 115448 tokens (90.2% of limit)
-Final message count: 3
-Estimated tokens: 115448
+Final message count: 51
+Estimated tokens: 10256
 ```
 
 **What's happening:**
@@ -154,7 +153,7 @@ model_limit = 128000
 #              ^^^^^^
 #              GPT-4o's context window: 128,000 tokens
 #              GPT-4-turbo: 128,000 tokens
-#              GPT-3.5-turbo: 16,384 tokens
+#              GPT-3.5-turbo: 16,385 tokens
 
 # We build messages until we hit 90% of the limit
 if total_tokens > model_limit * 0.9:
@@ -172,7 +171,7 @@ if total_tokens > model_limit * 0.9:
 
 | Model | Context Window | ~Words | ~Pages of Text |
 |-------|----------------|--------|----------------|
-| GPT-3.5-turbo | 16,384 tokens | ~12,000 words | ~25 pages |
+| GPT-3.5-turbo | 16,385 tokens | ~12,000 words | ~25 pages |
 | GPT-4-turbo | 128,000 tokens | ~96,000 words | ~200 pages |
 | GPT-4o | 128,000 tokens | ~96,000 words | ~200 pages |
 | GPT-4o-mini | 128,000 tokens | ~96,000 words | ~200 pages |
@@ -287,19 +286,19 @@ def sliding_window(messages: list[dict], max_messages: int = 10) -> list[dict]:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │   BEFORE (21 messages):                                        │
-│   [system] [u1] [a1] [u2] [a2] ... [u20] [a20]               │
+│   [system] [u1] [a1] [u2] [a2] ... [u10] [a10]               │
 │                                                                 │
 │   Apply sliding_window(max_messages=6):                        │
 │                                                                 │
 │   1. Extract system: [system]                                   │
-│   2. Extract others: [u1] [a1] [u2] ... [u20] [a20]           │
-│   3. Take last 6: [u15] [a15] [u16] [a16] [u17] [a17]         │
-│   4. Combine: [system] + [u15] [a15] ... [u17] [a17]          │
+│   2. Extract others: [u1] [a1] [u2] ... [u10] [a10]           │
+│   3. Take last 6: [u8] [a8] [u9] [a9] [u10] [a10]             │
+│   4. Combine: [system] + [u8] [a8] ... [u10] [a10]            │
 │                                                                 │
 │   AFTER (7 messages):                                          │
-│   [system] [u15] [a15] [u16] [a16] [u17] [a17]               │
+│   [system] [u8] [a8] [u9] [a9] [u10] [a10]                   │
 │                                                                 │
-│   ✗ Dropped: u1-a14, a14-u14 (old context lost!)              │
+│   ✗ Dropped: u1-a7 (old context lost!)                        │
 │   ✓ Kept: System prompt + most recent exchange                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -396,7 +395,7 @@ Output:
 Before: 7 messages
 After: 4 messages
   [system] You are a sensor assistant.
-  [user] Previous conversation summary: User asked about What is the temperature of sensor T-01?. As
+  [user] Previous conversation summary: User asked about What is the temperature of senso
   [user] What about humidity levels?
   [assistant] Humidity at T-01 is 55%, T-02 is 62%.
 ```
@@ -519,9 +518,9 @@ print(f"Input: ${input_cost:.4f}, Output: ${output_cost:.4f}")
 
 Output:
 ```
-Input tokens: 756
-Estimated cost: $0.0039
-Input: $0.0019, Output: $0.0020
+Input tokens: 1612
+Estimated cost: $0.0060
+Input: $0.0040, Output: $0.0020
 ```
 
 **What's happening:**
@@ -541,9 +540,9 @@ output_cost_per_1k = 0.01
 
 # Real-world example:
 # A 100K token conversation costs:
-# Input:  100,000 / 1000 * 0.0025 = $2.50
+# Input:  100,000 / 1000 * 0.0025 = $0.25
 # Output: 1,000 / 1000 * 0.01    = $0.01
-# Total:  ~$2.51 per API call!
+# Total:  ~$0.26 per API call!
 
 # That's why context management matters!
 ```

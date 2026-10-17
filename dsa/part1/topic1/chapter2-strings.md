@@ -97,7 +97,7 @@ string single = s.substr(2, 1); // "g"
 **What's happening:**
 ```
 s = "algorithm"
-     01234567
+     012345678
 
 s.substr(0, 4):
  Start at index 0, take 4 characters
@@ -245,7 +245,7 @@ String concatenation with `+` in a loop is $O(N^2)$ because each `+` creates a n
 // BAD: O(N^2) — creates a new string every iteration
 string result = "";
 for (int i = 0; i < 1000; i++) {
-    result += to_string(i) + ", "; // Each += copies the entire string
+    result = result + to_string(i) + ", "; // Each + copies the entire string
 }
 
 // GOOD: O(N) — appends to the same buffer
@@ -288,11 +288,11 @@ You can modify individual characters of a string since it's mutable:
 ```cpp
 string s = "hello";
 s[0] = 'H';       // "Hello"
-s[1] = 'A';       // "HAello"
+s[1] = 'A';       // "HAllo"
 
 // Transform all characters
 for (char& c : s) {
-    c = toupper(c); // "HAELLO"
+    c = toupper(c); // "HALLO"
 }
 
 // Reverse a string
@@ -311,7 +311,7 @@ if (pos != string::npos) { ... }  // CORRECT: always compare to npos
 
 // MISTAKE 2: substr in tight loops
 for (int i = 0; i < s.length(); i++) {
-    string sub = s.substr(i, 1); // Creates new string each time — O(N) per call!
+    string sub = s.substr(i, 1); // Creates new string each time — O(K) per call!
 }
 // FIX: Use s[i] instead of s.substr(i, 1) when you just need a char
 

@@ -65,7 +65,7 @@ pip install fastapi==0.110
 # Later, you start Project B, which needs FastAPI 0.100
 pip install fastapi==0.100
 
-# Now Project A is BROKEN because FastAPI was upgraded!
+# Now Project A is BROKEN because FastAPI was downgraded!
 # Project A was written for 0.110, but now has 0.100
 ```
 
@@ -74,7 +74,7 @@ pip install fastapi==0.100
 │           VERSION CONFLICT EXAMPLE                           │
 │                                                              │
 │  Project A: requires fastapi>=0.110                          │
-│  Project B: requires fastapi>=0.100                          │
+│  Project B: requires fastapi==0.100                          │
 │                                                              │
 │  Without venv:                                                │
 │  ┌─────────────────────────────────────────┐                 │
@@ -197,7 +197,7 @@ uv add fastapi httpx pydantic
 uv venv
 # ^^
 # uv's built-in venv creation — faster than python -m venv
-# Creates .venv/ with Python interpreter and pip
+# Creates .venv/ with a Python interpreter (no pip by default; add --seed to include pip)
 
 uv pip install fastapi httpx pydantic
 #    ^^^
@@ -293,8 +293,8 @@ dev = ["pytest", "ruff"]      # Dev-only dependencies (testing, linting)
 │  │ version = "0.1.0"               │  ← Project metadata     │
 │  │ requires-python = ">=3.11"      │  ← Python version       │
 │  │                                 │                         │
-│  │ [project.dependencies]          │                         │
-│  │ fastapi = ">=0.110"             │  ← Core dependencies    │
+│  │ dependencies = [                │                         │
+│  │   "fastapi>=0.110" ]            │  ← Core dependencies    │
 │  │                                 │                         │
 │  │ [project.optional-dependencies] │                         │
 │  │ dev = ["pytest", "ruff"]        │  ← Optional deps        │

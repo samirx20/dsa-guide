@@ -435,7 +435,7 @@ choice.finish_reason
 #         Why the AI stopped:
 #         "stop"   = naturally finished (said everything it needed)
 #         "length" = hit max_tokens limit (response was cut off)
-#         "tool"   = wants to call a tool (agentic use case)
+#         "tool_calls" = wants to call a tool (agentic use case)
 
 response.usage
 #         ^^^^^
@@ -451,7 +451,7 @@ response.usage
 |-----------------|---------|------------|
 | `"stop"` | AI finished naturally | Process the response |
 | `"length"` | Hit `max_tokens` limit | Increase `max_tokens` or truncate |
-| `"tool"` | AI wants to call a tool | Execute the tool and send result |
+| `"tool_calls"` | AI wants to call a tool | Execute the tool and send result |
 | `"content_filter"` | Response blocked by safety filter | Review your prompt |
 
 ### Error Scenarios and Fixes
@@ -598,9 +598,9 @@ The Chat Completions API uses a messages list with `system`, `user`, and `assist
 | System role | `{"role": "system", "content": "..."}` | Set AI behavior |
 | User role | `{"role": "user", "content": "..."}` | Human input |
 | Assistant role | `{"role": "assistant", "content": "..."}` | AI previous response |
-| Temperature | `0.0` to `1.0` | Controls randomness |
+| Temperature | `0.0` to `2.0` | Controls randomness |
 | Max tokens | Integer (e.g., `500`) | Limits response length |
-| Finish reason | `"stop"`, `"length"`, `"tool"` | Why AI stopped |
+| Finish reason | `"stop"`, `"length"`, `"tool_calls"` | Why AI stopped |
 | Prompt tokens | `response.usage.prompt_tokens` | Input token count |
 | Completion tokens | `response.usage.completion_tokens` | Output token count |
 | Content | `response.choices[0].message.content` | AI's response text |

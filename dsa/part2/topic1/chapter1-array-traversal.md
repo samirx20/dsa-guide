@@ -65,7 +65,7 @@ Iteration 4: i=1 → print 2
 Iteration 5: i=0 → print 1
 ```
 
-**Dry-Run Table:**
+**Dry-Run Table (Forward Traversal):**
 | Iteration | i Value | nums[i] | Output |
 |-----------|---------|---------|--------|
 | 1         | 0       | 1       | 1      |

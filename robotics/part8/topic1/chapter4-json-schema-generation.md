@@ -252,7 +252,7 @@ Output:
   "type": "function",
   "function": {
     "name": "read_sensor",
-    "description": "Read the current value from a sensor",
+    "description": "Read the current value from a sensor.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -268,7 +268,7 @@ Output:
   "type": "function",
   "function": {
     "name": "set_alarm",
-    "description": "Set an alarm threshold for a sensor",
+    "description": "Set an alarm threshold for a sensor.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -338,7 +338,7 @@ Output:
 ```
 {'type': 'string', 'enum': ['start', 'stop', 'restart']}
 {'type': 'array', 'items': {'type': 'string'}}
-{'type': 'number'}
+{'type': 'string'}
 ```
 
 ### Type Handling Comparison

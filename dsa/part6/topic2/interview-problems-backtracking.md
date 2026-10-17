@@ -245,7 +245,7 @@ Start at (0,0) char='A' matches word[0]='A'
 │   ├── Mark (0,1) as '#'
 │   ├── index=2 == word.length() → return true
 │   └── Restore (0,1) to 'B'
-├── Explore Left: out of bounds → false
+├── Explore Left: skipped (|| short-circuits once Right returned true)
 └── Restore (0,0) to 'A'
 ```
 
@@ -307,8 +307,8 @@ void backtrack(int row, int n, vector<string>& board, vector<int>& cols,
 |-----|-----|--------|--------|-------------|
 | 0 | 0 | Yes | Place Q | ["Q...","....","....","...."] |
 | 1 | 2 | Yes | Place Q | ["Q...","..Q.","....","...."] |
-| 2 | 3 | Yes | Place Q | ["Q...","..Q.","...Q","...."] |
-| 3 | - | No valid | Backtrack | ["Q...","..Q.","....","...."] |
+| 2 | - | No valid (col 3 shares a diagonal with (1,2)) | Backtrack | ["Q...","....","....","...."] |
+| 1 | 3 | Yes | Place Q | ["Q...","...Q","....","...."] |
 
 **Comparison: Naive vs Set-optimized:**
 

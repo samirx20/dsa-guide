@@ -71,19 +71,19 @@ int main() {
 maxHeap.push(10):  [10]
 maxHeap.push(50):  [50, 10]           → bubble up 50
 maxHeap.push(20):  [50, 10, 20]       → 20 is child of 50, OK
-maxHeap.push(40):  [50, 10, 20, 40]   → bubble up 40
+maxHeap.push(40):  [50, 40, 20, 10]   → bubble up 40 (swaps with 10)
 
 Tree after all pushes:
         50
        /  \
-     10    20
+     40    20
     /
-  40
+  10
 
 maxHeap.top() → 50 (root, always max)
 
 maxHeap.pop():
-  Remove 50, move 40 to root, bubble down:
+  Remove 50, move last element 10 to root, bubble down (swap with 40):
         40
        /  \
      10    20
@@ -262,10 +262,10 @@ Memory layout:
 ```cpp
 int main() {
     // Lambda for min-heap of pairs
-    auto cmp = [](pair<int,int>& a, pair<int,int>& b) {
+    auto cmp = [](pair<int,string>& a, pair<int,string>& b) {
         return a.first > b.first;  // > for min-heap
     };
-    priority_queue<pair<int,int>, vector<pair<int,int>>, decltype(cmp)> pq(cmp);
+    priority_queue<pair<int,string>, vector<pair<int,string>>, decltype(cmp)> pq(cmp);
 
     pq.push({3, "A"});
     pq.push({1, "C"});
@@ -296,7 +296,7 @@ We must pass `cmp` to the constructor because lambdas with captures need runtime
 | `top()` | $O(1)$ | $O(1)$ | Return root (max or min) |
 | `size()` | $O(1)$ | $O(1)$ | Stored member |
 | `empty()` | $O(1)$ | $O(1)$ | Returns bool |
-| `swap(other)` | $O(N)$ | $O(1)$ | Swaps with another heap |
+| `swap(other)` | $O(1)$ | $O(1)$ | Swaps with another heap |
 
 ```
 Why O(log N) for push/pop?

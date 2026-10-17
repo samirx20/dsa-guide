@@ -197,8 +197,8 @@ for (auto it = freq.begin(); it != freq.end(); ++it) {
 }
 
 // Iterating a map (sorted order)
-map<string, int> sorted Ages = {{"Charlie", 35}, {"Alice", 30}};
-for (const auto& [name, age] : sorted Ages) {
+map<string, int> sortedAges = {{"Charlie", 35}, {"Alice", 30}};
+for (const auto& [name, age] : sortedAges) {
     cout << name << ": " << age << "\n"; // Prints in alphabetical key order
 }
 ```

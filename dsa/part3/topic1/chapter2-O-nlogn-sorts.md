@@ -478,7 +478,7 @@ Phase 1: Scan and swap elements < pivot to the left
 
 After partitioning:
 ┌────┬────┬────┬────┬────┬────┬────┐
-│ 10 │ 30 │ 40 │ 50 │ 70 │ 80 │ 90 │
+│ 10 │ 30 │ 40 │ 50 │ 70 │ 90 │ 80 │
 │ <  │ <  │ <  │ <  │PIV │ >= │ >= │
 └────┴────┴────┴────┴────┴────┴────┘
               ↑
@@ -487,7 +487,7 @@ After partitioning:
 
 Recursive calls:
 - Left:  [10, 30, 40, 50]  (indices 0-3)
-- Right: [80, 90]           (indices 5-6)
+- Right: [90, 80]           (indices 5-6)
 ```
 
 **Edge Case - Already Sorted Array (Worst Case):**
@@ -542,7 +542,7 @@ int medianOfThree(vector<int>& arr, int left, int right) {
     if (arr[left] > arr[right]) swap(arr[left], arr[right]);
     if (arr[mid] > arr[right]) swap(arr[mid], arr[right]);
     
-    // Put median at right-1, use as pivot
+    // Put median at right, use as pivot
     swap(arr[mid], arr[right]);
     return partition(arr, left, right);
 }
@@ -602,7 +602,7 @@ int medianOfThree(vector<int>& arr, int left, int right) {
 
 **Key Formulas:**
 - Merge Sort recursion depth: $\log_2 N$
-- Merge Sort total comparisons: $N \log_2 N$ (exact: $N \lceil \log_2 N \rceil$)
+- Merge Sort total comparisons: $N \log_2 N$ (upper bound: $N \lceil \log_2 N \rceil$)
 - Quick Sort recursion depth: $\log N$ average, $N$ worst case
 - Quick Sort partition comparisons: $N-1$ per partition
 

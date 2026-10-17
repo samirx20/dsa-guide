@@ -133,7 +133,7 @@ Output:
 1 validation error for SensorReading
 temperature
   Input should be a valid number, unable to parse string as a number
-  [type=number_parsing, input_value='not_a_number', input_type=str]
+  [type=float_parsing, input_value='not_a_number', input_type=str]
 ```
 
 **What's happening:**
@@ -357,7 +357,7 @@ Output:
 1 validation error for DroneTelemetry
 location.latitude
   Input should be a valid number, unable to parse string as a number
-  [type=number_parsing, input_value='not_a_number', input_type=str]
+  [type=float_parsing, input_value='not_a_number', input_type=str]
 ```
 
 **What's happening:**
@@ -508,7 +508,7 @@ Output:
 ```
 Rejected: 1 validation error for SetTempArgs
 value
-  Input should be a valid number, unable to parse string as a number [type=number_parsing, input_value='hot', input_type=str]
+  Input should be a valid number, unable to parse string as a number [type=float_parsing, input_value='hot', input_type=str]
 ```
 
 **What's happening:**
@@ -561,7 +561,7 @@ from pydantic import ValidationError    # Error type for try/except
 
 | Feature | Pydantic v1 | Pydantic v2 |
 |---|---|---|
-| Validate dict | `.from_dict(dict)` | `.model_validate(dict)` |
+| Validate dict | `.parse_obj(dict)` | `.model_validate(dict)` |
 | Validate JSON | `.parse_raw(str)` | `.model_validate_json(str)` |
 | Serialize to dict | `.dict()` | `.model_dump()` |
 | Serialize to JSON | `.json()` | `.model_dump_json()` |

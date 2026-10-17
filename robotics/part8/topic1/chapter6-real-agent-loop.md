@@ -295,7 +295,7 @@ def execute_tool_parallel(tool_calls: list) -> list[dict]:
     return results
 
 # Usage inside the loop
-tool_messages = execute_tool_parallel(message.tool_calls)
+tool_messages = execute_tool_parallel([tc.model_dump() for tc in message.tool_calls])
 messages.extend(tool_messages)
 ```
 

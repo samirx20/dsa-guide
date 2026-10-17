@@ -140,7 +140,7 @@ Deterministic Object Lifecycle in C++:
 
 ### 3. Why Deterministic Destruction (`}` — RAII) Prevents Memory Leaks
 
-If you allocate memory manually on the Heap with `int* arr = new int[1000];` and your function returns early (or throws an error) before reaching `delete[] arr;`, that Heap block is **leaked forever** — orphaned in RAM with no pointer pointing to it! In a 24/7 autonomous robot running a 100 Hz control loop, leaking just 4 KB per iteration will exhaust 16 GB of RAM and crash the robot in **66 minutes**.
+If you allocate memory manually on the Heap with `int* arr = new int[1000];` and your function returns early (or throws an error) before reaching `delete[] arr;`, that Heap block is **leaked forever** — orphaned in RAM with no pointer pointing to it! In a 24/7 autonomous robot running a 100 Hz control loop, leaking just 4 KB per iteration will exhaust 16 GB of RAM and crash the robot in **about 11 hours**.
 
 C++ solves this with **RAII** (**Resource Acquisition Is Initialization**). Despite the intimidating academic name, the idea is dead simple:
 

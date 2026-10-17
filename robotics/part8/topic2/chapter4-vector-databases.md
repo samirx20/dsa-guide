@@ -115,7 +115,7 @@ for r in results:
 # search([0.88, 0.12, 0.0]):
 #   query points strongly toward dimension 0 (pump-related)
 #   doc0: [0.9, 0.1, 0.0] → score ≈ 0.99 (very close direction)
-#   doc1: [0.1, 0.9, 0.0] → score ≈ 0.19 (different direction)
+#   doc1: [0.1, 0.9, 0.0] → score ≈ 0.24 (different direction)
 #   doc2: [0.85, 0.15, 0.0] → score ≈ 0.99 (very close direction)
 #
 # top_k=2 returns doc0 and doc2 (both pump-related)

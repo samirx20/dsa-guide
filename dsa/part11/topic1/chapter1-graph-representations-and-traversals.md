@@ -48,7 +48,7 @@ Consider edges: `0-1, 1-2, 2-0, 2-3`
 
 ```
 Adjacency Matrix (V x V):       Adjacency List:
-     0  1  2  3                  0: [1]
+     0  1  2  3                  0: [1, 2]
   0: 0  1  1  0                  1: [0, 2]
   1: 1  0  1  0                  2: [0, 1, 3]
   2: 1  1  0  1                  3: [2]
@@ -208,7 +208,7 @@ void bfs(int startNode, vector<vector<int>>& adjList, vector<bool>& visited) {
 - Line 8: Mark start as visited immediately (not later!).
 - Line 11-13: Pop the front, process it.
 - Line 18-24: For each unvisited neighbor, mark visited THEN push. This prevents duplicate entries in the queue.
-- Line 22-23: Common bug: marking AFTER pop causes O(V*E) queue bloat instead of O(V).
+- Line 22-23: Common bug: marking AFTER pop causes O(E) queue bloat (duplicate entries) instead of O(V).
 
 #### BFS Dry-Run: Level-by-Level
 
@@ -221,8 +221,8 @@ BFS starting from 0:
 Step | Queue (front->back) | visited[] | Action
 -----|---------------------|-----------|--------
 1    | [0]                 | [T,F,F,F] | Pop 0, neighbors [1,3]
-2    | [1, 3]              | [T,T,T,F] | Push 1,3. Mark visited.
-3    | [3]                 | [T,T,T,F] | Pop 1, neighbors [0,2]
+2    | [1, 3]              | [T,T,F,T] | Push 1,3. Mark visited.
+3    | [3]                 | [T,T,F,T] | Pop 1, neighbors [0,2]
 4    | [3, 2]              | [T,T,T,T] | 0 visited, push 2.
 5    | [2]                 | [T,T,T,T] | Pop 3, neighbors [0,2]
 6    | []                  | [T,T,T,T] | Both visited. Pop 2. Done.
@@ -315,12 +315,12 @@ Step | (r,c) | Grid State          | Action
 -----|-------|---------------------|------------------
 1    | (0,0) | 0  1  0 / 1 0 0 / 0 0 1 | Mark (0,0) visited
 2    | (1,0) | 0  1  0 / 0 0 0 / 0 0 1 | Mark (1,0) visited
-3    | (2,0) | 0  1  0 / 0 0 0 / 0 0 1 | Out of bounds (water), return
+3    | (2,0) | 0  1  0 / 0 0 0 / 0 0 1 | Water, return
 4    | (0,0) | 0  1  0 / 0 0 0 / 0 0 1 | Already visited, return
 5    | (1,1) | 0  1  0 / 0 0 0 / 0 0 1 | Water, return
 6    | (1,-1)| 0  1  0 / 0 0 0 / 0 0 1 | Out of bounds, return
 7    | (0,1) | 0  0  0 / 0 0 0 / 0 0 1 | Mark (0,1) visited
-8    | (1,1) | 0  0  0 / 0 0 0 / 0 0 1 | Already visited, return
+8    | (1,1) | 0  0  0 / 0 0 0 / 0 0 1 | Water, return
 ...   ...   | ...                  | Continue until all reachable done
 
 Island found! Next unvisited '1' is at (2,2) -> second island.

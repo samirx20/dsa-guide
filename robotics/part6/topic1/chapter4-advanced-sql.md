@@ -24,6 +24,7 @@ FROM (
     FROM posts
     GROUP BY user_id
 ) AS user_posts
+JOIN users ON users.id = user_posts.user_id
 WHERE post_count > (
     SELECT AVG(post_count)
     FROM (

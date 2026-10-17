@@ -157,19 +157,18 @@ Elements in the stack are always in decreasing temperature order.
 | Step | i | Temp | Stack (indices) | Comparison | Action | Result |
 |------|---|------|-----------------|------------|--------|--------|
 | 1 | 0 | 73 | [0] | Empty stack | Push 0 | [0,0,0,0,0,0,0] |
-| 2 | 1 | 74 | [0,1] | 74 > 73? YES | Pop 0, result[0]=1-0=1 | [1,0,0,0,0,0,0] |
-| 3 | 2 | 75 | [1,2] | 75 > 74? YES | Pop 1, result[1]=2-1=1 | [1,1,0,0,0,0,0] |
-| 4 | 3 | 71 | [1,2,3] | 71 > 75? NO | Push 3 | [1,1,0,0,0,0,0] |
-| 5 | 4 | 69 | [1,2,3,4] | 69 > 71? NO | Push 4 | [1,1,0,0,0,0,0] |
-| 6 | 5 | 72 | [1,2,3,4] | 72 > 69? YES | Pop 4, result[4]=5-4=1 | [1,1,0,0,1,0,0] |
-| 7 | 5 | 72 | [1,2,3] | 72 > 71? YES | Pop 3, result[3]=5-3=2 | [1,1,0,2,1,0,0] |
-| 8 | 5 | 72 | [1,2] | 72 > 75? NO | Push 5 | [1,1,0,2,1,0,0] |
-| 9 | 6 | 76 | [1,2,5] | 76 > 72? YES | Pop 5, result[5]=6-5=1 | [1,1,0,2,1,1,0] |
-| 10 | 6 | 76 | [1,2] | 76 > 75? YES | Pop 2, result[2]=6-2=4 | [1,1,4,2,1,1,0] |
-| 11 | 6 | 76 | [1] | 76 > 74? YES | Pop 1, result[1]=6-1=5 | [1,5,4,2,1,1,0] |
-| 12 | 6 | 76 | [] | Empty stack | Push 6 | [1,5,4,2,1,1,0] |
+| 2 | 1 | 74 | [1] | 74 > 73? YES | Pop 0, result[0]=1-0=1, Push 1 | [1,0,0,0,0,0,0] |
+| 3 | 2 | 75 | [2] | 75 > 74? YES | Pop 1, result[1]=2-1=1, Push 2 | [1,1,0,0,0,0,0] |
+| 4 | 3 | 71 | [2,3] | 71 > 75? NO | Push 3 | [1,1,0,0,0,0,0] |
+| 5 | 4 | 69 | [2,3,4] | 69 > 71? NO | Push 4 | [1,1,0,0,0,0,0] |
+| 6 | 5 | 72 | [2,3] | 72 > 69? YES | Pop 4, result[4]=5-4=1 | [1,1,0,0,1,0,0] |
+| 7 | 5 | 72 | [2] | 72 > 71? YES | Pop 3, result[3]=5-3=2 | [1,1,0,2,1,0,0] |
+| 8 | 5 | 72 | [2,5] | 72 > 75? NO | Push 5 | [1,1,0,2,1,0,0] |
+| 9 | 6 | 76 | [2] | 76 > 72? YES | Pop 5, result[5]=6-5=1 | [1,1,0,2,1,1,0] |
+| 10 | 6 | 76 | [] | 76 > 75? YES | Pop 2, result[2]=6-2=4 | [1,1,4,2,1,1,0] |
+| 11 | 6 | 76 | [6] | Empty stack | Push 6 | [1,1,4,2,1,1,0] |
 
-**Final result:** `[1, 5, 4, 2, 1, 1, 0]` ✓
+**Final result:** `[1, 1, 4, 2, 1, 1, 0]` ✓
 
 ---
 
@@ -301,7 +300,7 @@ while (!st.empty() && currentTemp > temperatures[st.back()]) {
 | Next Greater Element | Decreasing | `curr > top` | Always | Next greater value |
 | Next Smaller Element | Increasing | `curr < top` | Always | Next smaller value |
 | Daily Temperatures | Decreasing | `curr > top` | Always | Days until warmer |
-| Stock Span | Increasing | `curr >= top` | Always | Consecutive days |
+| Stock Span | Decreasing | `curr >= top` | Always | Consecutive days |
 | Largest Rectangle | Increasing | `curr < top` | Always | Rectangle width |
 
 **Key Takeaways:**
@@ -311,17 +310,17 @@ while (!st.empty() && currentTemp > temperatures[st.back()]) {
 - Amortized O(n) because each element pushed/popped at most once
 - Decreasing stack for "next greater", Increasing stack for "next smaller"
 
-### 10. Stock Span Problem (Increasing Monotonic Stack)
+### 10. Stock Span Problem (Decreasing Monotonic Stack)
 
 The Stock Span Problem asks: "For each day's stock price, find how many consecutive days (including today) the price was less than or equal to today's price."
 
-This is a classic application of an **Increasing Monotonic Stack**.
+This is a classic application of a **Decreasing Monotonic Stack**.
 
 ```cpp
 vector<int> stockSpan(vector<int>& prices) {
     int n = prices.size();
     vector<int> span(n, 1);  // Each day has at least span of 1 (itself)
-    vector<int> st;          // Increasing monotonic stack (indices)
+    vector<int> st;          // Decreasing monotonic stack (indices)
     
     for (int i = 0; i < n; i++) {
         // Pop all elements smaller than or equal to current price
@@ -355,7 +354,7 @@ Actually: 80 < 100, so we don't pop. stack not empty, span = 1-0 = 1
            push 1                            stack: [0,1]
 i=2 (60):  60 < 80, push 2                  stack: [0,1,2]
            span = 2-1 = 1
-i=3 (70):  70 > 60, pop 2. 70 > 70? No.
+i=3 (70):  70 > 60, pop 2. 70 > 80? No.
            span = 3-1 = 2, push 3           stack: [0,1,3]
 i=4 (60):  60 < 70, push 4                  stack: [0,1,3,4]
            span = 4-3 = 1
@@ -433,7 +432,7 @@ their rectangle width using the new top of stack as the left boundary.
 | 4 | 3 | 6 | [1,2,3] | — | — | — | 2 |
 | 5 | 4 | 2 | [1,4] | 3 (h=6), 2 (h=5) | 1, 2 | 6, 10 | 10 |
 | 6 | 5 | 3 | [1,4,5] | — | — | — | 10 |
-| 7 | 6 | 0 | [6] | 5,4,1 | 1,3,6 | 3,6,6 | 10 |
+| 7 | 6 | 0 | [6] | 5,4,1 | 1,4,6 | 3,8,6 | 10 |
 
 **Final answer:** 10
 

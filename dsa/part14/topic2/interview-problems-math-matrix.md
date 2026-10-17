@@ -134,14 +134,13 @@ bool isHappy(int n) {
 | Step | slow | fast | slow.next | fast.next | Equal? |
 |------|------|------|-----------|-----------|--------|
 | 0 | 4 | 16 | 16 | 58 | No |
-| 1 | 16 | 58 | 37 | 89 | No |
-| 2 | 37 | 89 | 58 | 145 | No |
-| 3 | 58 | 145 | 89 | 42 | No |
-| 4 | 89 | 42 | 145 | 20 | No |
-| 5 | 145 | 20 | 42 | 4 | No |
-| 6 | 42 | 4 | 20 | 16 | No |
-| 7 | 20 | 16 | 4 | 58 | No |
-| ... | cycle continues... | | | | |
+| 1 | 16 | 58 | 37 | 145 | No |
+| 2 | 37 | 145 | 58 | 20 | No |
+| 3 | 58 | 20 | 89 | 16 | No |
+| 4 | 89 | 16 | 145 | 58 | No |
+| 5 | 145 | 58 | 42 | 145 | No |
+| 6 | 42 | 145 | 20 | 20 | No |
+| 7 | 20 | 20 | — | — | Yes! (met inside the cycle; 20 != 1 → not happy) |
 
 ---
 
@@ -242,7 +241,7 @@ vector<int> spiralOrder(vector<vector<int>>& matrix) {
 | 1 | 0 | 2 | 0 | 3 | L→R | 1,2,3,4 |
 | 1 | 1 | 2 | 0 | 3 | T→B | 8,12 |
 | 1 | 1 | 2 | 0 | 2 | R→L | 11,10,9 |
-| 1 | 1 | 1 | 1 | 2 | B→T | 5 |
+| 1 | 1 | 1 | 0 | 2 | B→T | 5 |
 | 2 | 1 | 1 | 1 | 2 | L→R | 6,7 |
 | 2 | 2 | 1 | 1 | 2 | T→B | (top>bottom, stop) |
 
@@ -325,12 +324,12 @@ void setZeroes(vector<vector<int>>& matrix) {
 // Matrix:
 // 1  0  1      Step 1: firstRowZero=true
 // 1  1  1      Step 2: No inner zeros, flags stay as is
-// 1  1  1      Step 3: No changes (no flags set)
+// 1  1  1      Step 3: matrix[0][1]=0 acts as a column flag → matrix[1][1]=matrix[2][1]=0
 //               Step 4: firstRowZero=true → zero entire first row
 // Final:
 // 0  0  0
-// 1  1  1
-// 1  1  1
+// 1  0  1
+// 1  0  1
 ```
 
 **Dry Run Table:**
@@ -339,7 +338,7 @@ void setZeroes(vector<vector<int>>& matrix) {
 |------|--------|--------------|
 | 1 | Check first row/col | firstRowZero=true, firstColZero=false |
 | 2 | Mark flags (skip row 0, col 0) | No inner zeros found |
-| 3 | Zero based on flags | No changes |
+| 3 | Zero based on flags | matrix[0][1]=0 → column 1 zeroed: rows 1-2 → [1,0,1] |
 | 4 | Zero first row (firstRowZero=true) | Row 0 → [0,0,0] |
 
 ---
@@ -387,40 +386,40 @@ string multiply(string num1, string num2) {
 ```cpp
 // num1 = "123", num2 = "456"
 //
-// result array: [0, 0, 0, 0, 0] (size 5)
+// result array: [0, 0, 0, 0, 0, 0] (size m + n = 6)
 //
 // i=2 (digit=3):
-//   j=2 (digit=6): mul=18, sum=18+0=18 → result[4]=8, result[3]+=1
-//   j=1 (digit=5): mul=15, sum=15+0=15 → result[3]=5, result[2]+=1
-//   j=0 (digit=4): mul=12, sum=12+0=12 → result[2]=2, result[1]+=1
-//   result: [0, 1, 2, 5, 8]
+//   j=2 (digit=6): mul=18, sum=18+0=18 → result[5]=8, result[4]+=1
+//   j=1 (digit=5): mul=15, sum=15+1=16 → result[4]=6, result[3]+=1
+//   j=0 (digit=4): mul=12, sum=12+1=13 → result[3]=3, result[2]+=1
+//   result: [0, 0, 1, 3, 6, 8]
 //
 // i=1 (digit=2):
-//   j=2 (digit=6): mul=12, sum=12+5=17 → result[3]=7, result[2]+=1
-//   j=1 (digit=5): mul=10, sum=10+2=12 → result[2]=2, result[1]+=1
-//   j=0 (digit=4): mul=8, sum=8+1=9 → result[1]=9, result[0]+=0
-//   result: [0, 9, 2, 7, 8]
+//   j=2 (digit=6): mul=12, sum=12+6=18 → result[4]=8, result[3]+=1
+//   j=1 (digit=5): mul=10, sum=10+4=14 → result[3]=4, result[2]+=1
+//   j=0 (digit=4): mul=8, sum=8+2=10 → result[2]=0, result[1]+=1
+//   result: [0, 1, 0, 4, 8, 8]
 //
 // i=0 (digit=1):
-//   j=2 (digit=6): mul=6, sum=6+7=13 → result[3]=3, result[2]+=1
-//   j=1 (digit=5): mul=5, sum=5+2=7 → result[2]=7, result[1]+=0
-//   j=0 (digit=4): mul=4, sum=4+9=13 → result[1]=3, result[0]+=1
-//   result: [1, 3, 3, 7, 8]
+//   j=2 (digit=6): mul=6, sum=6+4=10 → result[3]=0, result[2]+=1
+//   j=1 (digit=5): mul=5, sum=5+1=6 → result[2]=6, result[1]+=0
+//   j=0 (digit=4): mul=4, sum=4+1=5 → result[1]=5, result[0]+=0
+//   result: [0, 5, 6, 0, 8, 8]
 //
-// Skip leading zero → "1337" wait, let me recalculate...
+// Skip leading zero → "56088"
 // 123 × 456 = 56088
 ```
 
 **Correction — detailed walkthrough for 123 × 456:**
 ```
-     1 2 3
-   ×   4 5 6
-   ---------
-     7 3 8     (3×456 = 1368, position at j=2)
-   6 1 5       (2×456 = 912, position at j=1, shifted left)
- 4 5 6         (1×456 = 456, position at j=0, shifted left)
- ---------
- 5 6 0 8 8
+         1 2 3
+     ×   4 5 6
+     ---------
+       1 3 6 8     (3×456 = 1368, from i=2)
+       9 1 2       (2×456 = 912, from i=1, shifted left)
+     4 5 6         (1×456 = 456, from i=0, shifted left twice)
+     ---------
+     5 6 0 8 8
 
 Index mapping for result[i+j+1]:
 i=2,j=2 → result[5], i=2,j=1 → result[4], i=2,j=0 → result[3]
@@ -432,15 +431,15 @@ i=0,j=2 → result[3], i=0,j=1 → result[2], i=0,j=0 → result[1]
 
 | i | j | num1[i] | num2[j] | mul | sum | result[i+j+1] | result[i+j] | result array |
 |---|---|---------|---------|-----|-----|---------------|-------------|--------------|
-| 2 | 2 | 3 | 6 | 18 | 18 | 8 | +1 | [0,0,0,1,8] |
-| 2 | 1 | 3 | 5 | 15 | 15 | 5 | +1 | [0,0,1,5,8] |
-| 2 | 0 | 3 | 4 | 12 | 12 | 2 | +1 | [0,1,2,5,8] |
-| 1 | 2 | 2 | 6 | 12 | 13 | 3 | +1 | [0,1,3,3,8] |
-| 1 | 1 | 2 | 5 | 10 | 12 | 2 | +1 | [0,2,3,3,8] |
-| 1 | 0 | 2 | 4 | 8 | 9 | 9 | +0 | [0,2,3,3,8] |
-| 0 | 2 | 1 | 6 | 6 | 7 | 7 | +0 | [0,2,7,3,8] |
-| 0 | 1 | 1 | 5 | 5 | 7 | 7 | +0 | [0,2,7,3,8] |
-| 0 | 0 | 1 | 4 | 4 | 6 | 6 | +0 | [0,5,6,0,8] |
+| 2 | 2 | 3 | 6 | 18 | 18 | 8 | +1 | [0,0,0,0,1,8] |
+| 2 | 1 | 3 | 5 | 15 | 16 | 6 | +1 | [0,0,0,1,6,8] |
+| 2 | 0 | 3 | 4 | 12 | 13 | 3 | +1 | [0,0,1,3,6,8] |
+| 1 | 2 | 2 | 6 | 12 | 18 | 8 | +1 | [0,0,1,4,8,8] |
+| 1 | 1 | 2 | 5 | 10 | 14 | 4 | +1 | [0,0,2,4,8,8] |
+| 1 | 0 | 2 | 4 | 8 | 10 | 0 | +1 | [0,1,0,4,8,8] |
+| 0 | 2 | 1 | 6 | 6 | 10 | 0 | +1 | [0,1,1,0,8,8] |
+| 0 | 1 | 1 | 5 | 5 | 6 | 6 | +0 | [0,1,6,0,8,8] |
+| 0 | 0 | 1 | 4 | 4 | 5 | 5 | +0 | [0,5,6,0,8,8] |
 
 Result: "56088" (skip leading zero)
 

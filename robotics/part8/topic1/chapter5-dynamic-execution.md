@@ -165,8 +165,8 @@ result = func(**args)
 
 Output:
 ```
-{'status': 'ok', 'result': {'sensor_id': 'T-01', 'metric': 72.5}}
-{'status': 'ok', 'result': {'sensor_id': 'T-01', 'metric': 72.5}}
+{'status': 'ok', 'result': {'sensor_id': 'T-01', 'temperature': 72.5}}
+{'status': 'ok', 'result': {'sensor_id': 'T-01', 'humidity': 72.5}}
 {'error': 'Unknown function: unknown_func'}
 {'error': 'Invalid JSON arguments: Expecting value: line 1 column 1 (char 0)'}
 ```

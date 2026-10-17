@@ -51,9 +51,9 @@ Scan (0,0) = '1' -> islandCount=1, DFS to sink:
 Step | Cell | Grid After          | visited (sunk cells)
 -----|------|---------------------|----------------------
 1    | (0,0)| 0 1 0 0 0 / ...     | {(0,0)}
-2    | (0,1)| 0 0 0 0 0 / ...     | {(0,0),(0,1)}
-3    | (1,0)| 0 0 0 0 0 / 0 1 ... | {(0,0),(0,1),(1,0)}
-4    | (1,1)| 0 0 0 0 0 / 0 0 ... | {(0,0),(0,1),(1,0),(1,1)}
+2    | (1,0)| 0 1 0 0 0 / 0 1 ... | {(0,0),(1,0)}
+3    | (1,1)| 0 1 0 0 0 / 0 0 ... | {(0,0),(1,0),(1,1)}
+4    | (0,1)| 0 0 0 0 0 / 0 0 ... | {(0,0),(1,0),(1,1),(0,1)}
 All neighbors water/visited -> DFS returns.
 
 Scan continues... (0,2)=0, (0,3)=0, ...
@@ -145,10 +145,10 @@ Grid:
   1 0 1
   0 1 1
 
-DFS at (0,0): returns 2 (cells (0,0),(0,1) -> (1,0) is water)
-DFS at (1,2): returns 4 (cells (1,2),(2,1),(2,2) -> (0,2) is water)
+DFS at (0,0): returns 3 (cells (0,0),(0,1),(1,0) -> (1,1) is water)
+DFS at (1,2): returns 3 (cells (1,2),(2,2),(2,1) -> (0,2) is water)
 
-globalMax = max(2, 4) = 4
+globalMax = max(3, 3) = 3
 ```
 
 #### Code
@@ -220,12 +220,13 @@ Step | Node | copies map               | Action
 -----|------|--------------------------|---------------------------
 1    | 1    | {}                       | Create clone(1), store
 2    | 2    | {1->clone1}              | Create clone(2), store
-3    | 3    | {1->clone1, 2->clone2}   | Create clone(3), store
-4    | 4    | {1->clone1, 2->2, 3->3}  | Create clone(4), store
-5    | 1    | {1->cl1, 2->cl2, ...}    | Already cloned, return cl1
-6    | 3    | {1->cl1, 2->cl2, ...}    | Already cloned, return cl3
-7    | 2    | {1->cl1, 2->cl2, ...}    | Already cloned, return cl2
-8    | 4    | {1->cl1, 2->cl2, ...}    | Already cloned, return cl4
+3    | 1    | {1->clone1, 2->clone2}   | Already cloned (2's neighbor), return cl1
+4    | 3    | {1->clone1, 2->clone2}   | Create clone(3), store
+5    | 2    | {1->cl1, 2->cl2, 3->cl3} | Already cloned (3's neighbor), return cl2
+6    | 4    | {1->cl1, 2->cl2, 3->cl3} | Create clone(4), store
+7    | 1    | {1->cl1, 2->cl2, ...}    | Already cloned (4's neighbor), return cl1
+8    | 3    | {1->cl1, 2->cl2, ...}    | Already cloned (4's neighbor), return cl3
+9    | 4    | {1->cl1, 2->cl2, ...}    | Already cloned (1's neighbor), return cl4
 
 Clone(1).neighbors = [clone2, clone4]
 Clone(2).neighbors = [clone1, clone3]
@@ -254,20 +255,17 @@ Grid:
 
 Initial: queue = [(0,0)], fresh = 6, minutes = 0
 
-Minute 0: Pop (0,0), rot neighbors
+Minute 1: Pop (0,0), rot neighbors
 Step | Queue (front->back)  | fresh | Action
 -----|----------------------|-------|---------------------------
 Init | [(0,0)]              | 6     | Start BFS
-0.1  | []                   | 5     | Pop (0,0), rot (0,1)
-0.2  | [(0,1)]              | 5     | Push (0,1)
-1.1  | []                   | 4     | Pop (0,1), rot (1,1)
-1.2  | [(1,1)]              | 4     | Push (1,1)
-2.1  | []                   | 3     | Pop (1,1), rot (0,2)
-2.2  | [(0,2)]              | 3     | (1,0) is 1, rot it too
-2.3  | [(0,2),(1,0)]         | 2     | Push both
-3.1  | [(1,0)]              | 1     | Pop (0,2), rot (1,2)? No, (1,2) is 0
-3.2  | []                   | 0     | Pop (1,0), no fresh neighbors
-Queue empty, fresh=0 -> return minutes = 3
+1.1  | [(1,0),(0,1)]        | 4     | Pop (0,0), rot+push (1,0) and (0,1)
+2.1  | [(0,1),(1,1)]        | 3     | Pop (1,0), rot+push (1,1)
+2.2  | [(1,1),(0,2)]        | 2     | Pop (0,1), rot+push (0,2)
+3.1  | [(0,2),(2,1)]        | 1     | Pop (1,1), rot+push (2,1)
+3.2  | [(2,1)]              | 1     | Pop (0,2), no fresh neighbors ((1,2) is 0)
+4.1  | [(2,2)]              | 0     | Pop (2,1), rot+push (2,2)
+fresh=0 -> loop stops -> return minutes = 4
 ```
 
 #### Code
@@ -461,7 +459,7 @@ Step | Queue       | Level | Transformations tried        | Found
 3    | [dot,lot]   | 3     | d->*: dog; l->*: log         | dog,log
 4    | [dog,log]   | 4     | d->*: cog; l->*: cog         | cog!
 
-Return level 4: hit -> hot -> dot -> dog -> cog (or hot->lot->log->cog)
+Return level + 1 = 5: hit -> hot -> dot -> dog -> cog (or hot->lot->log->cog), 5 words
 ```
 
 #### Code

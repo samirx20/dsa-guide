@@ -3,7 +3,7 @@
 
 The biggest danger of Backtracking is the Time Complexity.
 
-Because Backtracking explores every possible combination, its time complexity is usually Exponential $O(2^N)$ or Factorial $O(N!)$. For an input size of $N=20$, $O(N!)$ would take longer than the age of the universe to compute.
+Because Backtracking explores every possible combination, its time complexity is usually Exponential $O(2^N)$ or Factorial $O(N!)$. For an input size of $N=20$, $O(N!)$ is about $2.4 \times 10^{18}$ operations, which would take decades (~77 years at $10^9$ operations/second) to compute.
 
 We optimize backtracking using **Pruning**.
 
@@ -144,16 +144,18 @@ With pruning: break skips 6 AND 7 instantly (sorted → all remaining are bigger
 | 2 | 0 | 2 | [2,2] | 4 | Recurse |
 | 3 | 0 | 2 | [2,2,2] | 6 | Recurse |
 | 4 | 0 | 2 | [2,2,2,2] | 8 | **Prune** (8>7, break) |
-| 5 | 1 | 3 | [2,2,2] | 6 | **Prune** (6+3>7, break) |
-| 6 | 1 | 3 | [2,2] | 4 | Choose 3 → [2,2,3] sum=7 ✓ |
-| 7 | 2 | 6 | [2,2] | 4 | **Prune** (4+6>7, break) |
-| 8 | 1 | 3 | [2] | 2 | Choose 3 → [2,3] sum=5 |
-| 9 | 1 | 3 | [2,3,3] | 8 | **Prune** (8>7, break) |
-| 10 | 2 | 6 | [2,3] | 5 | **Prune** (5+6>7, break) |
-| 11 | 2 | 6 | [2] | 2 | **Prune** (2+6>7, break) |
-| 12 | 2 | 6 | [] | 0 | Choose 6 → [6] sum=6 |
-| 13 | 3 | 7 | [6] | 6 | **Prune** (6+7>7, break) |
-| 14 | 3 | 7 | [] | 0 | Choose 7 → [7] sum=7 ✓ |
+| 5 | 1 | 3 | [2,2] | 4 | Choose 3 → [2,2,3] sum=7 ✓ |
+| 6 | 2 | 6 | [2,2] | 4 | **Prune** (4+6>7, break) |
+| 7 | 1 | 3 | [2] | 2 | Choose 3 → [2,3] sum=5 |
+| 8 | 1 | 3 | [2,3,3] | 8 | **Prune** (8>7, break) |
+| 9 | 2 | 6 | [2] | 2 | **Prune** (2+6>7, break) |
+| 10 | 1 | 3 | [] | 0 | Choose 3 → [3] sum=3 |
+| 11 | 1 | 3 | [3] | 3 | Choose 3 → [3,3] sum=6 |
+| 12 | 1 | 3 | [3,3,3] | 9 | **Prune** (9>7, break) |
+| 13 | 2 | 6 | [3] | 3 | **Prune** (3+6>7, break) |
+| 14 | 2 | 6 | [] | 0 | Choose 6 → [6] sum=6 |
+| 15 | 2 | 6 | [6] | 6 | **Prune** (6+6>7, break) |
+| 16 | 3 | 7 | [] | 0 | Choose 7 → [7] sum=7 ✓ |
 
 **Solutions found: [2,2,3] and [7]**
 
@@ -296,12 +298,14 @@ Sort once → both checks become simple comparisons.
 | Step | i | nums[i] | current[] | currentSum | Action |
 |------|---|---------|-----------|------------|--------|
 | 1 | 0 | 1 | [1] | 1 | Recurse |
-| 2 | 0 | 1 | [1,1] | 2 | Recurse |
-| 3 | 1 | 1 | [1,1] | 2 | **Skip** (i>index, nums[1]==nums[0]) |
-| 4 | 2 | 2 | [1,1] | 2 | Choose 2 → [1,1,2] sum=4 |
-| 5 | 3 | 5 | [1,1,2] | 4 | Choose 5 → [1,1,2,5] sum=9 |
-| 6 | 3 | 5 | [1,1,2,5] | 9 | **Prune** (9>8, break) |
-| 7 | 4 | 6 | [1,1,2] | 4 | **Prune** (4+6>8, break) |
+| 2 | 1 | 1 | [1,1] | 2 | Recurse (i == index, first pick at this depth → allowed) |
+| 3 | 2 | 2 | [1,1] | 2 | Choose 2 → [1,1,2] sum=4 |
+| 4 | 3 | 5 | [1,1,2] | 4 | **Prune** (4+5>8, break) |
+| 5 | 3 | 5 | [1,1] | 2 | Choose 5 → [1,1,5] sum=7 |
+| 6 | 4 | 6 | [1,1,5] | 7 | **Prune** (7+6>8, break) |
+| 7 | 4 | 6 | [1,1] | 2 | Choose 6 → [1,1,6] sum=8 ✓ |
+| … | … | … | … | … | ([1,2,5], [1,7] found under [1]) |
+| 8 | 1 | 1 | [] | 0 | **Skip** (i>index=0, nums[1]==nums[0]) |
 
 ---
 

@@ -345,7 +345,7 @@ int main() {
 In coding interviews, passing a `vector`, `string`, `map`, or `set` without `&` into a helper function (especially a recursive DFS/Binary Search function!) copies the entire container on every call.
 
 ```cpp
-// BAD: Copies the ENTIRE vector on every recursive call! O(N) per call -> O(N^2) total!
+// BAD: Copies the ENTIRE vector on every recursive call! O(N) per call -> O(N log N) total instead of O(log N)!
 int binarySearchHelper(vector<int> nums, int left, int right, int target) { ... }
 
 // FIX: Pass by 'const vector<int>&' — O(1) zero-copy!

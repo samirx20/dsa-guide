@@ -134,10 +134,9 @@ Answer: 2 jumps
 
 | i | nums[i] | i + nums[i] | currentEnd | farthest | jumps |
 |---|---|---|---|---|---|
-| 0 | 2 | 2 | 0 | 2 | 0 |
-| 1 | 3 | 4 | 2 | 4 | 1 (hit currentEnd) |
-| 2 | 1 | 3 | 4 | 4 | — |
-| 3 | 1 | 4 | 4 | 4 | 2 (hit currentEnd) |
+| 0 | 2 | 2 | 2 | 2 | 1 (hit currentEnd=0) |
+| 1 | 3 | 4 | 2 | 4 | — |
+| 2 | 1 | 3 | 4 | 4 | 2 (hit currentEnd=2; 4 >= 4 → break) |
 
 ```cpp
 int jump(vector<int>& nums) {
@@ -219,8 +218,8 @@ Start at station 2:
   tank = -2 (< 0) → can't start here, try station 3
 Start at station 3:
   tank = 3 (≥ 0) → continue
-  tank = 3 + 3 = 6 (≥ 0) → continue
-  station 4: tank = 6 + (-2) = 4 (≥ 0) → done!
+  station 4: tank = 3 + 3 = 6 (≥ 0) → continue
+  wrap to stations 0, 1, 2: tank = 6 - 2 - 2 - 2 = 0 (≥ 0) → done!
 
 Answer: station 3
 ```
@@ -437,11 +436,12 @@ Result: [9, 7, 8]
 | 0 | a | 8 | 8 | NO | — |
 | 1 | b | 5 | 8 | NO | — |
 | 2 | a | 8 | 8 | NO | — |
-| 7 | a | 8 | 8 | NO | — |
-| 8 | d | 14 | 14 | NO | — |
+| 7 | c | 7 | 8 | NO | — |
+| 8 | a | 8 | 8 | YES | partition! size=9 |
+| 9 | d | 14 | 14 | NO | — |
 | ... | ... | ... | ... | ... | — |
-| 14 | e | 15 | 15 | NO | — |
-| 15 | d | 14 | 15 | YES | partition! size=7 |
+| 14 | d | 14 | 15 | NO | — |
+| 15 | e | 15 | 15 | YES | partition! size=7 |
 
 ```cpp
 vector<int> partitionLabels(string s) {

@@ -64,10 +64,10 @@ int lastStoneWeight(vector<int>& stones) {
 //   Push 1: [4, 2, 1, 1, 1]
 //
 // Round 2: y=4, x=2, diff=2
-//   Push 2: [2, 2, 1, 1, 1]
+//   Push 2: [2, 1, 1, 1]
 //
-// Round 3: y=2, x=2, diff=0
-//   Don't push: [1, 1, 1]
+// Round 3: y=2, x=1, diff=1
+//   Push 1: [1, 1, 1]
 //
 // Round 4: y=1, x=1, diff=0
 //   Don't push: [1]
@@ -81,7 +81,7 @@ int lastStoneWeight(vector<int>& stones) {
 |-------|------------|---|---|------|--------|
 | 1 | [8,7,4,2,1,1] | 8 | 7 | 1 | Push 1 |
 | 2 | [4,2,1,1,1] | 4 | 2 | 2 | Push 2 |
-| 3 | [2,2,1,1,1] | 2 | 2 | 0 | Don't push |
+| 3 | [2,1,1,1] | 2 | 1 | 1 | Push 1 |
 | 4 | [1,1,1] | 1 | 1 | 0 | Don't push |
 | 5 | [1] | - | - | - | Return 1 |
 
@@ -179,7 +179,7 @@ vector<vector<int>> kClosest(vector<vector<int>>& points, int k) {
 //   Size 3 > k=2, pop (26,[5,-1])
 //   heap=[(20,[-2,4]),(18,[3,3])]
 //
-// Result: [[3,3], [-2,4]] (2 closest)
+// Result: [[-2,4], [3,3]] (2 closest; popped farthest-first, any order is accepted)
 ```
 
 ---
@@ -241,29 +241,29 @@ int leastInterval(vector<char>& tasks, int n) {
 //   Queue: [(2,3), (2,4)]
 //   Heap: []
 //
-// Time 3: Heap empty, A's cooldown expired!
-//   Push A(2) to heap
-//   Pop A(2), A remaining=1, cooldown until 3+2=5
-//   Queue: [(2,4), (1,5)]
+// Time 3: Heap empty → IDLE (nothing to pop)
+//   Then A's cooldown expires (front time 3 == 3): push A(2) to heap
+//   Queue: [(2,4)]
 //
-// Time 4: Heap empty, B's cooldown expired!
-//   Push B(2) to heap
-//   Pop B(2), B remaining=1, cooldown until 4+2=6
-//   Queue: [(1,5), (1,6)]
-//
-// Time 5: Heap empty, A's cooldown expired!
-//   Push A(1) to heap
-//   Pop A(1), A remaining=0
+// Time 4: Pop A(2), A remaining=1, cooldown until 4+2=6
+//   Then B's cooldown expires (4 == 4): push B(2) to heap
 //   Queue: [(1,6)]
 //
-// Time 6: Heap empty, B's cooldown expired!
-//   Push B(1) to heap
-//   Pop B(1), B remaining=0
+// Time 5: Pop B(2), B remaining=1, cooldown until 5+2=7
+//   Queue: [(1,6), (1,7)]
+//
+// Time 6: Heap empty → IDLE
+//   Then A's cooldown expires: push A(1) to heap
+//   Queue: [(1,7)]
+//
+// Time 7: Pop A(1), A remaining=0
+//   Then B's cooldown expires: push B(1) to heap
 //   Queue: []
 //
-// Time 7: Heap empty, Queue empty → done
+// Time 8: Pop B(1), B remaining=0
+//   Heap empty, Queue empty → loop ends
 //
-// Total time: 6
+// Total time: 8  (A B idle A B idle A B)
 ```
 
 ---
@@ -427,7 +427,7 @@ ListNode* mergeKLists(vector<ListNode*>& lists) {
 ---
 
 ### 7. Ugly Number II (Medium)
-**Trigger:** Find the nth ugly number (divisible by 2, 3, or 5).
+**Trigger:** Find the nth ugly number (a positive number whose only prime factors are 2, 3, and 5).
 **Intuition:** Use three pointers (or a Min-Heap) to generate ugly numbers in order. Each ugly number can be multiplied by 2, 3, or 5 to get the next candidates.
 
 ```cpp

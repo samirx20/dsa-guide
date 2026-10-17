@@ -31,7 +31,7 @@ Instead of writing toy single-threaded scripts that freeze when planning a path 
                                        v
                     [ RealTimeRingBuffer<RobotStatePacket, 16> ]
                                        |
-                          pop_latest() |
+                pop_latest_and_clear() |
                                        v
   +--------------------------------------------------------------------------+
   | Thread 3: Hard Real-Time PD / Pure-Pursuit Controller (100 Hz / 10.0 ms) |
@@ -582,7 +582,7 @@ cmake --build . --config Release
 ./robot_daemon
 ```
 
-You will observe deterministic $100\text{ Hz}$ execution with sub-microsecond loop body times (`Exec=1.40 us`) and automatic RAII motor disarm on shutdown:
+You will observe deterministic $100\text{ Hz}$ execution with few-microsecond loop body times (`Exec=1.40 us`) and automatic RAII motor disarm on shutdown:
 
 ```text
 [RAII SafetyGuard] Armed motor bus (v=0.0 m/s, w=0.0 rad/s)

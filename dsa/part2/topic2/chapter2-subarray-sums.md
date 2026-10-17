@@ -12,7 +12,7 @@ While the standard Prefix Sum array is great for answering specific range querie
 | Approach | Time | Space | Handles Negatives? | Handles Zeros? |
 |----------|------|-------|-------------------|----------------|
 | Brute Force (nested loops) | O(N²) | O(1) | Yes | Yes |
-| Prefix Sum Array + Binary Search | O(N log N) | O(N) | Yes | Yes |
+| Prefix Sum Array + Binary Search | O(N log N) | O(N) | No | Yes |
 | Hash Map + Prefix Sum | O(N) | O(N) | Yes | Yes |
 | Sliding Window | O(N) | O(1) | **No** | Yes |
 

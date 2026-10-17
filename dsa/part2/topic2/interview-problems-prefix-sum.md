@@ -337,7 +337,7 @@ firstSeen:   {-1:0, 0:1, -2:3, -3:4, -4:5, -5:6}
 At i=7: currSum=-4, firstSeen[-4]=5 → length = 7-5 = 2
 At i=8: currSum=-3, firstSeen[-3]=4 → length = 8-4 = 4 ← maxLen
 
-Subarray [4..7]: nums[4..7] = [0,0,1,1] → 2 zeros, 2 ones ✓
+Subarray [5..8]: nums[5..8] = [0,0,1,1] → 2 zeros, 2 ones ✓
 ```
 
 **Dry-Run Table (nums = [0, 1, 0]):**

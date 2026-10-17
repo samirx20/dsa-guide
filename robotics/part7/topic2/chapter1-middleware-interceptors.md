@@ -177,8 +177,6 @@ print(execute_command(good_command))
 
 **Output:**
 ```
-[PRE-CHECK] Validating command: set_temperature
-[POST-CHECK] Verifying result: ok
 {'status': 'ok', 'executed': 'set_temperature', 'target': 'oven-1'}
 ```
 
@@ -270,7 +268,7 @@ Raw AI Command ──▶ Pre-Validate ──▶ Pydantic Model ──▶ Pass/Fa
 ### Edge Case: Command with Extra Fields
 
 ```python
-# Pydantic by default ignores extra fields (strict=False)
+# Pydantic by default ignores extra fields (extra="ignore")
 loose_command = {"action": "start", "motor_id": "M-01", "speed_rpm": 1200, "extra": "ignored"}
 ok, msg = pre_validate(loose_command)
 print(f"Extra fields command: {'PASS' if ok else 'FAIL'}")  # PASS
@@ -437,7 +435,7 @@ print(execute(cmd3))
 **What's happening:**
 - **Line 168-171:** `log_interceptor` logs the action before execution. It always passes the command through.
 - **Line 174-180:** `safety_interceptor` checks if the value exceeds 500. Emergency stops bypass this check.
-- **Line 183-184:** `@safety_interceptor` is applied first (outer), `@log_interceptor` second (inner). Python applies decorators bottom-up.
+- **Line 183-184:** `@log_interceptor` is applied first (inner), `@safety_interceptor` second (outer). Python applies decorators bottom-up, so at call time the outer `safety_interceptor` runs first.
 - **Line 188-189:** `cmd1` (value=100): passes both checks.
 - **Line 191-192:** `cmd2` (value=999): safety interceptor rejects it.
 - **Line 194-195:** `cmd3` (emergency_stop): bypasses value limit.
@@ -653,7 +651,7 @@ print(safe_parse(bad_input))
 
 **Output:**
 ```
-{'status': 'rejected', 'reason': 'Invalid JSON: Expecting property name enclosed in double quotes: ...'}
+{'status': 'rejected', 'reason': "Invalid JSON: Expecting ',' delimiter: line 1 column 39 (char 38)"}
 ```
 
 ### Scenario 2: Interceptor Chain Raises Exception
@@ -686,7 +684,7 @@ print(robust_execute({"no_action": True}))
 **Output:**
 ```
 {'status': 'ok', 'executed': 'start'}
-{'status': 'rejected', 'reason': "1 validation error for MotorCommand\naction\n  Field required [type=missing, ...]"}
+{'status': 'rejected', 'reason': "3 validation errors for MotorCommand\naction\n  Field required [type=missing, ...]"}
 ```
 
 ### Scenario 3: Timeout During Execution

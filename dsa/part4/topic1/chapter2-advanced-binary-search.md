@@ -83,8 +83,8 @@ int searchRotated(vector<int>& nums, int target) {
 //    L        M
 //    Wait, let's try with mid on the other side...
 //   [6, 7, 1, 2, 3, 4, 5]
-//    L     M
-//    6 > 1 ✗ → left half NOT sorted, so right half IS sorted
+//    L        M
+//    6 > 2 ✗ → left half NOT sorted, so right half IS sorted
 ```
 
 ---
@@ -96,7 +96,7 @@ Let's trace `searchRotated` with `nums = [4, 5, 6, 7, 0, 1, 2]` and `target = 0`
 | Iteration | left | right | mid | nums[mid] | Left Sorted? | Target in Sorted Half? | Action |
 |-----------|------|-------|-----|-----------|-------------|----------------------|--------|
 | 1 | 0 | 6 | 3 | 7 | Yes (4≤7) | No (0∉[4,7)) | `left = 4` |
-| 2 | 4 | 6 | 5 | 1 | Yes (0≤1) | No (0∉[0,1)) | `right = 4` |
+| 2 | 4 | 6 | 5 | 1 | Yes (0≤1) | Yes (0∈[0,1)) | `right = 4` |
 | 3 | 4 | 4 | 4 | 0 | — | — | **return 4** |
 
 **Step-by-step Array Diagram:**
@@ -112,7 +112,7 @@ Iteration 2: left=4, right=6, mid=5
 [4, 5, 6, 7, 0, 1, 2]
              L     M  R
 nums[left]=0 <= nums[mid]=1 → LEFT half sorted
-Is target 0 in [0, 1)? No (0 >= 0 but 0 < 1 is true... wait)
+Is target 0 in [0, 1)? Yes → go LEFT
 Actually: target >= nums[left] (0 >= 0 ✓) AND target < nums[mid] (0 < 1 ✓)
 → right = mid - 1 = 4
 

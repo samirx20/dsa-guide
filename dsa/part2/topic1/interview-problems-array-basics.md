@@ -58,7 +58,7 @@ Example: nums = [2, 7, 11, 15], target = 9
 Step 1: i=0, num=2, complement=7, map={2:0}
         → 7 not in map, store 2
 
-Step 2: i=1, num=7, complement=2, map={2:0, 7:1}
+Step 2: i=1, num=7, complement=2, map={2:0}
         → 2 IS in map at index 0!
         → Return [0, 1] ✓
 ```
@@ -79,7 +79,7 @@ Second pass:
 | i | nums[i] | complement | map state | found? | result |
 |---|---------|------------|-----------|--------|--------|
 | 0 | 2 | 9-2=7 | {2:0} | no | - |
-| 1 | 7 | 9-7=2 | {2:0,7:1} | YES | [0,1] |
+| 1 | 7 | 9-7=2 | {2:0} | YES | [0,1] |
 
 #### Code: Edge Case - Duplicates
 ```cpp

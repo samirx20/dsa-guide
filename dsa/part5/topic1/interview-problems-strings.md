@@ -176,7 +176,7 @@ bool isValid(string s) {
 Approach              Time     Space    Correct?
 ────────────────────  ───────  ───────  ────────
 Stack (push closer)   O(N)     O(N)     ✓ Correct
-Counting only (±1)    O(N)     O(1)     ✗ Wrong for "{[]}"
+Counting only (±1)    O(N)     O(1)     ✗ Wrong for "([)]"
 Regex replace loop    O(N^2)   O(N)     ✓ But slow
 ```
 

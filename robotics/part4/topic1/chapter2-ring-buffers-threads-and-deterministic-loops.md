@@ -251,7 +251,7 @@ And then we call **`std::this_thread::sleep_until(next_tick)`**!
 
 Let's combine everything from Chapters 1 and 2 into a complete, zero-heap-allocation C++ program featuring:
 1. A cache-aligned `ImuSample` struct (`alignas(32)`).
-2. A thread-safe, fixed-capacity `RingBuffer<T, Capacity>` with `push_overwrite()` and `pop_latest()`.
+2. A thread-safe, fixed-capacity `RingBuffer<T, Capacity>` with `push_overwrite()` and `pop_oldest()`.
 3. A $400\text{ Hz}$ IMU producer thread and a phase-locked $100\text{ Hz}$ PID consumer thread using `std::chrono::steady_clock` and `sleep_until`.
 
 ```cpp

@@ -98,7 +98,7 @@ List: `1 -> 2 -> 3 -> 4 -> 5 -> nullptr`
 | Start | node(1) | node(1) | - | - |
 | 1 | node(2) | node(3) | slow=slow->next | fast=fast->next->next |
 | 2 | node(3) | node(5) | slow=slow->next | fast=fast->next->next |
-| 3 | node(4) | nullptr | fast->next is nullptr, STOP | - |
+| 3 | node(3) | node(5) | fast->next is nullptr, STOP | - |
 
 Loop ends. Return `slow` = node(3). Middle found!
 
@@ -318,7 +318,7 @@ List: 1 -> 2 -> 3 -> 4 -> 5 -> 6
                        +----7----+
 
     a = distance from head to cycle start = 3 (nodes 1,2,3)
-    b = distance from cycle start to meeting = 2 (nodes 4,5)
+    b = distance from cycle start to meeting = 1 (4 -> 5)
     c = cycle length = 4 (nodes 4,5,6,7)
 
 Phase 1: Find meeting point
@@ -338,7 +338,7 @@ Phase 2: Find cycle start
 
 ### Dry-Run Table: Finding Cycle Start
 
-List: `1 -> 2 -> 3 -> 4 -> 5 -> 6 -> (back to 4)`
+List: `1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> (back to 4)`
 
 **Phase 1: Find intersection**
 

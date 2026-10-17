@@ -82,7 +82,7 @@ Processing:
   num=6: even → evens = [2, 4, 6]
 
 Auxiliary space:
-  evens vector: stores up to N/2 elements in worst case
+  evens vector: stores N/2 elements here (up to N in the worst case)
   num variable: O(1)
 
   O(N/2) + O(1) = O(N) (drop constant 1/2)
@@ -286,7 +286,7 @@ Memory layout:
   │   nums = [2, 7, 11, 15]    (O(N))   │
   ├──────────────────────────────────────┤
   │ Auxiliary (counted):                 │
-  │   seen = {2:0, 7:1}        (O(N))   │
+  │   seen = {2:0}             (O(N))   │
   │   i, complement             (O(1))  │
   └──────────────────────────────────────┘
 ```
@@ -415,17 +415,17 @@ Do not wait for the interviewer to ask. Proving you understand the price tag of 
 | Code Pattern | Auxiliary Space | Notes |
 |-------------|----------------|-------|
 | A few variables | $O(1)$ | int, bool, pointers |
-| New vector of size N | $O(N)` | Worst case stores all elements |
-| Hash map / set | $O(N)` | One entry per unique element |
-| Recursive (depth N) | $O(N)` | N stack frames |
-| Recursive (balanced tree) | $O(\log N)` | Height = log N |
-| 2D grid N×M | $O(NM)` | rows × cols |
-| String copy | $O(N)` | Full character copy |
-| Sort in-place | $O(\log N)` | QuickSort recursion depth |
-| Sort with extra array | $O(N)` | Merge sort temp array |
-| Two pointers | $O(1)` | Just two index variables |
-| Sliding window | $O(1)` to $O(N)` | Depends on window storage |
-| Memoization (DP) | $O(N)` to $O(N²)` | Depends on table size |
+| New vector of size N | $O(N)$ | Worst case stores all elements |
+| Hash map / set | $O(N)$ | One entry per unique element |
+| Recursive (depth N) | $O(N)$ | N stack frames |
+| Recursive (balanced tree) | $O(\log N)$ | Height = log N |
+| 2D grid N×M | $O(NM)$ | rows × cols |
+| String copy | $O(N)$ | Full character copy |
+| Sort in-place | $O(\log N)$ | QuickSort recursion depth |
+| Sort with extra array | $O(N)$ | Merge sort temp array |
+| Two pointers | $O(1)$ | Just two index variables |
+| Sliding window | $O(1)$ to $O(N)$ | Depends on window storage |
+| Memoization (DP) | $O(N)$ to $O(N²)$ | Depends on table size |
 
 ---
 

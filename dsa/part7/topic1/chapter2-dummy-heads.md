@@ -228,7 +228,7 @@ You should instantiate a Dummy Node in almost **every** Linked List problem wher
 | Deleting Nodes | Head might be the node to delete | Remove Nth Node From End |
 | Reordering/Partitioning | Building a new list from parts of the original | Odd-Even Linked List |
 | Reversing Sub-lists | Head of the reversed portion changes | Reverse Nodes in k-Group |
-| Removing Duplicates | Head might be duplicated | Remove Duplicates from Sorted List |
+| Removing Duplicates | Head might be duplicated | Remove Duplicates from Sorted List II |
 | Intersection Point | Both lists might be modified | Intersection of Two Linked Lists |
 
 ### Example: Merge Two Sorted Lists (Without Dummy)

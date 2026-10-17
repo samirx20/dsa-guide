@@ -371,8 +371,8 @@ P - N = 3 (target)
 2P = 8 -> P = 4
 
 New problem: Find number of subsets that sum to 4
-Subsets: {1,1,1,1} -> sum=4
-Answer: 1 way (all positive)
+Subsets: {1,1,1,1} -> sum=4 (any 4 of the 5 ones)
+Answer: 5 ways (C(5,4): choose which single 1 gets the minus sign)
 ```
 
 **Step 3 — Dry-Run Table: nums = [1,1,1,1,1], target = 3, P = 4**
@@ -463,13 +463,13 @@ Else: `dp[i][j] = 1 + min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1])`
     ├────┼────┼────┼────┤
 h   │  1 │  1 │  2 │  3 │  h!=r -> min(0,1,1)+1 = 1
     ├────┼────┼────┼────┤
-o   │  2 │  2 │  1 │  2 │  h!=o:1, o==o:dp[1][0]+0=2... 
+o   │  2 │  2 │  1 │  2 │  o!=r:2, o==o:dp[1][1]+0=1, o!=s:2
     ├────┼────┼────┼────┤
-r   │  3 │  2 │  2 │  2 │  r==r -> dp[1][1]+0=1? No, dp[2][1]=2
+r   │  3 │  2 │  2 │  2 │  r==r -> dp[2][0]+0=2
     ├────┼────┼────┼────┤
-s   │  4 │  3 │  3 │  2 │  s==s -> dp[2][2]+0=2
+s   │  4 │  3 │  3 │  2 │  s==s -> dp[3][2]+0=2
     ├────┼────┼────┼────┤
-e   │  5 │  4 │  4 │  3 │  e!=s -> min(dp[3][3],dp[3][2],dp[4][3])+1
+e   │  5 │  4 │  4 │  3 │  e!=s -> min(dp[4][2],dp[4][3],dp[5][2])+1
     └────┴────┴────┴────┘
 
 Answer: dp[5][3] = 3
@@ -553,7 +553,7 @@ nums = [3, 1, 5, 8] (with padding: [1, 3, 1, 5, 8, 1])
 Think: In range [1, 4] (balloons 3, 1, 5, 8), which to burst LAST?
 
 If balloon "1" (index 2) is last:
-  Left subproblem: [1, 1] (just the padding 1, 0 balloons)
+  Left subproblem: [1, 1] (balloon 3)
   Right subproblem: [3, 4] (balloons 5, 8)
   Coins: nums[0] * nums[2] * nums[5] = 1 * 1 * 1 = 1
   Plus: dp[1][1] + dp[3][4] (solutions for sub-intervals)

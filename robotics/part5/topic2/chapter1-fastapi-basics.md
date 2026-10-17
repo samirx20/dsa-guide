@@ -392,7 +392,7 @@ status.HTTP_201_CREATED            # 201 - Resource created
 status.HTTP_204_NO_CONTENT         # 204 - Success, no body
 status.HTTP_400_BAD_REQUEST        # 400 - Client error
 status.HTTP_401_UNAUTHORIZED       # 401 - Not authenticated
-status.HTTP_403_FORBIDDEN          # 402 - Authenticated but not allowed
+status.HTTP_403_FORBIDDEN          # 403 - Authenticated but not allowed
 status.HTTP_404_NOT_FOUND          # 404 - Resource not found
 status.HTTP_422_UNPROCESSABLE_ENTITY  # 422 - Validation error
 status.HTTP_500_INTERNAL_SERVER_ERROR # 500 - Server error
@@ -540,7 +540,8 @@ import httpx
 # Synchronous endpoint (blocks the thread for I/O)
 @app.get("/sensors/{sensor_id}")
 def get_sensor(sensor_id: str) -> dict:
-    # This blocks the event loop if calling external APIs!
+    # FastAPI runs plain 'def' endpoints in a threadpool, so this blocks a worker thread
+    # (not the event loop) while waiting on the external API!
     response = httpx.get(f"https://api.example.com/sensor/{sensor_id}")
     return response.json()
 

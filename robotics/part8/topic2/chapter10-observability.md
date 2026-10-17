@@ -109,7 +109,7 @@ def redact(value: str, show_last: int = 4) -> str:
     return "*" * (len(value) - show_last) + value[-show_last:]
 
 logger.log("auth", api_key=redact("sk-1234567890abcdef"))
-# Output: {"event": "auth", "api_key": "************cdef"}
+# Output: {"event": "auth", "api_key": "***************cdef"}
 ```
 
 **What's happening:**

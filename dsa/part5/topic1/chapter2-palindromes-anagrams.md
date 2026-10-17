@@ -87,23 +87,25 @@ int expandAroundCenter(string s, int left, int right) {
 //   - right has gone one step too far right
 //   - So length = right - left - 1
 //
-// Example: s = "abacaba", expanding from center index 3 ('a'):
-//   left=3, right=3: 'a'=='a' ✓ → left=2, right=4
-//   left=2, right=4: 'b'=='b' ✓ → left=1, right=5
-//   left=1, right=5: 'a'=='a' ✓ → left=0, right=6
-//   left=0, right=6: 'c'=='a' ✗ → stop
-//   length = 6 - 0 - 1 = 5
+// Example: s = "abacaba", expanding from center index 3 ('c'):
+//   left=3, right=3: 'c'=='c' ✓ → left=2, right=4
+//   left=2, right=4: 'a'=='a' ✓ → left=1, right=5
+//   left=1, right=5: 'b'=='b' ✓ → left=0, right=6
+//   left=0, right=6: 'a'=='a' ✓ → left=-1, right=7
+//   left=-1: out of bounds → stop
+//   length = 7 - (-1) - 1 = 7
 ```
 
 **Dry-run table for expanding center at index 3 in `"abacaba"`:**
 ```
 Step  left  right  s[left]  s[right]  Match?  Length so far
 ────  ────  ─────  ───────  ────────  ──────  ─────────────
-1     3     3      'a'      'a'       ✓       1
-2     2     4      'b'      'b'       ✓       3
-3     1     5      'a'      'a'       ✓       5
-4     0     6      'c'      'a'       ✗       stop
-Result: length = 6 - 0 - 1 = 5 → palindrome "bacab"
+1     3     3      'c'      'c'       ✓       1
+2     2     4      'a'      'a'       ✓       3
+3     1     5      'b'      'b'       ✓       5
+4     0     6      'a'      'a'       ✓       7
+5     -1    7      (out of bounds)    ✗       stop
+Result: length = 7 - (-1) - 1 = 7 → palindrome "abacaba"
 ```
 
 In the main function, you call this twice for every index `i`:

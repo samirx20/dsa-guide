@@ -218,17 +218,17 @@ Step | Node | visited[]  | path[]    | Action
       |      |            |             | Push 4 to stack: [4]
 6    | -    | [T,T,F,TT] | [T,T,F,F,F] | 3 done, pop from path
       |      |            |             | Push 3 to stack: [3,4]
-7    | 2    | [T,T,T,TT] | [T,T,T,F,F] | Visit 2, push to path
-8    | 3    | [T,T,T,TT] | -           | 3 already visited, skip
-9    | -    | [T,T,T,TT] | [T,T,T,F,F] | 2 done, pop from path
-      |      |            |             | Push 2 to stack: [2,3,4]
-10   | -    | [T,T,T,TT] | [T,F,F,F,F] | 1 done, pop from path
-      |      |            |             | Push 1 to stack: [1,2,3,4]
+7    | -    | [T,T,F,TT] | [T,F,F,F,F] | 1 done, pop from path
+      |      |            |             | Push 1 to stack: [1,3,4]
+8    | 2    | [T,T,T,TT] | [T,F,T,F,F] | Back at 0: visit next neighbor 2, push to path
+9    | 3    | [T,T,T,TT] | -           | 3 already visited, skip
+10   | -    | [T,T,T,TT] | [T,F,F,F,F] | 2 done, pop from path
+      |      |            |             | Push 2 to stack: [2,1,3,4]
 11   | -    | [T,T,T,TT] | [F,F,F,F,F] | 0 done, pop from path
-      |      |            |             | Push 0 to stack: [0,1,2,3,4]
+      |      |            |             | Push 0 to stack: [0,2,1,3,4]
 
-Stack (top to bottom): [0, 1, 2, 3, 4]
-Reversed: [0, 1, 2, 3, 4] -> Topological Order!
+Stack (top to bottom): [0, 2, 1, 3, 4] -> Topological Order!
+(With a vector: post-order [4, 3, 1, 2, 0], reversed = [0, 2, 1, 3, 4])
 ```
 
 #### Code: DFS-Based Topological Sort
@@ -491,7 +491,7 @@ string alienOrder(vector<string>& words) {
 **What's happening:**
 - Line 6-10: Initialize all characters as nodes.
 - Line 13-24: Compare adjacent words, find first differing character, add edge.
-- Line 15-16: If longer word equals prefix of shorter word, invalid ordering.
+- Line 15-16: If a longer word comes before its own prefix (e.g., "abc" before "ab"), invalid ordering.
 - Line 28-32: Kahn's Algorithm to get topological order of characters.
 - Line 34: If order includes all characters, valid. Otherwise, cycle in alphabet.
 

@@ -153,7 +153,7 @@ We know $^W_B\mathbf{T}$ (how $\{B\}$ sits inside $\{W\}$). What is the inverse 
 **Beginner Trap**: Beginners guess that you just transpose $\mathbf{R}$ and negate $\mathbf{t}$: $\begin{bmatrix} \mathbf{R}^T & -\mathbf{t} \\ \mathbf{0}^T & 1 \end{bmatrix}$. **WRONG!**
 Why is $-\mathbf{t} = [-3, -2]^T$ wrong?
 - Stand at $(3, 2)$ facing $+Y$ (North). Where is the World origin $(0, 0)$ from your perspective?
-- $(0, 0)$ is $2\text{ m}$ **behind** you ($x_B = -2$) and $3\text{ m}$ to your **right** ($y_B = -3$), which is $[-2, -3]^T$, NOT $[-3, -2]^T$!
+- $(0, 0)$ is $2\text{ m}$ **behind** you ($x_B = -2$) and $3\text{ m}$ to your **left** ($y_B = +3$), which is $[-2, +3]^T$, NOT $[-3, -2]^T$!
 - Why? Because $\mathbf{t}_{WB} = [3, 2]^T$ was measured along the **World axes**, whereas $^B_W\mathbf{T}$ needs the offset expressed along the **Robot's rotated axes**!
 
 Let's solve $^W\mathbf{p} = \mathbf{R}\,^B\mathbf{p} + \mathbf{t}$ for $^B\mathbf{p}$ step by step:

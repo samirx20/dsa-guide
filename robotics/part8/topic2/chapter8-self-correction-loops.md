@@ -314,7 +314,7 @@ print(f"Errors: {output['errors']}")
   Validation passes -> return result
 ```
 
-The first attempt fails because `priority` is "high" (a string, not an int) and `estimated_hours` is "4" (a string, not a float). The error message is appended to the prompt, giving the LLM explicit feedback to fix.
+The first attempt fails because `priority` is "high" (a string, not an int). `estimated_hours` is "4" (a string), but Pydantic's default lax mode coerces numeric strings to float, so it passes. The error message is appended to the prompt, giving the LLM explicit feedback to fix.
 
 ### 4. Logging Correction Attempts
 
@@ -367,9 +367,9 @@ for entry in correction_log:
   correction_log after 3 attempts:
   =================================
 
-  Attempt 1: 2 errors
+  Attempt 1: 1 error
     - priority: Input should be a valid integer
-    - estimated_hours: Input should be a valid float
+    (estimated_hours "4" is coerced to 4.0 in lax mode - no error)
 
   Attempt 2: 1 error
     - machine_id: String should have at least 1 character
@@ -432,14 +432,14 @@ def smart_self_correction(prompt, model_class, max_retries=3):
 | Error Type | Retriable? | Reason | Example |
 |-----------|-----------|--------|---------|
 | `missing` | Yes | LLM forgot a field, can be reminded | Missing `action` key |
-| `string_type` | Yes | LLM put string instead of number | `"priority": "high"` |
-| `int_parsing` | Yes | LLM put string that should be int | `"priority": "1"` |
-| `float_parsing` | Yes | LLM put string that should be float | `"hours": "4.5"` |
+| `string_type` | Yes | LLM put non-string where a string is expected | `"machine_id": 101` |
+| `int_parsing` | Yes | LLM put string that cannot parse as int | `"priority": "high"` |
+| `float_parsing` | Yes | LLM put string that cannot parse as float | `"hours": "four"` |
 | `list_type` | Yes | LLM put string instead of array | `"readings": "P101"` |
-| `value_error` | No | Enum value doesn't exist | `"severity": "mega"` |
+| `value_error` | No | Custom validator raised `ValueError` | Business rule failed |
 | `enum` | No | Value not in allowed set | `"status": "broken"` |
-| `assertion` | No | Custom constraint failed | Hours > 1000 (unrealistic) |
-| `value_error.url` | No | LLM hallucinated invalid URL | `"url": "not-a-url"` |
+| `assertion_error` | No | Custom constraint failed | Hours > 1000 (unrealistic) |
+| `url_parsing` | No | LLM hallucinated invalid URL | `"url": "not-a-url"` |
 
 Non-retriable errors raise immediately instead of wasting API calls. The classification function checks the error type — some issues like invalid enum values indicate a fundamental misunderstanding in the prompt, not a formatting mistake.
 
@@ -497,7 +497,7 @@ else:
 
 ```python
 # WRONG: Pydantic errors are too technical for the LLM
-error = "value_error: Input should be a valid integer, unable to parse string as an integer [type=string_type, input_value='high', input_type=str]"
+error = "priority: Input should be a valid integer, unable to parse string as an integer [type=int_parsing, input_value='high', input_type=str]"
 
 # RIGHT: Simplify for the LLM
 clean_message = "The 'priority' field must be a number (1-5), not a word like 'high'. Use 5 for high priority."

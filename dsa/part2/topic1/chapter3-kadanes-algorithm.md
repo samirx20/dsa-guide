@@ -322,10 +322,10 @@ nums = [-2, 1, -3, 4, -1, 2, 1, -5, 4]
 i=0: globalMax=-2, currentSum=-2, start=0, end=0
 i=1: Start fresh at 1, tempStart=1
      globalMax=1, start=1, end=1
-i=2: Extend, globalMax=1, start=1, end=2
+i=2: Extend, globalMax=1, start=1, end=1
 i=3: Start fresh at 4, tempStart=3
      globalMax=4, start=3, end=3
-i=4: Extend, globalMax=4, start=3, end=4
+i=4: Extend, globalMax=4, start=3, end=3
 i=5: Extend, globalMax=5, start=3, end=5
 i=6: Extend, globalMax=6, start=3, end=6
 i=7: Extend, globalMax=6, start=3, end=6
@@ -459,7 +459,7 @@ for (int i = 1; i < nums.size(); i++) {
 }
 ```
 
-**What's happening:** If we start at i=0, we compare `nums[0]` vs `0 + nums[0]`, which is redundant but harmless. However, if we initialize `currentSum = 0`, then starting at i=0 would compare `nums[0]` vs `0 + nums[0]`, always choosing `nums[0]`. It's cleaner to start at i=1.
+**What's happening:** If we start at i=0 with `currentSum = nums[0]`, we compare `nums[0]` vs `nums[0] + nums[0]`, which double-counts the first element whenever it is positive (e.g. `[5]` would return 10). However, if we initialize `currentSum = 0`, then starting at i=0 would compare `nums[0]` vs `0 + nums[0]`, always choosing `nums[0]`. It's cleaner to start at i=1.
 
 **Mistake 3: Not Updating globalMax in Loop**
 ```cpp

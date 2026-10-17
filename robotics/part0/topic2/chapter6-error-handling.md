@@ -162,6 +162,7 @@ async def call_llm(prompt: str) -> str:
     # Step 1: Try doing the risky thing
     try:
         response = await client.post(url, json={"prompt": prompt})
+        response.raise_for_status()  # httpx only raises HTTPStatusError if you ask it to
         
     # Step 2: Catch specific errors if the risky thing fails
     except httpx.TimeoutException as exc:
@@ -312,10 +313,10 @@ with open("data.json", "r") as f:
     data = f.read()
 # File is automatically closed, even if an exception occurs
 
-# Database connection — automatically closes connection
+# Database connection — automatically commits (or rolls back on error)
 with sqlite3.connect("factory.db") as conn:
     cursor = conn.execute("SELECT * FROM sensors")
-# Connection is automatically closed
+# Transaction is committed — but sqlite3 does NOT close the connection here (call conn.close())
 
 # Temporary directory — automatically deleted
 import tempfile
@@ -523,7 +524,7 @@ logger.info("Pipeline started", extra={"query": query})
 #          ^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^
 #          |                    |
 #          |                    └── Extra context attached to the log
-#          |                        Shows as: query=What is the temp?
+#          |                        Stored as record.query (shown only if your formatter includes it)
 #          └── Log level: info (normal operation)
 #
 # Log levels (most to least severe):
@@ -565,7 +566,8 @@ logger.exception("Error processing sensor: %s", sensor_id)
 try:
     result = call_llm(prompt)
 except Exception:
-    # This catches EVERYTHING — even KeyboardInterrupt, SystemExit
+    # This catches almost EVERYTHING (every Exception subclass) — only
+    # BaseException-only types like KeyboardInterrupt and SystemExit escape it
     # You might swallow critical errors
     pass
 

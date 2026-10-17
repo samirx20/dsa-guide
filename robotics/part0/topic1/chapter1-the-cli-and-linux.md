@@ -199,8 +199,8 @@ kill -9 4821
 kill 4821
 #    ^^^^
 #    Despite the violent name, 'kill' simply sends a signal to a PID!
-#    By default, 'kill <PID>' sends SIGTERM (Signal 15) — identical to pressing Ctrl+C
-#    (SIGINT = Signal 2). The C++ program catches it, runs its RAII destructors,
+#    By default, 'kill <PID>' sends SIGTERM (Signal 15) — a polite stop request, similar in
+#    spirit to pressing Ctrl+C (which sends SIGINT = Signal 2). The C++ program catches it, runs its RAII destructors,
 #    commands the wheel motors to 0.0 m/s, and exits cleanly.
 
 kill -9 4821
@@ -311,7 +311,7 @@ rm -rf ./build/
 ```
 
 #### Mistake 2: Putting Spaces Around `=` in `export` or Shell Variables
-In C++ and Python, `x = 5` is fine. In `bash`/`zsh`, `export ROS_DOMAIN_ID = 42` fails because the shell thinks `ROS_DOMAIN_ID` is a command name and `=` is its first argument!
+In C++ and Python, `x = 5` is fine. In `bash`/`zsh`, `ROS_DOMAIN_ID = 42` fails because the shell thinks `ROS_DOMAIN_ID` is a command name and `=` is its first argument, and `export ROS_DOMAIN_ID = 42` fails because `export` treats `=` and `42` as separate (invalid) variable names (`export: '=': not a valid identifier`)!
 
 ```bash
 # BAD: Spaces around '=' cause "command not found" or syntax error!

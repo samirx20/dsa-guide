@@ -48,7 +48,7 @@ int main() {
     pair<int, string> p3 = {3, "Charlie"};
 
     // Auto type deduction
-    auto p4 = make_pair(4, "Diana"); // pair<int, string>
+    auto p4 = make_pair(4, "Diana"); // pair<int, const char*>
 }
 ```
 

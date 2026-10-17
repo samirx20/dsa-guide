@@ -161,7 +161,7 @@ class SensorConfig(BaseModel):
     firmware_version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
 
 config = SensorConfig(
-    sensor_id="T-001",
+    sensor_id="TC-001",
     name="Main Thermocouple",
     firmware_version="2.1.0"
 )
@@ -190,10 +190,12 @@ firmware_version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
 
 Output:
 ```
-Configured: T-001 v2.1.0
-Rejected: 1 validation error for SensorConfig
+Configured: TC-001 v2.1.0
+Rejected: 2 validation errors for SensorConfig
 sensor_id
   String should match pattern '^[A-Z]{2}-\d{3}$' [type=string_pattern_mismatch, input_value='bad_id', input_type=str]
+firmware_version
+  String should match pattern '^\d+\.\d+\.\d+$' [type=string_pattern_mismatch, input_value='v2', input_type=str]
 ```
 
 ### Common Regex Patterns for Industrial Data
@@ -234,7 +236,7 @@ Output:
 Code: 123
 Rejected: 1 validation error for CommonMistakes
 code
-  String should match pattern '^\\d{3}$' [type=string_pattern_mismatch, input_value='abc123', input_type=str]
+  String should match pattern '^\d{3}$' [type=string_pattern_mismatch, input_value='abc123', input_type=str]
 ```
 
 ---
@@ -337,7 +339,8 @@ active_alarms: list[str] = Field(default_factory=list)
 #              └── List of strings
 
 # Without default_factory:
-# active_alarms: list[str] = []  ← BUG: all instances share the SAME list
+# active_alarms: list[str] = []  ← Pydantic copies this per instance, but the
+#                                   same idiom is a shared-list BUG in plain Python
 ```
 
 Output:
@@ -346,7 +349,7 @@ Output:
 []
 ```
 
-Each instance gets its own list. Without `default_factory`, both panels would share the same list — a common Python bug.
+Each instance gets its own list. In plain Python (function defaults, class attributes) a `[]` default is shared between all callers — a common bug. Pydantic deep-copies a literal `[]` default per instance, so it would not share here, but `default_factory` makes the intent explicit and is the portable habit.
 
 ---
 
@@ -403,6 +406,7 @@ Every field enforces its own domain rule. An LLM generating a reading with `pres
 ### What Happens When Each Constraint Fails
 
 ```python
+from typing import Literal
 from pydantic import BaseModel, Field, ValidationError
 
 class Sensor(BaseModel):

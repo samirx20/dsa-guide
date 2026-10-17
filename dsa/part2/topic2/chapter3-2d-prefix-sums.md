@@ -271,25 +271,25 @@ Expected: 6+7+10+11 = 34
 prefix matrix:
 |  0   0   0   0   0 |
 |  0   1   3   6  10 |
-|  0   6  15  27  43 |
-|  0  15  36  63  99 |
-|  0  28  63 114 180 |
+|  0   6  14  24  36 |
+|  0  15  33  54  78 |
+|  0  28  60  96 136 |
 
-bottom_right = prefix[3][3] = 63 (sum of 0,0 → 2,2)
+bottom_right = prefix[3][3] = 54 (sum of 0,0 → 2,2)
 top_rectangle = prefix[1][3] = 6 (sum of 0,0 → 0,2)
 left_rectangle = prefix[3][1] = 15 (sum of 0,0 → 2,0)
 top_left_overlap = prefix[1][1] = 1 (sum of 0,0 → 0,0)
 
-Result = 63 - 6 - 15 + 1 = 43
+Result = 54 - 6 - 15 + 1 = 34
 Wait, let me recalculate...
 
 Actually for sumRegion(1,1,2,2):
-bottom_right = prefix[3][3] = 63
+bottom_right = prefix[3][3] = 54
 top_rectangle = prefix[1][3] = 6
 left_rectangle = prefix[3][1] = 15
 overlap = prefix[1][1] = 1
 
-63 - 6 - 15 + 1 = 43
+54 - 6 - 15 + 1 = 34
 
 But actual sum should be 6+7+10+11 = 34...
 
@@ -464,7 +464,7 @@ long long max = ~9.2 * 10^18
 ```cpp
 // What happens if matrix is empty?
 NumMatrix obj({});  // matrix.size() == 0
-// prefix becomes a 1x1 matrix: {{0}}
+// matrix[0].size() on an empty matrix is undefined behavior (likely crash)
 // Any call to sumRegion will access out-of-bounds indices
 
 // ✅ Defensive check
@@ -477,7 +477,7 @@ NumMatrix(vector<vector<int>>& matrix) {
 }
 ```
 
-**What's happening:** An empty matrix means `ROWS = 0` or `COLS = 0`. The prefix matrix would be `1x1` with just a zero, but any query would try to access indices beyond the bounds. Always check for empty input.
+**What's happening:** An empty matrix means `ROWS = 0` or `COLS = 0`. Reading `matrix[0]` when `ROWS = 0` is undefined behavior; with the defensive check the prefix matrix is `1x1` with just a zero, but any query would try to access indices beyond the bounds. Always check for empty input.
 
 #### Edge Case: Single Row Matrix
 ```
@@ -502,10 +502,10 @@ Verify: matrix[0][1] + matrix[0][2] = 2 + 3 = 5 ✓
 //         |  3 -4 |
 // prefix: |  0  0  0 |
 //         |  0 -1  1 |
-//         |  0  2 -1 |
+//         |  0  2  0 |
 //
 // sumRegion(0, 0, 1, 1) = prefix[2][2] - prefix[0][2] - prefix[2][0] + prefix[0][0]
-//                       = -1 - 0 - 0 + 0 = -1 ✓ (which is -1+2+3-4 = 0... wait)
+//                       = 0 - 0 - 0 + 0 = 0 ✓ (which is -1+2+3-4 = 0... wait)
 // Actually: -1 + 2 + 3 + (-4) = 0 ✓
 ```
 
@@ -578,12 +578,12 @@ Sometimes you need sum of entire rows or columns efficiently:
 
 ```cpp
 // Row sum: sum of entire row r
-int rowSum = prefix[r+1][COLS+1] - prefix[r][COLS+1] - prefix[r+1][0] + prefix[r][0];
-// Simplifies to: prefix[r+1][COLS+1] - prefix[r][COLS+1]
+int rowSum = prefix[r+1][COLS] - prefix[r][COLS] - prefix[r+1][0] + prefix[r][0];
+// Simplifies to: prefix[r+1][COLS] - prefix[r][COLS]
 
 // Column sum: sum of entire column c
-int colSum = prefix[ROWS+1][c+1] - prefix[0][c+1] - prefix[ROWS+1][c] + prefix[0][c];
-// Simplifies to: prefix[ROWS+1][c+1] - prefix[ROWS+1][c]
+int colSum = prefix[ROWS][c+1] - prefix[0][c+1] - prefix[ROWS][c] + prefix[0][c];
+// Simplifies to: prefix[ROWS][c+1] - prefix[ROWS][c]
 ```
 
 #### What's Happening

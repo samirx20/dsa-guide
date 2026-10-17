@@ -362,7 +362,7 @@ void selectionSortStable(vector<int>& arr) {
         int min_idx = i;
         
         for (int j = i + 1; j < n; j++) {
-            // Strict less than ensures stability
+            // Strict less than picks the FIRST of equal minimums (not enough for stability)
             // Elements equal to min don't update min_idx
             if (arr[j] < arr[min_idx]) {
                 min_idx = j;
@@ -381,7 +381,7 @@ void selectionSortStable(vector<int>& arr) {
 // With duplicates: [3a, 2, 3b, 1]
 // When i=0, min_idx will point to 1 (not 3b)
 // Because we use strict < (not <=)
-// 3a and 3b stay in relative order
+// Then swapping arr[0]=3a with arr[3]=1 gives [1, 2, 3b, 3a]: 3a and 3b flip order
 // But Selection Sort is STILL unstable because
 // the swap at the end can move elements far apart
 ```
