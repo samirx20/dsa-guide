@@ -402,6 +402,124 @@ Use these four concrete engineering verification tests to validate your implemen
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. One guidance cycle with the Python gains.** The EKF estimate is $\hat{\mathbf{x}} = [2.0\text{ m},\ 1.0\text{ m},\ \pi/2]^T$ (facing North) and the active waypoint is $(5.0, 5.0)$. Trace `compute_control(dt=0.01)` from the Python implementation. Assume `heading_integral = 0` and `prev_theta_est` $= \pi/2$ before the call, so the derivative term is $0$. Give $d_{\text{err}}$, $\theta_{\text{goal}}$, $e_\theta$, `heading_integral`, `w_cmd` and `v_cmd`.
+
+**Q2. Wrap and pivot.** (a) $\hat{\theta} = +170^\circ$ and $\theta_{\text{goal}} = -170^\circ$. What is the wrapped $e_\theta$, and which way does the robot turn? (b) With the waypoint at $e_\theta = 100^\circ$, what is $v_{\text{cmd}}$, and why?
+
+**Q3. The C++ outlier gate.** In `updateGPS`, suppose $S_{00} = S_{11} = 0.25\text{ m}^2$ ($P = 0.16$ plus $R = 0.09$). For innovations (a) $\mathbf{y} = (0.9, -1.2)$ and (b) $\mathbf{y} = (1.0, 1.2)$, compute `mahal_sq` and say whether the update runs.
+
+**Q4. Covariance growth in one predict.** Starting from the C++ `EKFStateEstimator` initial $\mathbf{P} = \operatorname{diag}(0.2, 0.2, 0.05)$ with heading $\hat{\theta} = \pi/2$, call `predict(1.0, 0.0, 0.01)` once. Compute `F02`, `F12`, and the new `P[0][0]`, `P[1][1]`, `P[0][2]`, `P[2][2]`. Which position axis gains a correlation with heading, and why that one?
+
+**Q5. Multi-rate bookkeeping.** In the Python `__main__` loop (100 Hz, GPS when `tick % 10 == 0`): (a) how many GPS updates are attempted during ticks 0–99? (b) At what simulated time is the multipath spike injected, and how far (in metres) does it displace the GPS fix? (c) If the spike is rejected, how many EKF predict steps run before the next GPS update is attempted?
+
+### Coding Exercises
+
+**E1 (Easy). Pure-P guidance law.** Write `guidance(pose, wp, kp_dist=1.0, v_max=1.5, kp_th=2.5, w_max=2.0) -> tuple[float, float, float, float]` that returns $(d_{\text{err}}, e_\theta, v_{\text{cmd}}, \omega_{\text{cmd}})$ using Modules 3–4 with a P-only heading loop.
+- `guidance((1, 1, 0), (4, 5))` → `(5.0, 0.927, 1.5, 2.0)` (Section 3 table)
+- `guidance((0, 0, 0), (-1, 0.5))` → `(1.118, 2.678, 0.0, 2.0)` (waypoint behind: pivot in place)
+
+**E2 (Easy–Medium). Waypoint manager with multi-capture.** Write a class `WaypointManager(waypoints, capture_radius=0.25)` with `advance(est_xy) -> int` that keeps advancing the index while the current waypoint is within the capture radius, so closely spaced waypoints can be captured in one tick. It returns the active index, or `len(waypoints)` when the mission is complete.
+- `wm = WaypointManager([(1.0, 0.0), (1.1, 0.0), (3.0, 0.0)])`
+- `wm.advance((0.95, 0.0))` → `2` (both of the first two captured at once)
+- `wm.advance((2.9, 0.1))` → `3` (mission complete)
+
+**E3 (Medium). Full vs. diagonal Mahalanobis gate.** The C++ `updateGPS` uses only the diagonal of $\mathbf{S}$, while the Python version uses the full $\mathbf{S}^{-1}$. Write `mahal_sq_full(y, S)` (hand-inverting the $2 \times 2$) and `mahal_sq_diag(y, S)`, then show a case where the two gates disagree at the $9.21$ threshold.
+- `S = [[0.25, 0.15], [0.15, 0.25]]`, `y = (1.0, 1.2)` → full `6.25` (accept), diag `9.76` (reject)
+
+#### Dry-Run: Answers
+
+**Q1.** $\Delta x = 3.0$ and $\Delta y = 4.0$, so $d_{\text{err}} = \mathbf{5.0\text{ m}}$ and $\theta_{\text{goal}} = \operatorname{atan2}(4, 3) = \mathbf{0.927\text{ rad}}$. Then $e_\theta = \operatorname{wrap}(0.927 - 1.571) = \mathbf{-0.644\text{ rad}}$ ($-36.87^\circ$): turn right. `heading_integral` $= \operatorname{clamp}(0 + (-0.644)(0.01)) = \mathbf{-0.00644}$. `w_cmd` $= 3.0(-0.644) + 0.4(-0.00644) + 0.15(0) = -1.931 - 0.003 = \mathbf{-1.933\text{ rad/s}}$, which is inside $\pm 2.5$. `v_cmd` $= \operatorname{clamp}(1.2 \times 5.0 \times \cos(-0.644)) = \operatorname{clamp}(6.0 \times 0.8) = \operatorname{clamp}(4.8) = \mathbf{1.5\text{ m/s}}$.
+
+**Q2.** (a) The raw difference is $-170 - 170 = -340^\circ$, which wraps to $\mathbf{+20^\circ}$, a $20^\circ$ left (counter-clockwise) turn through $180^\circ$, not a $340^\circ$ right spin. (b) $\cos 100^\circ = -0.174$ and $\max(0, -0.174) = 0$, so **$v_{\text{cmd}} = 0$**. The robot pivots in place until $|e_\theta| < 90^\circ$ (Milestone 2).
+
+**Q3.** `mahal_sq` $= y_0^2/S_{00} + y_1^2/S_{11}$. (a) $(0.81 + 1.44)/0.25 = \mathbf{9.00} \le 9.21$, so it is **accepted** and the update runs. (b) $(1.00 + 1.44)/0.25 = \mathbf{9.76} > 9.21$, so it is **rejected** and `updateGPS` returns `false`.
+
+**Q4.** $\sin(\pi/2) = 1$ and $\cos(\pi/2) = 0$, so `F02` $= -1.0 \times 1 \times 0.01 = \mathbf{-0.01}$ and `F12` $= \mathbf{0}$ (up to float error, about $6 \times 10^{-19}$). With the old $P_{02} = 0$ and $P_{22} = 0.05$:
+- `P[0][0]` $= 0.2 + 2(-0.01)(0) + (0.01)^2(0.05) + 0.001 = \mathbf{0.201005}$
+- `P[1][1]` $= 0.2 + 0 + 0 + 0.001 = \mathbf{0.201}$
+- `P[0][2]` $= 0 + (-0.01)(0.05) = \mathbf{-0.0005}$
+- `P[2][2]` $= 0.05 + 0.0005 = \mathbf{0.0505}$ (updated last, so the lines above use the old $0.05$)
+
+Only $x$ correlates with heading. Facing North, a small heading error swings the robot sideways in $x$ (a positive $\delta\theta$ moves it toward $-x$, hence the negative sign), but it does not change how far it travels in $y$ to first order.
+
+**Q5.** (a) Ticks $0, 10, 20, \dots, 90$ give **10 GPS updates** (10 Hz). (b) `tick == 500` corresponds to $t = 500 \times 0.01 = \mathbf{5.0\text{ s}}$. The offset is $(15, -12)$, so its magnitude is $\sqrt{225 + 144} = \sqrt{369} \approx \mathbf{19.2\text{ m}}$. (c) The next GPS tick is 510. Predict runs on every tick, so ticks 501–509 plus 510 itself (predict runs before the update in the loop) make **10 predict steps** between the two update attempts. The estimate rides on odometry alone for $0.1\text{ s}$.
+
+**E1. Reference solution**
+
+```python
+import math
+
+def wrap_to_pi(a: float) -> float:
+    return math.atan2(math.sin(a), math.cos(a))
+
+def guidance(pose, wp, kp_dist=1.0, v_max=1.5, kp_th=2.5, w_max=2.0):
+    x, y, th = pose
+    dx, dy = wp[0] - x, wp[1] - y
+    d_err = math.hypot(dx, dy)
+    e_th = wrap_to_pi(math.atan2(dy, dx) - th)
+    v_cmd = max(0.0, min(v_max, kp_dist * d_err * max(0.0, math.cos(e_th))))
+    w_cmd = max(-w_max, min(w_max, kp_th * e_th))
+    return d_err, e_th, v_cmd, w_cmd
+
+print([round(v, 3) for v in guidance((1, 1, 0), (4, 5))])     # [5.0, 0.927, 1.5, 2.0]
+print([round(v, 3) for v in guidance((0, 0, 0), (-1, 0.5))])  # [1.118, 2.678, 0.0, 2.0]
+```
+
+$O(1)$. For the second call, $e_\theta = \operatorname{atan2}(0.5, -1) = 2.678\text{ rad} = 153.4^\circ$, so $\cos e_\theta < 0$ and $v = 0$, and $2.5 \times 2.678 = 6.7$ clamps to $2.0$.
+
+**E2. Reference solution**
+
+```python
+import math
+
+class WaypointManager:
+    def __init__(self, waypoints, capture_radius: float = 0.25):
+        self.waypoints = list(waypoints)
+        self.capture_radius = capture_radius
+        self.idx = 0
+
+    def advance(self, est_xy) -> int:
+        while self.idx < len(self.waypoints):
+            wx, wy = self.waypoints[self.idx]
+            if math.hypot(wx - est_xy[0], wy - est_xy[1]) >= self.capture_radius:
+                break
+            self.idx += 1  # captured: move to the next waypoint and test it too
+        return self.idx
+
+wm = WaypointManager([(1.0, 0.0), (1.1, 0.0), (3.0, 0.0)])
+print(wm.advance((0.95, 0.0)))  # 2  (dist 0.05, then 0.15, then 2.05 stops)
+print(wm.advance((2.9, 0.1)))   # 3  (dist 0.141 < 0.25: mission complete)
+```
+
+This is $O(k)$ per call for $k$ waypoints captured, and amortized $O(1)$ over a mission. The Python `compute_control` does the same with recursion. A `while` loop avoids recursion-depth surprises.
+
+**E3. Reference solution**
+
+```python
+def mahal_sq_full(y, S) -> float:
+    a, b, c, d = S[0][0], S[0][1], S[1][0], S[1][1]
+    det = a * d - b * c
+    inv = [[d / det, -b / det], [-c / det, a / det]]
+    return (y[0] * (inv[0][0] * y[0] + inv[0][1] * y[1])
+            + y[1] * (inv[1][0] * y[0] + inv[1][1] * y[1]))
+
+def mahal_sq_diag(y, S) -> float:
+    return y[0] ** 2 / S[0][0] + y[1] ** 2 / S[1][1]   # what the C++ updateGPS computes
+
+S = [[0.25, 0.15], [0.15, 0.25]]
+y = (1.0, 1.2)
+print(round(mahal_sq_full(y, S), 3), mahal_sq_full(y, S) <= 9.21)  # 6.25 True
+print(round(mahal_sq_diag(y, S), 3), mahal_sq_diag(y, S) <= 9.21)  # 9.76 False
+```
+
+$\det = 0.0625 - 0.0225 = 0.04$, so $\mathbf{S}^{-1} = \begin{bmatrix} 6.25 & -3.75 \\ -3.75 & 6.25 \end{bmatrix}$ and $d^2 = 6.25 - 2(3.75)(1.2) + 6.25(1.44) = 6.25 - 9.0 + 9.0 = 6.25$. Positively correlated $x, y$ uncertainty makes a same-sign innovation more plausible, and only the full form sees that. $O(1)$.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Widget Purpose

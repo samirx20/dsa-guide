@@ -425,6 +425,134 @@ if __name__ == "__main__":
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. A 3-tick 1D Kalman dry-run.** Repeat the Section 4 table with new numbers: $\hat{x}_0 = 0.0\text{ m}$, $P_0 = 2.0\text{ m}^2$, $v\Delta t = +1.5\text{ m}$ per tick, $Q = 0.25\text{ m}^2$, $R = 0.75\text{ m}^2$, and GPS readings $z = [1.8,\ 2.7,\ 4.6]\text{ m}$. Fill in $\hat{x}^-$, $P^-$, innovation $y$, $K$, $\hat{x}_k$ and $P_k$ for ticks 1–3.
+
+**Q2. Steady-state gain.** In Section 4 ($Q = 0.5$, $R = 1.0$), $P_k$ settled at $0.500$. Without simulating, find the steady-state posterior variance $P_\infty$ when $Q = R = 1.0$. (Hint: at steady state $P = \frac{(P+Q)R}{P+Q+R}$.) What happens to $K$ as $Q \to 0$?
+
+**Q3. Velocity from a position-only sensor.** Run one tick of the chapter's `KalmanFilter1DPosVel` by hand, with process noise switched off: `kf(0.0, 0.0, /*sigma_accel=*/0.0, /*sigma_meas=*/1.0)`, then `kf.predict(0.0, 1.0)` and `kf.updatePosition(3.0)`. What are $\mathbf{P}^-$, the gain vector $[K_0, K_1]$, the updated position and velocity, and the updated $\mathbf{P}$?
+
+**Q4. EKF Jacobian.** A robot at $\hat{\mathbf{x}} = [1.0,\ 1.0,\ \pi/6]^T$ drives with $v = 2.0\text{ m/s}$, $\omega = 0$, $\Delta t = 0.5\text{ s}$. Give the predicted mean $\hat{\mathbf{x}}_{k|k-1}$ and the two non-trivial Jacobian entries $\partial x_k/\partial\theta$ and $\partial y_k/\partial\theta$.
+
+**Q5. 1D innovation gate.** The prior is $\hat{x}^- = 10.0\text{ m}$, $P^- = 0.5$, and $R = 0.5$. Using the Common Mistakes gate $|y| < 3\sqrt{S}$, is $z = 13.5$ fused? Is $z = 12.4$? For the accepted one, give $\hat{x}_k$ and $P_k$.
+
+### Coding Exercises
+
+**E1 (Easy). One scalar Kalman step.** Write `kf1d_step(x, P, u_dt, z, Q, R) -> tuple[float, float]` that performs predict + update and returns $(\hat{x}_k, P_k)$. Running it over the Section 4 inputs must reproduce that table.
+- `kf1d_step(0.0, 1.0, 2.0, 2.4, 0.5, 1.0)` → `(2.24, 0.6)`
+- Feeding Q1's inputs gives final `(4.520, 0.345)` (3 decimals).
+
+**E2 (Easy–Medium). Steady-state finder.** Write `steady_state(Q, R, tol=1e-12, max_iter=10_000) -> tuple[float, float]` that iterates predict/update (no measurements needed, since $P$ does not depend on $z$) until $P$ stops changing and returns $(P_\infty, K_\infty)$.
+- `steady_state(0.5, 1.0)` → `(0.5, 0.5)`
+- `steady_state(1.0, 1.0)` → `(0.618, 0.618)` (3 decimals)
+- `steady_state(0.1, 1.0)` → `(0.270, 0.270)` (3 decimals)
+
+**E3 (Medium). Position–velocity filter in pure Python.** Port the chapter's C++ `KalmanFilter1DPosVel` to a Python class `PosVelKF(init_pos, init_vel, sigma_accel, sigma_meas)` with `predict(accel_cmd, dt)` and `update_position(z)`. Keep $\mathbf{P}$ as four floats `[P00, P01, P10, P11]` initialized to the identity, and use exactly the chapter's $\mathbf{F}\mathbf{P}\mathbf{F}^T + \mathbf{Q}$ expansion.
+- `kf = PosVelKF(0, 0, 0.0, 1.0)`. After `predict(0, 1.0)` and `update_position(3.0)`: `pos=2.0, vel=1.0`.
+- A second `predict(0, 1.0)` and `update_position(5.0)` gives `pos=4.333, vel=1.667`.
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| Tick | $\hat{x}^-$ | $P^-$ | $z$ | $y = z - \hat{x}^-$ | $K = \frac{P^-}{P^-+0.75}$ | $\hat{x}_k$ | $P_k = (1-K)P^-$ |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | $0.0 + 1.5 = 1.500$ | $2.0 + 0.25 = 2.250$ | 1.8 | $+0.300$ | $2.25/3.00 = 0.750$ | $1.5 + 0.75(0.3) = \mathbf{1.725}$ | $0.25 \times 2.25 = \mathbf{0.5625}$ |
+| 2 | $1.725 + 1.5 = 3.225$ | $0.5625 + 0.25 = 0.8125$ | 2.7 | $-0.525$ | $0.8125/1.5625 = 0.520$ | $3.225 - 0.273 = \mathbf{2.952}$ | $0.48 \times 0.8125 = \mathbf{0.390}$ |
+| 3 | $2.952 + 1.5 = 4.452$ | $0.390 + 0.25 = 0.640$ | 4.6 | $+0.148$ | $0.64/1.39 \approx 0.460$ | $4.452 + 0.068 = \mathbf{4.520}$ | $0.540 \times 0.64 \approx \mathbf{0.345}$ |
+
+The large initial $P_0$ makes tick 1 trust GPS heavily ($K = 0.75$). As $P$ shrinks, $K$ falls toward its steady state.
+
+**Q2.** Let $P^- = P + 1$. Steady state requires $P = \frac{P^-\cdot 1}{P^- + 1}$, so $P(P + 2) = P + 1$, which gives $P^2 + P - 1 = 0$. Then $P_\infty = \frac{-1 + \sqrt{5}}{2} \approx \mathbf{0.618\text{ m}^2}$ (the golden ratio), and $K_\infty = \frac{1.618}{2.618} \approx 0.618$. As $Q \to 0$, $P$ shrinks every tick with nothing adding it back, so $P \to 0$ and $K \to 0$. The filter stops listening to sensors ("filter senility"), the first Common Mistake.
+
+**Q3.** With $q = 0$ and $\Delta t = 1$: $P_{00}^- = 1 + 1(0 + 0) + 1 \cdot 1 = 2$, $P_{01}^- = P_{10}^- = 0 + 1 = 1$, $P_{11}^- = 1$. So $\mathbf{P}^- = \begin{bmatrix} 2 & 1 \\ 1 & 1 \end{bmatrix}$, and the state is still $[0, 0]$. Update: $S = 2 + 1 = 3$, $K_0 = 2/3$, $K_1 = P_{10}/S = 1/3$, innovation $= 3.0$. **Position $= 0 + \frac{2}{3}(3) = 2.0$, velocity $= 0 + \frac{1}{3}(3) = 1.0$.** The velocity moved even though only position was measured, through $P_{10}^- = 1$. New $\mathbf{P}$: $p_{00} = \frac{1}{3}\cdot 2 = 0.667$, $p_{01} = \frac{1}{3}\cdot 1 = 0.333$, $p_{10} = 1 - \frac{1}{3}\cdot 2 = 0.333$, $p_{11} = 1 - \frac{1}{3}\cdot 1 = 0.667$.
+
+**Q4.** $\cos(\pi/6) = 0.866$ and $\sin(\pi/6) = 0.5$. Mean: $x = 1.0 + 2(0.866)(0.5) = \mathbf{1.866}$, $y = 1.0 + 2(0.5)(0.5) = \mathbf{1.500}$, $\theta = \pi/6$ (unchanged since $\omega = 0$). Jacobian: $\partial x_k/\partial\theta = -v\sin\theta\,\Delta t = -2(0.5)(0.5) = \mathbf{-0.500}$ and $\partial y_k/\partial\theta = +v\cos\theta\,\Delta t = 2(0.866)(0.5) = \mathbf{+0.866}$.
+
+**Q5.** $S = P^- + R = 1.0$, so the gate is $|y| < 3$. $z = 13.5$: $|y| = 3.5 \ge 3$, **rejected**. $z = 12.4$: $|y| = 2.4$, **accepted**. Then $K = 0.5/1.0 = 0.5$, $\hat{x}_k = 10.0 + 0.5(2.4) = \mathbf{11.2\text{ m}}$, and $P_k = 0.5 \times 0.5 = \mathbf{0.25\text{ m}^2}$.
+
+**E1. Reference solution**
+
+```python
+def kf1d_step(x: float, P: float, u_dt: float, z: float, Q: float, R: float) -> tuple[float, float]:
+    x_prior = x + u_dt          # predict mean (physics)
+    P_prior = P + Q             # predict variance (uncertainty grows)
+    K = P_prior / (P_prior + R) # Kalman gain
+    x_post = x_prior + K * (z - x_prior)
+    P_post = (1.0 - K) * P_prior
+    return x_post, P_post
+
+x, P = 0.0, 2.0
+for z in [1.8, 2.7, 4.6]:
+    x, P = kf1d_step(x, P, 1.5, z, 0.25, 0.75)
+print(round(x, 3), round(P, 3))  # 4.52 0.345
+```
+
+$O(1)$ per tick. These are the boxed equations from Sections 2 and 3, in order.
+
+**E2. Reference solution**
+
+```python
+def steady_state(Q: float, R: float, tol: float = 1e-12, max_iter: int = 10_000) -> tuple[float, float]:
+    P, K = 1.0, 0.0
+    for _ in range(max_iter):
+        P_prior = P + Q
+        K = P_prior / (P_prior + R)
+        P_new = (1.0 - K) * P_prior
+        if abs(P_new - P) < tol:
+            return P_new, K
+        P = P_new
+    return P, K
+
+for q in (0.5, 1.0, 0.1):
+    P, K = steady_state(q, 1.0)
+    print(q, round(P, 3), round(K, 3))  # 0.5 0.5 0.5 | 1.0 0.618 0.618 | 0.1 0.27 0.27
+```
+
+This converges geometrically, typically in a few dozen iterations. $P_\infty = K_\infty$ here because $R = 1$ (from $P = (1-K)P^-$ and $K = P^-/(P^-+R)$ we get $P = KR$). A larger $Q$ gives a larger $K$, so the filter tracks the sensor more aggressively, matching the Quick Reference table.
+
+**E3. Reference solution**
+
+```python
+class PosVelKF:
+    def __init__(self, init_pos: float, init_vel: float, sigma_accel: float, sigma_meas: float):
+        self.x = [init_pos, init_vel]
+        self.P = [1.0, 0.0, 0.0, 1.0]            # [P00, P01, P10, P11]
+        self.q = sigma_accel ** 2                 # square std devs into variances!
+        self.r = sigma_meas ** 2
+
+    def predict(self, accel_cmd: float, dt: float) -> None:
+        pos, vel = self.x
+        self.x = [pos + vel * dt + 0.5 * accel_cmd * dt * dt, vel + accel_cmd * dt]
+        p00, p01, p10, p11 = self.P
+        q = self.q
+        self.P = [p00 + dt * (p01 + p10) + dt * dt * p11 + 0.25 * dt ** 4 * q,
+                  p01 + dt * p11 + 0.5 * dt ** 3 * q,
+                  p10 + dt * p11 + 0.5 * dt ** 3 * q,
+                  p11 + dt * dt * q]
+
+    def update_position(self, z: float) -> None:
+        p00, p01, p10, p11 = self.P
+        innovation = z - self.x[0]
+        S = p00 + self.r
+        k0, k1 = p00 / S, p10 / S
+        self.x = [self.x[0] + k0 * innovation, self.x[1] + k1 * innovation]
+        self.P = [(1 - k0) * p00, (1 - k0) * p01, p10 - k1 * p00, p11 - k1 * p01]
+
+kf = PosVelKF(0.0, 0.0, 0.0, 1.0)
+kf.predict(0.0, 1.0); kf.update_position(3.0)
+print(kf.x)                                   # [2.0, 1.0]
+kf.predict(0.0, 1.0); kf.update_position(5.0)
+print([round(v, 3) for v in kf.x])            # [4.333, 1.667]
+```
+
+Second tick: the prediction moves the state to $[3.0, 1.0]$ with $\mathbf{P}^- = \begin{bmatrix} 2 & 1 \\ 1 & 0.667 \end{bmatrix}$. Then $S = 3$, $K = [2/3, 1/3]$, innovation $= 2$, giving $[3 + 1.333,\ 1 + 0.667]$. $O(1)$ per tick.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Widget Purpose

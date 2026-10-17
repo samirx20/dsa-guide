@@ -519,6 +519,130 @@ When you sit down next to a real robot with unknown mass and friction, **never g
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Droop math.** The arm from Section 3 now carries a heavier payload whose gravity load requires $4.0\text{ V}$ of holding effort. With a pure P-controller, target $r = 100^\circ$ and $K_p = 0.8\text{ V/deg}$, what are $e_{\text{ss}}$ and $y_{\text{ss}}$? What would $K_p$ have to be to shrink the droop to $1^\circ$?
+
+**Q2. Re-run the Section 6 dry-run table on a new trajectory.** Keep everything from Section 6 ($r = 100^\circ$, $K_p = 1.0$, $K_i = 0.5$, $K_d = 0.2$, $\Delta t = 0.1\text{ s}$, derivative-on-measurement with $D[0] = 0$, output clamp $[-100, +100]$, no anti-windup, no derivative filter). The measured trajectory is now $y = [0^\circ, 20^\circ, 50^\circ, 80^\circ, 95^\circ]$. Fill in `int[k]`, $u_I$, $u_D$ and the clamped output $u$ for ticks 0–4. At which tick does the controller first command braking ($u < 0$)?
+
+**Q3. Derivative kick.** A joint sits at $y = 0^\circ$ with $r = 0^\circ$. At one tick the user changes the setpoint to $r = 45^\circ$. The loop runs at $500\text{ Hz}$ and $K_d = 0.05$. What does a naive derivative-on-error term $K_d \frac{e[k]-e[k-1]}{\Delta t}$ output on that tick? What does the derivative-on-measurement term output?
+
+**Q4. Trace the chapter's Python `PIDController`.** Create `PIDController(kp=1.0, ki=0.0, kd=0.5, out_min=-100, out_max=100, d_filter_alpha=0.8)` and call `update(50.0, y, 0.1)` with $y = 0, 10, 20, 30$ in turn. Give `filtered_deriv`, `d_term` and the returned output for each call.
+
+**Q5. Conditional anti-windup.** Use the chapter's `PIDController(kp=2.0, ki=1.0, kd=0.0, out_min=-12, out_max=12)`, $r = 10$, $\Delta t = 0.5\text{ s}$. A human holds the arm at $y = 0$ for 4 ticks, then lets go and the next reading is $y = 9$. What is `integral` after the 4 held ticks, and what is the output on the 5th tick? Repeat for a naive PI with no anti-windup (always `integral += e*dt`, then clamp the output).
+
+### Coding Exercises
+
+**E1 (Easy). Filtered derivative-on-measurement.** Write `filtered_derivatives(measurements: list[float], dt: float, alpha: float) -> list[float]` that returns the EMA-filtered $-\frac{dy}{dt}$ value for every sample, exactly as the chapter's `PIDController` computes `filtered_deriv` (raw derivative $0$ on the first sample, filter state starting at $0$).
+- `filtered_derivatives([0, 10, 20, 30], 0.1, 0.8)` → `[0.0, -20.0, -36.0, -48.8]`
+- `filtered_derivatives([5, 5, 5], 0.01, 0.9)` → `[0.0, 0.0, 0.0]`
+
+**E2 (Easy–Medium). PI with integral clamping.** The chapter mentions two anti-windup methods but only codes conditional integration. Implement the other one: `ClampedPI(kp, ki, i_max, out_min, out_max)` with `update(setpoint, measurement, dt) -> float`, where the accumulator is clamped to $[-I_{\max}, +I_{\max}]$ after every `integral += e*dt`, and the output is clamped to the actuator limits.
+- `ClampedPI(2, 1, 3, -12, 12)` fed $r = 10$ and $y = [0, 0, 0, 0, 9]$ with $\Delta t = 0.5$ → outputs `[12, 12, 12, 12, 5]`, final `integral == 3`.
+
+**E3 (Medium). Measure steady-state droop in simulation.** Using the chapter's Python `PIDController` and the plant from the C++ `main()` (`accel = (u - 3.0 - 0.5*v) * 20.0`, then `v += accel*dt`, `angle += v*dt`, $\Delta t = 0.02$, target $90^\circ$, $\alpha = 0.7$, limits $\pm 12\text{ V}$), write `final_angle(kp, ki, kd, steps) -> float`. Verify that the P/PD droop matches $e_{\text{ss}} = F_{\text{gravity}} / K_p$ and that adding $K_i$ removes it.
+- `final_angle(0.5, 0.0, 0.0, 1000)` → about `84.00` ($e_{\text{ss}} = 3.0/0.5 = 6^\circ$)
+- `final_angle(2.5, 0.0, 0.4, 1000)` → about `88.80` ($e_{\text{ss}} = 3.0/2.5 = 1.2^\circ$)
+- `final_angle(2.5, 1.2, 0.4, 1000)` → about `90.00`
+
+#### Dry-Run: Answers
+
+**Q1.** $e_{\text{ss}} = F_{\text{gravity}}/K_p = 4.0/0.8 = 5^\circ$, so $y_{\text{ss}} = 95^\circ$. Check: at $95^\circ$, $u_P = 0.8 \times 5 = 4.0\text{ V}$, exactly the gravity load. For a $1^\circ$ droop you need $K_p = 4.0/1 = 4.0\text{ V/deg}$, five times stiffer, which is why the chapter adds an I-term instead of raising $K_p$.
+
+**Q2.** Integral, derivative and output per tick:
+
+| Tick | $y$ | $e$ | $u_P$ | `int` | $u_I$ | $\Delta y/\Delta t$ | $u_D$ | Raw sum | Clamped $u$ |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 0 | 0 | 100 | 100 | 10.0 | 5.00 | 0 (init) | 0 | 105.0 | **100.0** |
+| 1 | 20 | 80 | 80 | 18.0 | 9.00 | 200 | −40 | 49.0 | **49.0** |
+| 2 | 50 | 50 | 50 | 23.0 | 11.50 | 300 | −60 | 1.5 | **1.5** |
+| 3 | 80 | 20 | 20 | 25.0 | 12.50 | 300 | −60 | −27.5 | **−27.5** |
+| 4 | 95 | 5 | 5 | 25.5 | 12.75 | 150 | −30 | −12.25 | **−12.25** |
+
+Braking first appears at **tick 3**, where the arm is still $20^\circ$ short. Compared with the chapter's trajectory, the arm accelerates more gently here, so braking starts one tick later.
+
+**Q3.** $\Delta t = 1/500 = 0.002\text{ s}$. Derivative on error: $0.05 \times \frac{45 - 0}{0.002} = 0.05 \times 22{,}500 = \mathbf{1{,}125}$ (a huge one-tick spike). Derivative on measurement: $-K_d \frac{0 - 0}{0.002} = \mathbf{0}$, because $y$ did not move. That is why the chapter differentiates $y$, not $e$.
+
+**Q4.** $\alpha = 0.8$, so `filtered = 0.8*filtered + 0.2*raw`:
+
+| Call | $y$ | raw $-\Delta y/\Delta t$ | `filtered_deriv` | `d_term` $= 0.5 \times$ filtered | $u_P = 50 - y$ | Output |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | 0 | 0 (first call) | 0.0 | 0.0 | 50 | **50.0** |
+| 2 | 10 | −100 | −20.0 | −10.0 | 40 | **30.0** |
+| 3 | 20 | −100 | −36.0 | −18.0 | 30 | **12.0** |
+| 4 | 30 | −100 | −48.8 | −24.4 | 20 | **−4.4** |
+
+Even though the raw velocity is constant from call 2 onward, the filtered value only gradually reaches $-100$. That lag is the price of filtering out noise.
+
+**Q5.** With conditional anti-windup: on each held tick $e = 10$, $u_P = 20$, candidate integral $= 0 + 5 = 5$, unclamped $= 25 > 12$ and $e > 0$, so the candidate is **rejected**. `integral` stays **0.0** for all 4 ticks and the output is clamped to $12$. Tick 5: $e = 1$, $u_P = 2$, candidate $= 0.5$, unclamped $= 2.5$ (not saturated), so it is accepted. **Output $= 2.5\text{ V}$**, which is a gentle approach.
+
+Naive PI: the integral grows $5 \to 10 \to 15 \to 20$ while the output sits at $12$. Tick 5: integral $= 20.5$, raw output $= 2 + 20.5 = 22.5$, **clamped to $12\text{ V}$**. The motor is still at full throttle $1^\circ$ from the target, which is the windup overshoot described in Section 5.
+
+**E1. Reference solution**
+
+```python
+def filtered_derivatives(measurements: list[float], dt: float, alpha: float) -> list[float]:
+    out: list[float] = []
+    filtered = 0.0
+    prev = None
+    for y in measurements:
+        raw = 0.0 if prev is None else -(y - prev) / dt  # derivative on measurement
+        prev = y
+        filtered = alpha * filtered + (1.0 - alpha) * raw  # EMA low-pass
+        out.append(filtered)
+    return out
+
+print(filtered_derivatives([0, 10, 20, 30], 0.1, 0.8))  # [0.0, -20.0, -36.0, -48.8] (up to float rounding)
+```
+
+$O(N)$ time and $O(1)$ extra state. It is the same recurrence the chapter's controller runs once per tick.
+
+**E2. Reference solution**
+
+```python
+class ClampedPI:
+    def __init__(self, kp: float, ki: float, i_max: float, out_min: float, out_max: float):
+        self.kp, self.ki, self.i_max = kp, ki, i_max
+        self.out_min, self.out_max = out_min, out_max
+        self.integral = 0.0
+
+    def update(self, setpoint: float, measurement: float, dt: float) -> float:
+        error = setpoint - measurement
+        self.integral += error * dt
+        self.integral = max(-self.i_max, min(self.i_max, self.integral))  # integral clamping
+        output = self.kp * error + self.ki * self.integral
+        return max(self.out_min, min(self.out_max, output))
+
+pi = ClampedPI(2, 1, 3, -12, 12)
+print([pi.update(10, y, 0.5) for y in [0, 0, 0, 0, 9]], pi.integral)  # [12, 12, 12, 12, 5] 3
+```
+
+Trace: the integral goes $5 \to$ clamped $3$ and then stays at 3 while held. On the last tick it reaches $3.5 \to$ clamped $3$, so the output is $2 \cdot 1 + 1 \cdot 3 = 5$. Clamping limits the windup to $K_i I_{\max} = 3\text{ V}$ but does not prevent it. Conditional integration (Q5) prevents it entirely.
+
+**E3. Reference solution**
+
+```python
+def final_angle(kp: float, ki: float, kd: float, steps: int) -> float:
+    pid = PIDController(kp, ki, kd, out_min=-12.0, out_max=12.0, d_filter_alpha=0.7)
+    angle, velocity, dt = 0.0, 0.0, 0.02
+    for _ in range(steps):
+        voltage = pid.update(90.0, angle, dt)
+        accel = (voltage - 3.0 - 0.5 * velocity) * 20.0  # gravity load = 3.0 V
+        velocity += accel * dt
+        angle += velocity * dt
+    return angle
+
+for gains in [(0.5, 0.0, 0.0), (2.5, 0.0, 0.4), (2.5, 1.2, 0.4)]:
+    print(gains, round(final_angle(*gains, 1000), 2))
+# (0.5, 0.0, 0.0) 84.0   (2.5, 0.0, 0.4) 88.8   (2.5, 1.2, 0.4) 90.0
+```
+
+At rest, $v = 0$ and the D-term is $0$, so the plant balances when $u = 3.0\text{ V}$. Without an I-term that forces $K_p e_{\text{ss}} = 3.0$. With $K_i > 0$, the integral alone supplies the $3.0\text{ V}$ and $e_{\text{ss}} \to 0$ (the PID run peaks at about $90.12^\circ$ before settling). Cost is $O(\text{steps})$.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Widget Purpose

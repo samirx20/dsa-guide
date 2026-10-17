@@ -425,6 +425,120 @@ print(f"1-Sigma Ellipse Semi-Axes: {axis_std_devs.round(3)} m, Tilt Angle: {tilt
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Mean, variance, standard deviation.** A calibrated LiDAR aimed at the same wall from Section 2 now returns $Z = \{2.10,\ 1.90,\ 2.00,\ 2.20,\ 1.80\}$ m. Compute $\mu$, the population variance $\sigma^2$ (divide by $N$), $\sigma$, and the unbiased sample variance (divide by $N-1$).
+
+**Q2. Dead-reckoning growth.** A robot drives in steps of $\Delta x \sim \mathcal{N}(0.5\text{ m},\ 0.09\text{ m}^2)$. After $k = 16$ steps, what are $\mu_k$, $\sigma_k^2$, $\sigma_k$, the $3\sigma$ interval, and the bell-curve peak height $\frac{1}{\sqrt{2\pi\sigma_k^2}}$? Fill in the missing row of the Section 4 style table.
+
+**Q3. Covariance by hand.** A camera reports four positions of a stationary robot: $(2, 1)$, $(4, 3)$, $(6, 1)$, $(8, 3)$. Build the dry-run table from Section 6 and give $\boldsymbol{\mu}$, $\mathbf{\Sigma}$ and $\rho_{xy}$. Is the ellipse tilted?
+
+**Q4. The $\mathbf{A}\mathbf{\Sigma}\mathbf{A}^T$ sandwich.** A position–velocity state starts with $\mathbf{\Sigma}_0 = \operatorname{diag}(0.5,\ 2.0)$ and coasts for $\Delta t = 0.5\text{ s}$, so $\mathbf{A} = \begin{bmatrix} 1 & 0.5 \\ 0 & 1 \end{bmatrix}$. Compute $\mathbf{\Sigma}_1$.
+
+**Q5. Gating and validity.** (a) The belief is $\mu = 5.0\text{ m}$ with $\sigma^2 = 0.04\text{ m}^2$. Does a $3\sigma$ gate accept $z = 5.5$? What about $z = 5.7$? (b) A teammate hand-types $\mathbf{\Sigma} = \begin{bmatrix} 1.0 & 1.2 \\ 1.2 & 1.0 \end{bmatrix}$. Using the Common Mistakes check, is it a legal covariance matrix?
+
+### Coding Exercises
+
+**E1 (Easy). Startup bias calibration.** Write `calibrate_bias(stationary: list[float], true_value: float = 0.0) -> tuple[float, list[float]]` that returns the bias $b = \mu - x_{\text{true}}$ and the bias-corrected readings, as described in Section 1.
+- `calibrate_bias([0.42, 0.38, 0.40, 0.41, 0.39])` → `(0.40, [0.02, -0.02, 0.0, 0.01, -0.01])` (rounded to 2 decimals)
+
+**E2 (Easy–Medium). Covariance sanity check.** Write `is_valid_covariance_2x2(S) -> bool` that returns `True` only if $\mathbf{\Sigma}$ is symmetric (within `1e-9`), both diagonals are $> 0$, and $\det(\mathbf{\Sigma}) > 0$.
+- `[[1.25, 1.5], [1.5, 2.0]]` → `True` (det $= 0.25$)
+- `[[1.0, 1.2], [1.2, 1.0]]` → `False` (det $= -0.44$)
+- `[[1.0, 0.3], [0.2, 1.0]]` → `False` (not symmetric)
+
+**E3 (Medium). 2D Mahalanobis gate.** The $3\sigma$ gate in Section 3 is 1D. Generalize it: write `mahalanobis_gate(z, mu, S, gate=3.0) -> tuple[float, bool]` that returns $d = \sqrt{(\mathbf{z}-\boldsymbol{\mu})^T\mathbf{\Sigma}^{-1}(\mathbf{z}-\boldsymbol{\mu})}$ and whether $d \le$ `gate`. Invert the $2 \times 2$ matrix by hand (no NumPy). Use the Section 6 covariance $\mathbf{\Sigma} = \begin{bmatrix} 1.25 & 1.5 \\ 1.5 & 2.0 \end{bmatrix}$ and $\boldsymbol{\mu} = (2.5, 4.0)$:
+- `z = (3.5, 5.0)` → `(1.0, True)`
+- `z = (3.5, 3.0)` → `(5.0, False)`
+
+Both points are the same Euclidean distance $\sqrt{2}$ from $\boldsymbol{\mu}$. Explain why only one passes.
+
+#### Dry-Run: Answers
+
+**Q1.** $\mu = 10.00/5 = \mathbf{2.00\text{ m}}$. The deviations are $+0.10, -0.10, 0.00, +0.20, -0.20$, with squares $0.01, 0.01, 0, 0.04, 0.04$ that sum to $0.10$. So $\sigma^2 = 0.10/5 = \mathbf{0.020\text{ m}^2}$ and $\sigma = \sqrt{0.02} \approx \mathbf{0.141\text{ m}}$. The unbiased variance is $0.10/4 = \mathbf{0.025\text{ m}^2}$. This sensor is noisier than the Section 2 one ($0.005\text{ m}^2$) even though both average to $2.00\text{ m}$.
+
+**Q2.**
+
+| Step $k$ | $\mu_k = 0.5k$ | $\sigma_k^2 = 0.09k$ | $\sigma_k$ | $3\sigma$ interval | Peak height |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **16** | $8.00\text{ m}$ | $1.44\text{ m}^2$ | $1.20\text{ m}$ | $[4.40,\ 11.60]\text{ m}$ | $\frac{1}{\sqrt{2\pi \cdot 1.44}} \approx 0.332$ |
+
+Variance grows linearly ($16\times$), while $\sigma$ grows only by $\sqrt{16} = 4\times$, from $0.3$ to $1.2\text{ m}$.
+
+**Q3.** $\mu_x = 20/4 = 5.0$ and $\mu_y = 8/4 = 2.0$.
+
+| $i$ | $\Delta x$ | $\Delta y$ | $(\Delta x)^2$ | $(\Delta y)^2$ | $\Delta x\Delta y$ |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | −3 | −1 | 9 | 1 | +3 |
+| 2 | −1 | +1 | 1 | 1 | −1 |
+| 3 | +1 | −1 | 1 | 1 | −1 |
+| 4 | +3 | +1 | 9 | 1 | +3 |
+| **Sum / 4** | | | **5.0** | **1.0** | **+1.0** |
+
+$\mathbf{\Sigma} = \begin{bmatrix} 5.0 & 1.0 \\ 1.0 & 1.0 \end{bmatrix}$ and $\rho_{xy} = \frac{1.0}{\sqrt{5}\cdot 1} \approx \mathbf{+0.447}$. The ellipse is wide along $x$ and tilted mildly upward (SW–NE), a much weaker correlation than the chapter's $0.949$.
+
+**Q4.** $\mathbf{A}\mathbf{\Sigma}_0 = \begin{bmatrix} 0.5 & 1.0 \\ 0 & 2.0 \end{bmatrix}$. Multiplying by $\mathbf{A}^T = \begin{bmatrix} 1 & 0 \\ 0.5 & 1 \end{bmatrix}$ gives $\mathbf{\Sigma}_1 = \begin{bmatrix} 0.5 + 0.5 & 1.0 \\ 1.0 & 2.0 \end{bmatrix} = \begin{bmatrix} \mathbf{1.0} & \mathbf{1.0} \\ \mathbf{1.0} & \mathbf{2.0} \end{bmatrix}$. Position variance doubled ($0.5 \to 1.0$ because $\Delta t^2 \sigma_v^2 = 0.25 \times 2 = 0.5$ was added), and coasting created the correlation $\sigma_{xv} = \Delta t\,\sigma_v^2 = 1.0$.
+
+**Q5.** (a) $\sigma = 0.2$, so the gate is $[4.4,\ 5.6]$. $z = 5.5$ is $0.5/0.2 = 2.5\sigma$ away and is **accepted**. $z = 5.7$ is $3.5\sigma$ away and is **rejected**. (b) $\det = 1.0 \cdot 1.0 - 1.2^2 = -0.44 < 0$, so it is **not legal**: $|\sigma_{xy}| = 1.2 > \sigma_x\sigma_y = 1.0$ would mean $|\rho| = 1.2 > 1$.
+
+**E1. Reference solution**
+
+```python
+def calibrate_bias(stationary: list[float], true_value: float = 0.0) -> tuple[float, list[float]]:
+    mu = sum(stationary) / len(stationary)
+    bias = mu - true_value                       # b = E[z] - x_true
+    corrected = [z - bias for z in stationary]   # subtract bias from every reading
+    return bias, corrected
+
+b, fixed = calibrate_bias([0.42, 0.38, 0.40, 0.41, 0.39])
+print(round(b, 2), [round(v, 2) for v in fixed])  # 0.4 [0.02, -0.02, 0.0, 0.01, -0.01]
+```
+
+$O(N)$. After correction the readings are zero-mean, so the remaining jitter is the white noise $v_k$, which only a filter can handle.
+
+**E2. Reference solution**
+
+```python
+def is_valid_covariance_2x2(S: list[list[float]]) -> bool:
+    sxx, sxy, syx, syy = S[0][0], S[0][1], S[1][0], S[1][1]
+    if abs(sxy - syx) > 1e-9:
+        return False                      # must be symmetric
+    if sxx <= 0.0 or syy <= 0.0:
+        return False                      # variances must be positive
+    return sxx * syy - sxy * sxy > 0.0   # det > 0  <=>  |rho| < 1
+
+print(is_valid_covariance_2x2([[1.25, 1.5], [1.5, 2.0]]))  # True
+print(is_valid_covariance_2x2([[1.0, 1.2], [1.2, 1.0]]))   # False
+print(is_valid_covariance_2x2([[1.0, 0.3], [0.2, 1.0]]))   # False
+```
+
+$O(1)$. For a symmetric $2 \times 2$ matrix, positive diagonals plus $\det > 0$ is exactly positive-definiteness.
+
+**E3. Reference solution**
+
+```python
+import math
+
+def mahalanobis_gate(z, mu, S, gate: float = 3.0) -> tuple[float, bool]:
+    dx, dy = z[0] - mu[0], z[1] - mu[1]
+    a, b, c, d = S[0][0], S[0][1], S[1][0], S[1][1]
+    det = a * d - b * c
+    ia, ib, ic, idd = d / det, -b / det, -c / det, a / det   # S^-1 = (1/det) [[d, -b], [-c, a]]
+    d2 = dx * (ia * dx + ib * dy) + dy * (ic * dx + idd * dy)
+    dist = math.sqrt(d2)
+    return dist, dist <= gate
+
+S = [[1.25, 1.5], [1.5, 2.0]]
+print(mahalanobis_gate((3.5, 5.0), (2.5, 4.0), S))  # (1.0, True)   up to float rounding
+print(mahalanobis_gate((3.5, 3.0), (2.5, 4.0), S))  # (5.0, False)
+```
+
+$\det = 2.5 - 2.25 = 0.25$, so $\mathbf{\Sigma}^{-1} = \begin{bmatrix} 8 & -6 \\ -6 & 5 \end{bmatrix}$. For $\Delta = (1, 1)$: $d^2 = 8 - 6 - 6 + 5 = 1$. For $\Delta = (1, -1)$: $d^2 = 8 + 6 + 6 + 5 = 25$. The ellipse is stretched along the $+45^\circ$ diagonal ($\rho = 0.949$), so moving along it is expected, while moving across it ($x$ up, $y$ down) is very unlikely. $O(1)$.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Widget Purpose

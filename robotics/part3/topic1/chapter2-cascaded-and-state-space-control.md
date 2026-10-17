@@ -438,6 +438,107 @@ for step in range(8):
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. New rows for the Section 4 cascaded table.** Use the same gains: $\theta_{\text{ref}} = 10.0\text{ rad}$, $K_{p,\text{pos}} = 2.0$, velocity clamp $\pm 5.0\text{ rad/s}$, $K_{p,\text{vel}} = 1.5$, $u_{\text{FF}} = +2.0\text{ V}$. Compute $\dot{\theta}_{\text{ref}}$ and the total motor command $u$ for these three snapshots:
+- (a) $\theta = 6.0$, $\dot{\theta} = 4.0$
+- (b) $\theta = 9.2$, $\dot{\theta} = 3.0$
+- (c) $\theta = 10.5$, $\dot{\theta} = -0.5$ (overshot the goal)
+
+**Q2. A fifth LQR scenario.** With the chapter's Segway gain $\mathbf{K} = [-2.0,\ -3.0,\ +40.0,\ +8.0]$, compute every term of $u = -\mathbf{K}\mathbf{x}$ for $\mathbf{x} = [x, \dot{x}, \theta, \dot{\theta}]^T = [-0.30,\ +0.20,\ +0.05,\ -0.10]^T$. Which term dominates?
+
+**Q3. Bryson's Rule on tighter specs.** A smaller balancing robot can tolerate at most $x_{\max} = 0.2\text{ m}$, $\dot{x}_{\max} = 0.5\text{ m/s}$, $\theta_{\max} = 0.05\text{ rad}$ and $\dot{\theta}_{\max} = 0.25\text{ rad/s}$, with motor force $u_{\max} = 20\text{ N}$. Write $\mathbf{Q} = \operatorname{diag}(\dots)$ and $R$. How many times more heavily is tilt penalized than position?
+
+**Q4. Closed-loop eigenvalues.** For the chapter's 1D mass example with $m = 2\text{ kg}$ ($\mathbf{A} = \begin{bmatrix} 0 & 1 \\ 0 & 0 \end{bmatrix}$, $\mathbf{B} = \begin{bmatrix} 0 \\ 0.5 \end{bmatrix}$) and $\mathbf{K} = [8,\ 4]$, compute $\mathbf{A} - \mathbf{B}\mathbf{K}$ and its eigenvalues. Is the loop stable? Which PD gains is this equivalent to?
+
+**Q5. Feedforward voltage.** With $K_s = 0.3\text{ V}$, $K_v = 1.2\text{ V/(m/s)}$ and $K_a = 0.25\text{ V/(m/s}^2)$, compute $u_{\text{FF}} = K_s\operatorname{sgn}(\dot{r}) + K_v\dot{r} + K_a\ddot{r}$ for (a) $\dot{r} = 2.0$, $\ddot{r} = -4.0$ and (b) $\dot{r} = -1.5$, $\ddot{r} = +2.0$. Also give the gravity feedforward $K_{\text{grav}}\cos\theta$ for $K_{\text{grav}} = 2.5\text{ V}$ at $\theta = 60^\circ$.
+
+### Coding Exercises
+
+**E1 (Easy). Velocity/acceleration feedforward.** Write `feedforward_voltage(ks, kv, ka, r_dot, r_ddot) -> float` implementing the chapter's $u_{\text{FF}}$, with $\operatorname{sgn}(0) = 0$ so a stationary reference does not fight static friction.
+- `feedforward_voltage(0.3, 1.2, 0.25, 2.0, -4.0)` → `1.7`
+- `feedforward_voltage(0.3, 1.2, 0.25, 0.0, 1.0)` → `0.25`
+
+**E2 (Easy–Medium). Normalized Bryson cost.** Write `bryson_cost(x, x_max, u, u_max) -> float` that returns the instantaneous LQR integrand $\mathbf{x}^T\mathbf{Q}\mathbf{x} + \mathbf{u}^T\mathbf{R}\mathbf{u}$ with $\mathbf{Q}$, $\mathbf{R}$ built by Bryson's Rule (lists of states and efforts, diagonal weights).
+- `bryson_cost([0.25, 0.0, 0.05, 0.0], [0.5, 1.0, 0.1, 0.5], [5.0], [10.0])` → `0.75`
+
+**E3 (Medium). Stability checker for 2-state full-state feedback.** Write `closed_loop_eigs(A, B, K)` for a $2 \times 2$ $\mathbf{A}$, a length-2 $\mathbf{B}$ and a length-2 $\mathbf{K}$. It should return the two eigenvalues of $\mathbf{A} - \mathbf{B}\mathbf{K}$ (via the characteristic polynomial $\lambda^2 - \operatorname{tr}\lambda + \det = 0$) and a boolean `stable` (both real parts $< 0$). Use only the standard library (`cmath`).
+- `A=[[0,1],[0,0]], B=[0,0.5], K=[8,4]` → `(-1+1.732j, -1-1.732j), True`
+- `K=[8,0]` (P only, no damping) → `(+2j, -2j), False` (marginal: oscillates forever)
+- `K=[-1,0]` (wrong sign) → `(0.707, -0.707), False`
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| Case | $e_\theta$ | $K_{p,\text{pos}}e_\theta$ | $\dot{\theta}_{\text{ref}}$ (clamped) | $e_{\dot{\theta}}$ | $u_{\text{vel}} = 1.5e_{\dot{\theta}}$ | $u = u_{\text{vel}} + 2.0$ |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| (a) | $+4.0$ | $+8.0$ | **$+5.0$** (speed cap) | $+1.0$ | $+1.5$ | **$+3.5\text{ V}$** |
+| (b) | $+0.8$ | $+1.6$ | **$+1.6$** | $-1.4$ | $-2.1$ | **$-0.1\text{ V}$** |
+| (c) | $-0.5$ | $-1.0$ | **$-1.0$** | $-0.5$ | $-0.75$ | **$+1.25\text{ V}$** |
+
+In (c) the arm overshot, so the velocity loop asks for $-1.0\text{ rad/s}$. The total is still positive because gravity feedforward ($+2.0\text{ V}$) keeps holding the arm up while feedback trims $0.75\text{ V}$ off.
+
+**Q2.** $-k_1x = -(-2.0)(-0.30) = -0.60$. $-k_2\dot{x} = -(-3.0)(0.20) = +0.60$. $-k_3\theta = -(40)(0.05) = -2.00$. $-k_4\dot{\theta} = -(8)(-0.10) = +0.80$. **Total $u = -1.20\text{ N}$.** The pitch term dominates. The position and velocity terms cancel exactly, and the falling-back pitch rate offsets $0.8\text{ N}$ of the pitch correction.
+
+**Q3.** $\mathbf{Q} = \operatorname{diag}\!\left(\frac{1}{0.2^2}, \frac{1}{0.5^2}, \frac{1}{0.05^2}, \frac{1}{0.25^2}\right) = \operatorname{diag}(25,\ 4,\ 400,\ 16)$, and $R = \frac{1}{20^2} = 0.0025$. The tilt weight is $400/25 = \mathbf{16\times}$ the position weight.
+
+**Q4.** $\mathbf{B}\mathbf{K} = \begin{bmatrix} 0 & 0 \\ 4 & 2 \end{bmatrix}$, so $\mathbf{A} - \mathbf{B}\mathbf{K} = \begin{bmatrix} 0 & 1 \\ -4 & -2 \end{bmatrix}$. Trace $= -2$ and det $= 4$, so $\lambda^2 + 2\lambda + 4 = 0$ and $\lambda = -1 \pm j\sqrt{3} \approx -1 \pm 1.732j$. Both real parts are $-1 < 0$, so the loop is **stable** (a damped oscillation). As in Section 5, $u = -8(x - r) - 4\dot{x}$ is a PD controller with $K_p = 8$, $K_d = 4$.
+
+**Q5.** (a) $0.3(+1) + 1.2(2.0) + 0.25(-4.0) = 0.3 + 2.4 - 1.0 = \mathbf{+1.7\text{ V}}$. (b) $0.3(-1) + 1.2(-1.5) + 0.25(2.0) = -0.3 - 1.8 + 0.5 = \mathbf{-1.6\text{ V}}$. Gravity: $2.5\cos 60^\circ = 2.5 \times 0.5 = \mathbf{1.25\text{ V}}$.
+
+**E1. Reference solution**
+
+```python
+def feedforward_voltage(ks: float, kv: float, ka: float, r_dot: float, r_ddot: float) -> float:
+    sgn = 0.0 if r_dot == 0.0 else (1.0 if r_dot > 0.0 else -1.0)
+    return ks * sgn + kv * r_dot + ka * r_ddot
+
+print(round(feedforward_voltage(0.3, 1.2, 0.25, 2.0, -4.0), 6))  # 1.7
+print(feedforward_voltage(0.3, 1.2, 0.25, 0.0, 1.0))            # 0.25
+```
+
+This is $O(1)$. It uses only the reference trajectory $(\dot{r}, \ddot{r})$, never measured $y$, as the Common Mistakes table requires.
+
+**E2. Reference solution**
+
+```python
+def bryson_cost(x: list[float], x_max: list[float], u: list[float], u_max: list[float]) -> float:
+    state_cost = sum((xi / xm) ** 2 for xi, xm in zip(x, x_max))   # Q_ii = 1 / xm^2
+    effort_cost = sum((ui / um) ** 2 for ui, um in zip(u, u_max))  # R_jj = 1 / um^2
+    return state_cost + effort_cost
+
+print(bryson_cost([0.25, 0.0, 0.05, 0.0], [0.5, 1.0, 0.1, 0.5], [5.0], [10.0]))  # 0.75
+```
+
+Each term is $(0.25/0.5)^2 = 0.25$, $0$, $(0.05/0.1)^2 = 0.25$, $0$, and $(5/10)^2 = 0.25$, for a total of $0.75$. Every state at half its limit contributes the same $0.25$, which is the normalization Bryson's Rule promises. $O(n + p)$.
+
+**E3. Reference solution**
+
+```python
+import cmath
+
+def closed_loop_eigs(A, B, K):
+    M = [[A[i][j] - B[i] * K[j] for j in range(2)] for i in range(2)]  # A - B K
+    tr = M[0][0] + M[1][1]
+    det = M[0][0] * M[1][1] - M[0][1] * M[1][0]
+    disc = cmath.sqrt(tr * tr - 4 * det)
+    l1, l2 = (tr + disc) / 2, (tr - disc) / 2
+    stable = l1.real < 0 and l2.real < 0
+    return (l1, l2), stable
+
+A, B = [[0, 1], [0, 0]], [0, 0.5]
+print(closed_loop_eigs(A, B, [8, 4]))   # ((-1+1.732j), (-1-1.732j)), True
+print(closed_loop_eigs(A, B, [8, 0]))   # (2j, -2j), False
+print(closed_loop_eigs(A, B, [-1, 0]))  # (0.707+0j, -0.707+0j), False
+```
+
+For $\mathbf{K} = [8, 0]$, $\mathbf{A}-\mathbf{B}\mathbf{K} = \begin{bmatrix} 0 & 1 \\ -4 & 0 \end{bmatrix}$ gives $\lambda^2 + 4 = 0$, so $\lambda = \pm 2j$. That is the undamped "virtual spring" from Chapter 1. For $\mathbf{K} = [-1, 0]$ the matrix is $\begin{bmatrix} 0 & 1 \\ 0.5 & 0 \end{bmatrix}$, giving $\lambda = \pm\sqrt{0.5} \approx \pm 0.707$. The positive root means the loop diverges. $O(1)$.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Widget Purpose
