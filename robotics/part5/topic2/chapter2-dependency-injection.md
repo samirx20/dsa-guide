@@ -736,6 +736,163 @@ Use `Depends()` to decouple endpoints from external resources. Yield dependencie
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+These answers were checked with `fastapi.testclient.TestClient` against the chapter's own dependencies.
+
+**Q1. Yield-dependency lifecycle (Section 3).** Add a `print("endpoint running")` as the first line of `health_check`. What does the server print, in order, for `GET /health`, and what does the client get? Now add a second endpoint that uses the same dependency but raises `HTTPException(status_code=500, detail="boom")` right after printing. What is printed this time?
+
+**Q2. Pagination dependency (Section 5).** Give the JSON for each request to `GET /readings`:
+- (a) `?page=3&per_page=25`
+- (b) `?page=0&per_page=500`
+- (c) `?page=-2&per_page=100`
+- (d) `?page=abc`
+
+**Q3. Factory floor chain (Section 9).** For `GET /sensors/arm-02`, give the status and body when the request sends:
+- (a) header `x-api-key: factory-key-002`
+- (b) no headers at all
+- (c) header `x-api-key: factory-key-999`
+- (d) header `X-API-KEY: factory-key-001`
+- (e) header `x_api_key: factory-key-001` (underscores)
+
+**Q4. Dependency caching.** Add this endpoint to the Section 9 app and put a counter in each of `verify_api_key`, `get_tenant`, and `get_db`. For **one** request with a valid key, how many times does each function run?
+
+```python
+@app.get("/audit")
+def audit(
+    db: dict = Depends(get_db),
+    tenant: str = Depends(get_tenant),
+    key: str = Depends(verify_api_key),
+) -> dict:
+    return {"tenant": tenant, "same": db["tenant"] == tenant}
+```
+
+**Q5. Overriding the middle of a chain.** In the Section 9 app, a test sets `app.dependency_overrides[get_tenant] = lambda: "factory-test"` and then sends `GET /sensors/arm-02` **with no `x-api-key` header**. What does the client get? Which of the three dependency functions actually run?
+
+### Coding Exercises
+
+**E1 (Easy).** Write a dependency `get_units(units: str = "celsius") -> str` that only allows `"celsius"` or `"fahrenheit"` (otherwise `400`, `detail="units must be celsius or fahrenheit"`). Use it in `GET /sensors/{sensor_id}/temperature`, which returns the fixed reading $23.5$ °C converted to the requested unit (rounded to 2 decimals).
+- `GET /sensors/temp-01/temperature` returns `{"sensor_id": "temp-01", "value": 23.5, "units": "celsius"}`
+- `?units=fahrenheit` returns `value: 74.3`. `?units=kelvin` returns `400`.
+
+**E2 (Easy–Medium).** Extend the Section 9 chain with a third layer, `get_tenant_sensors(tenant = Depends(get_tenant)) -> list[str]`, backed by `TENANT_SENSORS = {"factory-north": ["temp-01", "temp-02"], "factory-south": ["arm-02"]}`. An unknown tenant gets an empty list. Endpoint `GET /my-sensors` returns `{"tenant", "count", "sensors"}`.
+- With `x-api-key: factory-key-001` it returns `{"tenant": "factory-north", "count": 2, "sensors": ["temp-01", "temp-02"]}`
+- With `dependency_overrides[get_tenant] = lambda: "factory-east"` and no header, it returns `{"tenant": "factory-east", "count": 0, "sensors": []}`
+
+**E3 (Medium).** Write a **class-based** dependency `RateLimiter(max_requests)` whose `__call__(self, api_key: str = Depends(verify_api_key)) -> str` counts requests per API key and raises `429 "Rate limit exceeded"` once a key goes over the limit. Use one instance, `limiter = RateLimiter(max_requests=3)`, in `GET /limited`, which returns `{"ok": True, "used": n}`.
+- Four calls with `factory-key-001` return `used: 1`, `used: 2`, `used: 3`, then `429`.
+- A following call with `factory-key-002` returns `used: 1` (separate budget). An invalid key returns `403` and is never counted.
+
+#### Dry-Run: Answers
+
+**Q1.** For `GET /health`, the server prints:
+
+```
+Opening database connection
+endpoint running
+Closing database connection
+```
+
+and the client gets `200 {"connected": true}`. The response was built while `connection["connected"]` was still `True`, and teardown flips it afterwards. For the crashing endpoint, the **same three lines** print, because the teardown sits in `finally:`. The client gets `500 {"detail": "boom"}`.
+
+**Q2.** Trace of `pagination`:
+
+| request | page after clamp | per_page after clamp | offset $=(p-1)\cdot pp$ | JSON |
+|---------|---:|---:|---:|------|
+| (a) | 3 | 25 | $2 \cdot 25 = 50$ | `{"offset": 50, "limit": 25, "data": []}` |
+| (b) | 0 → 1 | 500 → 20 | 0 | `{"offset": 0, "limit": 20, "data": []}` |
+| (c) | -2 → 1 | 100 (allowed, since $\le 100$) | 0 | `{"offset": 0, "limit": 100, "data": []}` |
+| (d) | — | — | — | `422`, `int_parsing` at `["query", "page"]` |
+
+Clamping only happens *inside* the function. Type conversion happens before it, so `"abc"` never reaches your code.
+
+**Q3.**
+- (a) `200 {"tenant": "factory-south", "sensor_id": "arm-02", "value": 23.5}`
+- (b) `422`, `"Field required"` at `["header", "x-api-key"]`. `Header(...)` is required, so validation fails before `verify_api_key` runs.
+- (c) `403 {"detail": "Invalid API key"}`
+- (d) `200` with `"tenant": "factory-north"`. HTTP header names are case-insensitive.
+- (e) `422`. `Header` maps the parameter `x_api_key` to the header name **`x-api-key`**, so a header literally spelled with underscores does not match.
+
+**Q4.** Each one runs **exactly once** (`verify_api_key: 1, get_tenant: 1, get_db: 1`), and the response is `{"tenant": "factory-north", "same": true}`. Within one request FastAPI caches every dependency by function. `get_db → get_tenant → verify_api_key` is resolved once, and the direct `Depends(get_tenant)` and `Depends(verify_api_key)` reuse the cached values. (Pass `Depends(f, use_cache=False)` if you really want a second call.)
+
+**Q5.** `200 {"tenant": "factory-test", "sensor_id": "arm-02", "value": 23.5}`. Only `get_db` runs. The override replaces `get_tenant` **together with its sub-dependencies**: the lambda has no parameters, so `verify_api_key` is never part of the graph and the missing header is never checked. After `app.dependency_overrides.clear()`, the same request returns `422` again.
+
+**E1 — reference solution**
+
+```python
+from fastapi import Depends, FastAPI, HTTPException
+
+app = FastAPI()
+
+def get_units(units: str = "celsius") -> str:          # a query param ?units=
+    if units not in {"celsius", "fahrenheit"}:
+        raise HTTPException(status_code=400,
+                            detail="units must be celsius or fahrenheit")
+    return units
+
+@app.get("/sensors/{sensor_id}/temperature")
+def read_temperature(sensor_id: str, units: str = Depends(get_units)) -> dict:
+    value_c = 23.5
+    value = value_c if units == "celsius" else round(value_c * 9 / 5 + 32, 2)
+    return {"sensor_id": sensor_id, "value": value, "units": units}
+```
+
+$23.5 \cdot \tfrac{9}{5} + 32 = 42.3 + 32 = 74.3$. The validation lives in one reusable dependency, so every endpoint that needs units gets the same rule.
+
+**E2 — reference solution**
+
+```python
+TENANT_SENSORS = {"factory-north": ["temp-01", "temp-02"],
+                  "factory-south": ["arm-02"]}
+
+def get_tenant_sensors(tenant: str = Depends(get_tenant)) -> list[str]:
+    return TENANT_SENSORS.get(tenant, [])
+
+@app.get("/my-sensors")
+def my_sensors(
+    tenant: str = Depends(get_tenant),
+    sensors: list[str] = Depends(get_tenant_sensors),
+) -> dict:
+    return {"tenant": tenant, "count": len(sensors), "sensors": sensors}
+
+# test
+# app.dependency_overrides[get_tenant] = lambda: "factory-east"
+# client.get("/my-sensors").json() == {"tenant": "factory-east", "count": 0, "sensors": []}
+# app.dependency_overrides.clear()
+```
+
+`get_tenant` is used twice (directly and via `get_tenant_sensors`) but runs once per request because of the cache. The override reaches both uses, because the override is keyed by the function object.
+
+**E3 — reference solution**
+
+```python
+from fastapi import Depends, HTTPException
+
+class RateLimiter:
+    def __init__(self, max_requests: int) -> None:
+        self.max_requests = max_requests
+        self.counts: dict[str, int] = {}
+
+    def __call__(self, api_key: str = Depends(verify_api_key)) -> str:
+        n = self.counts.get(api_key, 0) + 1
+        self.counts[api_key] = n
+        if n > self.max_requests:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded")
+        return api_key
+
+limiter = RateLimiter(max_requests=3)
+
+@app.get("/limited")
+def limited(api_key: str = Depends(limiter)) -> dict:
+    return {"ok": True, "used": limiter.counts[api_key]}
+```
+
+`Depends(limiter)` passes an **instance**, so FastAPI calls `limiter(...)` on every request while the state in `self.counts` lives as long as the app. Because `verify_api_key` is a sub-dependency, a bad key fails with `403` before the counter is touched. After the run above, `counts == {"factory-key-001": 4, "factory-key-002": 1}`. Each check is $O(1)$. In production you would keep these counters in Redis with a TTL, so they survive restarts and are shared by every worker.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

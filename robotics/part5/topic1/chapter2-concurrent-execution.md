@@ -464,6 +464,198 @@ Use `asyncio.gather()` to run multiple coroutines concurrently and get all resul
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+All questions use this helper:
+
+```python
+import asyncio, time
+
+async def job(name: str, delay: float) -> str:
+    print(f"start {name}")
+    await asyncio.sleep(delay)
+    print(f"end {name}")
+    return name.upper()
+```
+
+**Q1. `gather()` print order.** Write every printed line in order, plus the final list and the elapsed time (to 1 decimal).
+
+```python
+async def main():
+    t0 = time.perf_counter()
+    results = await asyncio.gather(job("a", 0.3), job("b", 0.1), job("c", 0.2))
+    print(results, f"{time.perf_counter() - t0:.1f}s")
+```
+
+**Q2. When does a `create_task` task actually start?** This is the chapter's "start logging in the background" pattern from Section 2. Predict the five lines.
+
+```python
+async def main():
+    t0 = time.perf_counter()
+    task = asyncio.create_task(job("log", 0.5))
+    print("after create_task")
+    await asyncio.sleep(0.2)          # stands in for fetch_primary_data()
+    print("primary done")
+    r = await task
+    print(r, f"{time.perf_counter() - t0:.1f}s")
+```
+
+**Q3. `asyncio.wait()` with `FIRST_COMPLETED`.** Take Section 5's three tasks (`fetch_with_timeout(1, 2)`, `(2, 1)`, `(3, 3)`), but call
+`done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)`.
+What are `len(done)`, `len(pending)`, the result(s) in `done`, and how many seconds have passed when `wait` returns?
+
+**Q4. Cancellation trace.** Run Section 8's `long_running_task()` unchanged (it sleeps 1 s and then prints `Working...` in a loop), but `main()` sleeps **3.5 s** instead of 5 before calling `task.cancel()`. List every printed line. What does `task.cancelled()` return afterwards?
+
+**Q5. Partial failure.** Using Section 3's `might_fail` (only `task_id == 2` raises), predict both outputs:
+
+```python
+async def main():
+    results = await asyncio.gather(
+        *(might_fail(i) for i in [1, 2, 3, 4]), return_exceptions=True)
+    successful = [r for r in results if not isinstance(r, Exception)]
+    failed = [r for r in results if isinstance(r, Exception)]
+    print(f"Got {len(successful)} results, {len(failed)} failures")
+
+    try:
+        await asyncio.gather(might_fail(1), might_fail(2), might_fail(3))
+    except ValueError as e:
+        print("caught:", e)
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Write `async def fetch_all(delays: dict[str, float]) -> dict[str, str]` that fetches every sensor **concurrently** with `asyncio.gather`. Use the simulated fetch `fake_fetch(sensor_id, delay)`, which sleeps `delay` seconds and returns `f"{sensor_id}:ok"`. The result dict must keep the input key order.
+- `await fetch_all({"temp-01": 0.3, "temp-02": 0.1, "temp-03": 0.2})` returns `{'temp-01': 'temp-01:ok', 'temp-02': 'temp-02:ok', 'temp-03': 'temp-03:ok'}` in about $0.3$ s (not $0.6$ s).
+
+**E2 (Easy–Medium).** Write `async def first_responder(delays: list[float]) -> int` that starts one task per delay (task $i$ sleeps `delays[i]` and returns `i`). It should return the **index of the first task to finish**, and cancel every other task before returning.
+- `await first_responder([0.3, 0.1, 0.2])` returns `1` after about $0.1$ s.
+- `await first_responder([0.2])` returns `0`.
+
+**E3 (Medium).** Write `async def gather_within(coros: list, timeout: float) -> list` that runs all coroutines concurrently for at most `timeout` seconds. It should return a list **in input order**: the coroutine's result if it finished successfully in time, otherwise `None` (for both timed-out and failed coroutines). Unfinished tasks must be cancelled.
+- `await gather_within([fake_fetch("a", 0.1), fake_fetch("b", 0.5), fake_fetch("c", 0.2)], 0.3)` returns `['a:ok', None, 'c:ok']` in about $0.3$ s.
+- If a coroutine raises `RuntimeError` after 0.05 s, its slot is `None` and the call does **not** raise.
+
+#### Dry-Run: Answers
+
+**Q1.** Output:
+
+```
+start a
+start b
+start c
+end b
+end c
+end a
+['A', 'B', 'C'] 0.3s
+```
+
+`gather` starts all three before any of them finishes. They finish in delay order (b at 0.1, c at 0.2, a at 0.3), but the result list keeps **input** order. Elapsed time is the maximum delay, $\max(0.3, 0.1, 0.2) = 0.3$ s, not the sum ($0.6$ s).
+
+**Q2.** Output:
+
+```
+after create_task
+start log
+primary done
+end log
+LOG 0.5s
+```
+
+| t (s) | What runs |
+|------:|-----------|
+| 0.0 | `create_task` only *schedules* the task, and `main` keeps going and prints `after create_task` |
+| 0.0 | `main` hits `await asyncio.sleep(0.2)` and yields, so the task runs and prints `start log` |
+| 0.2 | `main` resumes and prints `primary done`, then waits on `task` |
+| 0.5 | the task prints `end log` and returns `"LOG"` |
+
+The two waits overlap, so the total is $\max(0.2, 0.5) = 0.5$ s.
+
+**Q3.** `len(done) == 1`, `len(pending) == 2`, and the done task's result is `"Task 2 done"`. `wait` returns after **1 s**, when the shortest task (`delay=1`) finishes. Tasks 1 and 3 are still running in `pending`, so you should cancel them (or await them later).
+
+**Q4.** Output:
+
+```
+Working...
+Working...
+Working...
+Task was cancelled! Cleaning up...
+Confirmed: task was cancelled
+```
+
+The task prints at $t = 1, 2, 3$ s. At $t = 3.5$ s it is suspended inside `asyncio.sleep(1)` (the one that would end at 4 s). `cancel()` makes that `await` raise `CancelledError`, the `except` block prints the cleanup line and re-raises, and `await task` in `main` gets the `CancelledError`. `task.cancelled()` returns `True` because the task re-raised. If it had swallowed the error, it would return `False`.
+
+**Q5.** Output:
+
+```
+Got 3 results, 1 failures
+caught: Task 2 failed
+```
+
+With `return_exceptions=True`, `results == ['Task 1 succeeded', ValueError('Task 2 failed'), 'Task 3 succeeded', 'Task 4 succeeded']`, which is 3 strings and 1 exception. Without it, the first exception propagates out of `await gather(...)` and the `except ValueError` catches it. The error message is the text passed to `ValueError`, so the second line is `caught: Task 2 failed`.
+
+**E1 — reference solution**
+
+```python
+import asyncio
+
+async def fake_fetch(sensor_id: str, delay: float) -> str:
+    await asyncio.sleep(delay)
+    return f"{sensor_id}:ok"
+
+async def fetch_all(delays: dict[str, float]) -> dict[str, str]:
+    ids = list(delays)                                  # fix the order once
+    results = await asyncio.gather(*(fake_fetch(s, delays[s]) for s in ids))
+    return dict(zip(ids, results))                      # gather keeps input order
+```
+
+Wall time is $\max(\text{delays})$ instead of $\sum \text{delays}$. `zip` is safe because `gather` returns results in the order the coroutines were passed.
+
+**E2 — reference solution**
+
+```python
+import asyncio
+
+async def _sleeper(i: int, d: float) -> int:
+    await asyncio.sleep(d)
+    return i
+
+async def first_responder(delays: list[float]) -> int:
+    tasks = [asyncio.create_task(_sleeper(i, d)) for i, d in enumerate(delays)]
+    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    for t in pending:
+        t.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)  # let cancellations finish
+    return min(t.result() for t in done)   # tie-break: lowest index
+```
+
+`FIRST_COMPLETED` returns as soon as one task is done, after $\min(\text{delays})$ seconds. Gathering the cancelled tasks with `return_exceptions=True` absorbs their `CancelledError`s, so no task is left running.
+
+**E3 — reference solution**
+
+```python
+import asyncio
+
+async def gather_within(coros: list, timeout: float) -> list:
+    tasks = [asyncio.create_task(c) for c in coros]
+    done, pending = await asyncio.wait(tasks, timeout=timeout)
+    for t in pending:
+        t.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)
+    out = []
+    for t in tasks:                                   # input order, not set order
+        if t in done and t.exception() is None:
+            out.append(t.result())
+        else:
+            out.append(None)                          # timed out or raised
+    return out
+```
+
+`asyncio.wait(..., timeout=...)` never raises on timeout. It just splits the tasks into `done` and `pending`. Iterating the original `tasks` list puts the results back in input order. A failed task is in `done`, but its `exception()` is not `None`, so it maps to `None` without propagating.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

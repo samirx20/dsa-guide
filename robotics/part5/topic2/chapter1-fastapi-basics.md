@@ -608,6 +608,142 @@ FastAPI provides type-safe request/response handling with zero boilerplate. Path
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+For each request, give the **status code** and the **JSON body** (or say "422" and name the field that failed). These answers were checked with `fastapi.testclient.TestClient` against the chapter's own endpoints.
+
+**Q1. Query parameters (Section 3, `list_readings`).**
+- (a) `GET /readings?limit=5&offset=20`
+- (b) `GET /readings?sensor_id=arm-02`
+- (c) `GET /readings?limit=five`
+
+**Q2. Query parameter types (Section 3, `search_sensors`).**
+- (a) `GET /search?q=temp&max_value=50&active=0`
+- (b) `GET /search?q=temp&active=yes`
+- (c) `GET /search?q=temp&active=maybe`
+- (d) `GET /search?min_value=5`
+
+**Q3. Stateful trace (Section 8 full example).** Start with an empty `DATABASE` and send these requests in order. Fill in the table.
+
+| # | Request | Status | Body |
+|--:|---------|-------:|------|
+| 1 | `POST /sensors` `{"sensor_id": "temp-01", "value": 23.5}` | ? | ? |
+| 2 | `POST /sensors` `{"sensor_id": "temp-02", "value": 250}` | ? | ? |
+| 3 | `GET /sensors` | ? | ? |
+| 4 | `GET /sensors/temp-02` | ? | ? |
+| 5 | `POST /sensors` `{"sensor_id": "temp-01", "value": "-40", "unit": "fahrenheit"}` | ? | ? |
+| 6 | `GET /sensors` | ? | ? |
+
+**Q4. Response model filtering (Section 5).** `POST /readings` (the `response_model=ReadingResponse` version that returns a `ReadingInternal`) receives the body `{"sensor_id": "arm-02", "value": -100, "internal_note": "x"}`. What does the client receive? What if the body is just `{"sensor_id": "arm-02"}`?
+
+**Q5. Status codes (Section 6).** What do `DELETE /sensors/temp-01` and `DELETE /sensors/temp-02` return (status + body)? The chapter's "Common status codes" list has a comment `# 402 - Authenticated but not allowed` next to `status.HTTP_403_FORBIDDEN`. What number does that constant really hold?
+
+### Coding Exercises
+
+**E1 (Easy).** Add `GET /convert/{celsius}` with a `float` path parameter that returns `{"celsius": c, "fahrenheit": round(c * 9 / 5 + 32, 2)}`. Reject anything below absolute zero ($-273.15$ °C) with `400` and `detail="Below absolute zero"`.
+- `GET /convert/100` returns `200 {"celsius": 100.0, "fahrenheit": 212.0}`
+- `GET /convert/-300` returns `400 {"detail": "Below absolute zero"}`. `GET /convert/hot` returns `422`.
+
+**E2 (Easy–Medium).** Given the Section 8 `DATABASE` preloaded with `temp-03`, `temp-01`, and `arm-02`, add `GET /sensors/page?limit=&offset=` that returns `{"total", "limit", "offset", "items"}`, where `items` is a slice of the **sorted** sensor ids. Validate `1 <= limit <= 100` (default 10) and `offset >= 0` (default 0) so bad values give `422`.
+- `GET /sensors/page?limit=2` returns `{"total": 3, "limit": 2, "offset": 0, "items": ["arm-02", "temp-01"]}`
+- `GET /sensors/page?limit=2&offset=2` returns `items: ["temp-03"]`. `?limit=0` returns `422`. `?offset=5` returns `items: []`.
+
+**E3 (Medium).** Add `PUT /sensors/{sensor_id}` (body: `SensorReading`, response: `ReadingResponse`) and `DELETE /sensors/{sensor_id}` (204 on success).
+- `PUT` returns `404 "Sensor not found"` if the id is unknown, and `400 "sensor_id in body does not match URL"` if the body's `sensor_id` differs from the path. Otherwise it replaces the stored reading and returns it.
+- `DELETE` returns `204` with an empty body, or `404` if the id is unknown.
+- Example: `PUT /sensors/temp-01 {"sensor_id": "temp-01", "value": 30}` returns `200 {"sensor_id": "temp-01", "value": 30.0, "unit": "celsius"}`. Deleting `arm-02` twice returns `204`, then `404`.
+
+#### Dry-Run: Answers
+
+**Q1.**
+- (a) `200 {"sensor_id": null, "limit": 5, "offset": 20, "data": []}`. `sensor_id` falls back to its default `None`, which becomes JSON `null`.
+- (b) `200 {"sensor_id": "arm-02", "limit": 10, "offset": 0, "data": []}`
+- (c) `422`. The error has `loc: ["query", "limit"]` and type `int_parsing`, because `"five"` cannot become an `int`.
+
+**Q2.**
+- (a) `200 {"q": "temp", "min": 0.0, "max": 50.0, "active": false}`. `"50"` is converted to the float `50.0`, and `"0"` is a valid false boolean.
+- (b) `200 {"q": "temp", "min": 0.0, "max": 100.0, "active": true}`. FastAPI accepts `true/false`, `1/0`, `yes/no`, and `on/off`.
+- (c) `422` on `active` (`bool_parsing`).
+- (d) `422`, `"Field required"` at `loc: ["query", "q"]`. `q` has no default, so it is required.
+
+**Q3.**
+
+| # | Status | Body | Why |
+|--:|-------:|------|-----|
+| 1 | 201 | `{"sensor_id": "temp-01", "value": 23.5, "unit": "celsius"}` | `status_code=201`, and `unit` uses its default |
+| 2 | 422 | `less_than_equal` at `["body", "value"]` | $250 > 200$ (`le=200`), so the function never runs and nothing is stored |
+| 3 | 200 | `["temp-01"]` | request 2 was rejected before the save |
+| 4 | 404 | `{"detail": "Sensor not found"}` | |
+| 5 | 201 | `{"sensor_id": "temp-01", "value": -40.0, "unit": "fahrenheit"}` | Pydantic's lax mode converts `"-40"` to `-40.0`, which is inside $[-100, 200]$, and the dict key is overwritten |
+| 6 | 200 | `["temp-01"]` | still one key, since the POST replaced it rather than adding a new one |
+
+**Q4.** The first body gives `200 {"sensor_id": "arm-02", "value": -100.0, "unit": "celsius"}`. The incoming `internal_note` is **ignored** by `SensorReading` (extra fields are dropped by default). The `internal_note` that the handler sets is stripped by `response_model`. $-100$ passes because `ge=-100` is inclusive. The second body gives `422`, `"Field required"` at `["body", "value"]`, because `Field(...)` makes `value` required.
+
+**Q5.** `DELETE /sensors/temp-01` returns `403 {"detail": "Cannot delete primary sensor"}`. `DELETE /sensors/temp-02` returns `204` with an **empty** body (the handler returns `None`). `status.HTTP_403_FORBIDDEN == 403`. The `402` in that comment is a typo (402 is "Payment Required").
+
+**E1 — reference solution**
+
+```python
+from fastapi import FastAPI, HTTPException
+
+app = FastAPI()
+
+@app.get("/convert/{celsius}")
+def convert(celsius: float) -> dict:
+    if celsius < -273.15:
+        raise HTTPException(status_code=400, detail="Below absolute zero")
+    return {"celsius": celsius, "fahrenheit": round(celsius * 9 / 5 + 32, 2)}
+```
+
+The type hint `float` gives the `422` for `"hot"` for free. The physics check is a business rule, so it is a `400` you raise yourself. Check: $100 \cdot \tfrac{9}{5} + 32 = 212$, $-40 \cdot \tfrac{9}{5} + 32 = -40$, and $36.6 \cdot \tfrac{9}{5} + 32 = 97.88$.
+
+**E2 — reference solution**
+
+```python
+from fastapi import Query
+
+# MUST be declared before @app.get("/sensors/{sensor_id}"), otherwise
+# "/sensors/page" matches that route with sensor_id="page" and returns 404.
+@app.get("/sensors/page")
+def list_sensors_page(
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> dict:
+    ids = sorted(DATABASE)
+    return {"total": len(ids), "limit": limit, "offset": offset,
+            "items": ids[offset:offset + limit]}
+```
+
+`sorted(["temp-03", "temp-01", "arm-02"])` gives `["arm-02", "temp-01", "temp-03"]`. The slice `[0:2]` is `["arm-02", "temp-01"]`, and `[2:4]` is `["temp-03"]`. Python slicing past the end returns `[]`, so `offset=5` is safe. It costs $O(n \log n)$ per request because of the sort.
+
+**E3 — reference solution**
+
+```python
+from fastapi import HTTPException, status
+
+@app.put("/sensors/{sensor_id}", response_model=ReadingResponse)
+def update_sensor(sensor_id: str, reading: SensorReading) -> SensorReading:
+    if sensor_id not in DATABASE:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+    if reading.sensor_id != sensor_id:
+        raise HTTPException(status_code=400,
+                            detail="sensor_id in body does not match URL")
+    DATABASE[sensor_id] = reading
+    return reading                       # response_model trims it to 3 fields
+
+@app.delete("/sensors/{sensor_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_sensor(sensor_id: str) -> None:
+    if sensor_id not in DATABASE:
+        raise HTTPException(status_code=404, detail="Sensor not found")
+    del DATABASE[sensor_id]
+```
+
+Order of checks matters. FastAPI validates the body **before** calling your function, so `PUT /sensors/temp-09` with `value: 300` returns `422`, not `404`. Only valid bodies reach the `404`/`400` checks.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

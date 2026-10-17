@@ -509,6 +509,142 @@ Replace `requests` with `httpx.AsyncClient` in async code. Reuse a single client
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+Questions Q1–Q4 use the chapter's `fetch_with_retry(client, url, max_retries)` from Section 4, unchanged. Imagine the server answers each successive request with the scripted responses listed (`T` means the request raises `httpx.ReadTimeout`, which is a subclass of `httpx.TimeoutException`).
+
+**Q1.** `max_retries=3`, server script: `503, 502, 200 {"value": 23.5}`. How many requests are sent, which `asyncio.sleep` calls happen, and what is returned?
+
+**Q2.** `max_retries=3`, server script: `503, 503, 503, 200`. Does the fourth response (`200`) ever get used? What does the call end with?
+
+**Q3.** `max_retries=3`, server script: `404, 200`. How many requests, how much total backoff, and what is the outcome?
+
+**Q4.** `max_retries=4`, server script: `T, 500, T, T, 200`. Fill in the trace table (attempt, response, action, sleep) and give the final outcome and total backoff time.
+
+| attempt | response | action | sleep (s) |
+|--------:|----------|--------|----------:|
+| 0 | T | ? | ? |
+| 1 | 500 | ? | ? |
+| 2 | T | ? | ? |
+| 3 | T | ? | ? |
+
+**Q5. Connection reuse arithmetic (Section 3, new numbers).** Use the chapter's costs: TCP handshake 100 ms, SSL handshake 200 ms, request 500 ms. For **5** sequential requests, what is the total time **without** reuse and **with** a single reused `AsyncClient`? What percent faster is reuse?
+
+**Q6. URL building.** With `SensorAPIClient(base_url="https://factory-api.example.com/", api_key="k")` (note the trailing slash), what URL does `list_sensors("temperature")` request? What about `list_sensors()`?
+
+### Coding Exercises
+
+**E1 (Easy).** Write `def backoff_schedule(max_retries: int, cap: int = 30) -> list[int]` that returns the sleep durations Section 4's `fetch_with_retry` performs if **every** attempt times out, with each sleep clamped to at most `cap` seconds.
+- `backoff_schedule(3)` returns `[1, 2]`
+- `backoff_schedule(7)` returns `[1, 2, 4, 8, 16, 30]`
+- `backoff_schedule(1)` returns `[]`
+
+**E2 (Easy–Medium).** Write `async def fetch_many(client: httpx.AsyncClient, urls: list[str]) -> dict[str, dict]` that GETs every URL **concurrently** on the one shared client, calls `raise_for_status()`, and returns `{url: json}` for the successful ones only. One failing URL must not sink the rest.
+- With a mock server where `/sensors/temp-02` returns 500 and everything else returns `{"sensor_id": ..., "value": 23.5}`:
+  `await fetch_many(c, ["/sensors/temp-01", "/sensors/temp-02", "/sensors/temp-03"])` returns the `temp-01` and `temp-03` entries only.
+- `await fetch_many(c, [])` returns `{}`.
+
+**E3 (Medium).** Write `async def fetch_with_retry_v2(client, url, max_retries=3, sleep=asyncio.sleep) -> tuple[dict, int]` that improves Section 4's version:
+- also retries `429 Too Many Requests` (retryable codes are `{429, 500, 502, 503, 504}`; anything else raises immediately);
+- if the error response has a `Retry-After` header (seconds), sleeps that long instead of `2 ** attempt`;
+- returns `(json_body, attempts_used)`. The `sleep` parameter lets tests record delays instead of waiting.
+
+Examples: the script `429 (Retry-After: 5), 503, 200 {"ok": true}` returns `({'ok': True}, 3)` with sleeps `[5.0, 2]`. The script `429 (no header), 403` raises `HTTPStatusError` (403) after sleeps `[1]`.
+
+#### Dry-Run: Answers
+
+**Q1.** 3 requests, sleeps `1` then `2` (3 s of backoff), and the call returns `{'value': 23.5}`.
+
+| attempt | response | action | sleep |
+|--------:|----------|--------|------:|
+| 0 | 503 | $\ge 500$ and $0 < 2$, so retry | $2^0 = 1$ |
+| 1 | 502 | $\ge 500$ and $1 < 2$, so retry | $2^1 = 2$ |
+| 2 | 200 | `return response.json()` | — |
+
+**Q2.** No. After two retries, attempt 2 also gets `503`, and now `attempt < max_retries - 1` is `2 < 2`, which is false. So it **re-raises `httpx.HTTPStatusError` (503)**. That makes 3 requests and sleeps `[1, 2]`. The `200` would have been the 4th request, which is never sent.
+
+**Q3.** 1 request, 0 s of backoff. The outcome is that `HTTPStatusError` (404) is raised immediately, because $404 < 500$ sends it to the `else: raise` branch. Client errors are not retried.
+
+**Q4.**
+
+| attempt | response | action | sleep (s) |
+|--------:|----------|--------|----------:|
+| 0 | T | not last attempt, so back off | $2^0 = 1$ |
+| 1 | 500 | $\ge 500$ and $1 < 3$, so back off | $2^1 = 2$ |
+| 2 | T | not last attempt, so back off | $2^2 = 4$ |
+| 3 | T | `attempt == max_retries - 1`, so `raise` | — |
+
+The outcome is that `httpx.ReadTimeout` propagates after 4 requests. The `200` is never reached. Total backoff is $1 + 2 + 4 = 7$ s, not counting the time spent waiting for the three timeouts themselves.
+
+**Q5.** Without reuse: $5 \times (100 + 200 + 500) = 5 \times 800 = 4000$ ms. With reuse: $800 + 4 \times 500 = 2800$ ms. Savings: $\frac{4000 - 2800}{4000} = \frac{1200}{4000} = 30\%$ faster. The more requests you send, the closer you get to $\frac{300}{800} = 37.5\%$, because every request after the first skips 300 ms of handshakes.
+
+**Q6.** `rstrip("/")` gives `self.base_url = "https://factory-api.example.com"`, so:
+- `list_sensors("temperature")` requests `https://factory-api.example.com/sensors?type=temperature`
+- `list_sensors()` leaves `params` empty, so it requests `https://factory-api.example.com/sensors` with no query string.
+
+Both requests carry the header `Authorization: Bearer k`. Without the `rstrip`, the path would contain `//sensors`.
+
+**E1 — reference solution**
+
+```python
+def backoff_schedule(max_retries: int, cap: int = 30) -> list[int]:
+    # fetch_with_retry sleeps after every attempt except the last one
+    return [min(2 ** attempt, cap) for attempt in range(max_retries - 1)]
+```
+
+There are $\max(0, n-1)$ sleeps of $2^0, 2^1, \dots$. Without a cap, the total is $2^{n-1} - 1$ seconds, so capping matters once $n$ grows.
+
+**E2 — reference solution**
+
+```python
+import asyncio
+import httpx
+
+async def fetch_many(client: httpx.AsyncClient, urls: list[str]) -> dict[str, dict]:
+    async def one(url: str) -> dict:
+        r = await client.get(url)
+        r.raise_for_status()
+        return r.json()
+
+    results = await asyncio.gather(*(one(u) for u in urls), return_exceptions=True)
+    return {u: r for u, r in zip(urls, results) if not isinstance(r, Exception)}
+```
+
+One pooled client is shared by every request (no per-request handshakes). `return_exceptions=True` turns each failure into a value that the comprehension filters out. Wall time is roughly the slowest request, not the sum.
+
+**E3 — reference solution**
+
+```python
+import asyncio
+import httpx
+
+RETRYABLE = {429, 500, 502, 503, 504}
+
+async def fetch_with_retry_v2(client, url, max_retries=3, sleep=asyncio.sleep):
+    for attempt in range(max_retries):
+        last = attempt == max_retries - 1
+        try:
+            r = await client.get(url)
+            r.raise_for_status()
+            return r.json(), attempt + 1
+        except httpx.TimeoutException:
+            if last:
+                raise
+            await sleep(2 ** attempt)
+        except httpx.HTTPStatusError as exc:
+            code = exc.response.status_code
+            if code not in RETRYABLE or last:
+                raise
+            ra = exc.response.headers.get("Retry-After")
+            await sleep(float(ra) if ra is not None else 2 ** attempt)
+```
+
+Trace for `429 (Retry-After: 5), 503, 200`: attempt 0 sleeps `5.0` (the header wins), attempt 1 sleeps $2^1 = 2$, and attempt 2 returns `({'ok': True}, 3)`. For `429, 403`: attempt 0 sleeps $2^0 = 1$, then 403 is not retryable, so it raises. You can test it offline with `httpx.AsyncClient(transport=httpx.MockTransport(handler))`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

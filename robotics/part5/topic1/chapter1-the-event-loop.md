@@ -472,6 +472,202 @@ The event loop lets Python handle thousands of concurrent I/O operations on a si
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Print order and elapsed time.** This is the chapter's sequential pattern from Section 5, shrunk to two workers with different delays. Write down every printed line in order, and the total runtime.
+
+```python
+import asyncio, time
+
+async def worker(name: str, delay: float) -> str:
+    print(f"{name} start")
+    await asyncio.sleep(delay)
+    print(f"{name} end")
+    return name
+
+async def main():
+    t0 = time.perf_counter()
+    a = await worker("A", 2)
+    b = await worker("B", 1)
+    print(a + b, f"{time.perf_counter() - t0:.0f}s")
+
+asyncio.run(main())
+```
+
+**Q2. Blocking vs non-blocking.** Using the chapter's `bad_example()` (`time.sleep(3)`) and `good_example()` (`await asyncio.sleep(3)`), how long does `main()` take? Would the answer change if a second, unrelated coroutine were also running on the same loop?
+
+```python
+async def main():
+    t0 = time.perf_counter()
+    x = await bad_example()
+    y = await good_example()
+    z = await asyncio.to_thread(time.sleep, 1)
+    print(x, y, z, f"{time.perf_counter() - t0:.0f}s")
+```
+
+**Q3. Coroutine objects (Section 7).** What exactly does this print, line by line? Pay attention to *when* `"fetching"` appears.
+
+```python
+async def fetch_data():
+    print("fetching")
+    return {"value": 42}
+
+async def main():
+    r = fetch_data()
+    print("created")
+    print(type(r).__name__)
+    v = await r
+    print(v["value"])
+
+asyncio.run(main())
+```
+
+**Q4. Pipeline timing (Section 9, new numbers).** Suppose the factory floor now has **4** sensors, each `read_sensor` takes **0.5 s**, and `process_reading` still takes **0.1 s**. Using the same sequential `main()` (all reads first, then all processing, each awaited one by one), what does the `Sequential:` line print (approximately)? What would the lower bound be if all four reads overlapped and all four processing steps overlapped?
+
+**Q5. Spot the bug.** For each line inside an `async def`, say whether it (a) blocks the event loop, (b) yields correctly, or (c) does not run the work at all.
+
+```python
+async def tick():
+    time.sleep(0.5)                              # line 1
+    await asyncio.sleep(0.5)                     # line 2
+    requests.get("https://api.example.com")      # line 3
+    await asyncio.to_thread(time.sleep, 0.5)     # line 4
+    asyncio.sleep(0.5)                           # line 5
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Write `async def countdown(n: int, delay: float) -> list[int]` that prints `n, n-1, …, 1` (one per line), awaiting `asyncio.sleep(delay)` after each number, then prints `Liftoff!` and returns the list of numbers it printed.
+- `await countdown(3, 0.1)` prints `3`, `2`, `1`, `Liftoff!` and returns `[3, 2, 1]` after about $0.3$ s.
+
+**E2 (Easy–Medium).** Given a fake sensor bus `RAW = {"temp-01": 50.0, "temp-02": 100.0, "temp-03": 75.0}`, write
+`async def calibrate_all(sensor_ids: list[str], latency: float) -> dict[str, float]` that, for each id **in order**, awaits a simulated read (`asyncio.sleep(latency)` then look up `RAW`) and stores the chapter's calibrated value `raw * 1.02` rounded to 2 decimals.
+- `await calibrate_all(["temp-01", "temp-02", "temp-03"], 0.1)` returns `{'temp-01': 51.0, 'temp-02': 102.0, 'temp-03': 76.5}` in about $0.3$ s.
+- `await calibrate_all([], 0.1)` returns `{}` immediately.
+
+**E3 (Medium).** Prove that `asyncio.to_thread` keeps the loop alive. Write a blocking CPU function `checksum(n) -> int` that returns $\left(\sum_{i=0}^{n-1} i^2\right) \bmod 1\,000\,007$ with a plain loop, and
+`async def run_with_heartbeat(n: int, period: float = 0.05) -> tuple[int, int]` that runs `checksum(n)` **off** the event loop while a heartbeat coroutine counts how many times it woke up every `period` seconds. Return `(checksum_result, ticks)`. (You may use `asyncio.create_task` and `asyncio.Event` as a preview of Chapter 2.)
+- `checksum(4)` returns `14` ($0 + 1 + 4 + 9$).
+- `await run_with_heartbeat(3_000_000)` returns `(996696, ticks)` with `ticks > 0`. If you call `checksum(n)` directly instead of through `to_thread`, `ticks` comes back `0`.
+
+#### Dry-Run: Answers
+
+**Q1.** Output:
+
+```
+A start
+A end
+B start
+B end
+AB 3s
+```
+
+`await worker("A", 2)` suspends `main()` until A is completely finished, so B cannot even print `start` until A has printed `end`. The two waits add up: $2 + 1 = 3$ s. `a + b` is string concatenation, `"A" + "B" = "AB"`.
+
+| t (s) | Event |
+|------:|-------|
+| 0 | `A start`, A sleeps |
+| 2 | `A end`, `B start`, B sleeps |
+| 3 | `B end`, final print |
+
+**Q2.** About **7 s**, printing `done done None 7s`. `time.sleep(3)` freezes the thread for 3 s, `asyncio.sleep(3)` waits 3 s (but lets other coroutines run), and `to_thread(time.sleep, 1)` waits 1 s on a worker thread: $3 + 3 + 1 = 7$. `time.sleep` returns `None`, so `z` is `None`. With a second coroutine on the loop, `main()` still takes 7 s, but that other coroutine is **frozen for the first 3 s** (the `time.sleep`) and runs freely during the other 4 s.
+
+**Q3.** Output:
+
+```
+created
+coroutine
+fetching
+42
+```
+
+Calling `fetch_data()` only builds a coroutine object; none of its body runs. The body (and its `print("fetching")`) runs only at `await r`.
+
+**Q4.** Reads: $4 \times 0.5 = 2.0$ s. Processing: $4 \times 0.1 = 0.4$ s. Total $\approx 2.4$ s, so it prints `Sequential: 2.40s` (give or take a little scheduling overhead). If everything overlapped, all reads would take as long as one read and all processing as long as one processing step: $0.5 + 0.1 = 0.6$ s. That is what `asyncio.gather()` gets you in Chapter 2.
+
+**Q5.**
+
+| Line | Verdict | Why |
+|-----:|---------|-----|
+| 1 | (a) blocks | `time.sleep` freezes the single "waiter" thread |
+| 2 | (b) yields | non-blocking sleep, the loop runs other tasks |
+| 3 | (a) blocks | `requests` is synchronous, so use `httpx.AsyncClient` or `to_thread` |
+| 4 | (b) yields | blocking call moved to a worker thread |
+| 5 | (c) never runs | coroutine object created but not awaited (Python warns "coroutine was never awaited") |
+
+**E1 — reference solution**
+
+```python
+import asyncio
+
+async def countdown(n: int, delay: float) -> list[int]:
+    seen = []
+    for i in range(n, 0, -1):
+        print(i)
+        seen.append(i)
+        await asyncio.sleep(delay)   # yield to the loop between ticks
+    print("Liftoff!")
+    return seen
+
+# asyncio.run(countdown(3, 0.1))  -> prints 3, 2, 1, Liftoff! ; returns [3, 2, 1]
+```
+
+Runtime is $n \cdot \text{delay}$ because each `await` waits for the one before it.
+
+**E2 — reference solution**
+
+```python
+import asyncio
+
+RAW = {"temp-01": 50.0, "temp-02": 100.0, "temp-03": 75.0}
+
+async def read_raw(sensor_id: str, latency: float) -> float:
+    await asyncio.sleep(latency)          # simulated network round trip
+    return RAW[sensor_id]
+
+async def calibrate_all(sensor_ids: list[str], latency: float) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for sid in sensor_ids:                 # sequential on purpose (Section 5 pattern)
+        raw = await read_raw(sid, latency)
+        out[sid] = round(raw * 1.02, 2)    # 2% calibration offset
+    return out
+```
+
+Time is $O(k \cdot \text{latency})$ for $k$ sensors, because the reads run one after another. Check: $50 \times 1.02 = 51.0$, $100 \times 1.02 = 102.0$, $75 \times 1.02 = 76.5$.
+
+**E3 — reference solution**
+
+```python
+import asyncio
+
+def checksum(n: int) -> int:
+    total = 0
+    for i in range(n):
+        total = (total + i * i) % 1_000_007
+    return total
+
+async def heartbeat(stop: asyncio.Event, period: float) -> int:
+    ticks = 0
+    while not stop.is_set():
+        await asyncio.sleep(period)
+        ticks += 1
+    return ticks
+
+async def run_with_heartbeat(n: int, period: float = 0.05) -> tuple[int, int]:
+    stop = asyncio.Event()
+    hb = asyncio.create_task(heartbeat(stop, period))
+    result = await asyncio.to_thread(checksum, n)   # CPU work off the loop
+    stop.set()
+    ticks = await hb
+    return result, ticks
+```
+
+While the worker thread runs `checksum`, `main` is suspended at `await asyncio.to_thread(...)`, so the loop is free to wake the heartbeat every `period` seconds. If you call `checksum(n)` directly, the heartbeat task never gets a turn before `stop.set()`. When it finally runs, it sees the flag already set and returns `0`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
