@@ -158,7 +158,7 @@ response = client.chat.completions.create(
     
     temperature=0.0,
     #           ^^^
-    #           0.0 = deterministic (same input → same output)
+    #           0.0 = near-deterministic (same input → almost always same output)
     #           1.0 = creative (varied outputs)
     
     max_tokens=50,
@@ -198,7 +198,7 @@ response = client.chat.completions.create(
 
 ### 3. Understanding Parameters
 
-`temperature` controls randomness (0.0 = deterministic, 1.0 = creative). `max_tokens` limits the response length.
+`temperature` controls randomness (0.0 = near-deterministic, 1.0 = creative; the API accepts up to 2.0). `max_tokens` limits the response length.
 
 ```python
 # Ask for a creative answer
@@ -247,10 +247,10 @@ print("Precise:", response_precise.choices[0].message.content)
 
 | Temperature | Behavior | Use Case | Consistency |
 |-------------|----------|----------|-------------|
-| 0.0 | Deterministic, predictable | Tool-calling, factual Q&A | Same input → same output |
+| 0.0 | Near-deterministic, predictable | Tool-calling, factual Q&A | Same input → almost always same output (not guaranteed) |
 | 0.3 | Mostly predictable, slight variation | Data analysis, summaries | Very consistent |
 | 0.7 | Balanced creativity | General chat, code generation | Moderate variation |
-| 1.0 | Maximum creativity | Creative writing, brainstorming | Highly varied |
+| 1.0 | High creativity (API max is 2.0) | Creative writing, brainstorming | Highly varied |
 
 ### Edge Case: Temperature with Same Prompt
 

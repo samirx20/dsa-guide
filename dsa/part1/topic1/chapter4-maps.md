@@ -48,7 +48,7 @@ There are two types of maps in C++. **Always default to `unordered_map`.**
 | Insert | $O(1)$ average | $O(\log N)$ |
 | Erase | $O(1)$ average | $O(\log N)$ |
 | Key Order | Random | Sorted |
-| Memory | Higher (hash table overhead) | Lower |
+| Memory | Bucket array + 1 node per key (often less in practice) | 3 pointers + color per node (often more) |
 | Worst Case | $O(N)$ (hash collisions) | $O(\log N)$ always |
 
 ### 3. Core Operations

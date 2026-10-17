@@ -238,7 +238,7 @@ For every step, scan the $K$ elements in the window to find the max. Time: $O(N 
 **The Monotonic Deque Insight:**
 We want to keep track of the maximums. If we encounter a `5`, and the previous elements in the window were `-1` and `-3`, those previous elements are now completely useless! They are smaller than `5`, and because they are older, they will fall out of the window *before* `5` does. We can safely throw them away.
 
-We maintain a **Strictly Decreasing Deque**.
+We maintain a **Decreasing Deque** (non-increasing: the code pops only smaller values, so equal values stay).
 The front of the deque will ALWAYS hold the maximum element for the current window.
 
 ---

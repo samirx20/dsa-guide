@@ -177,7 +177,7 @@ WITH pop_back (CORRECT):
   A adds [3] → [1,3]    ← CORRECT!
 ```
 
-**Visual Walkthrough: Subsets of {1, 2, 3}**
+**Visual Walkthrough: Choose/Unchoose over {1, 2, 3}** (base case = `index == n`, so only the 4 leaf states are recorded; the Subsets code in Section 4 records *every* state and returns all 8 subsets, including [], [1], [2], [1,2])
 ```
 Step | Action          | current[]  | result[]
 ─────┼─────────────────┼────────────┼─────────────────────────

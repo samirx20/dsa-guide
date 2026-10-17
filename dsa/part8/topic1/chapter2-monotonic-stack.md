@@ -1,7 +1,7 @@
 # Part 8, Topic 1: Stack
 ## Chapter 2: The Monotonic Stack
 
-A **Monotonic Stack** is a stack whose elements are always strictly increasing or strictly decreasing.
+A **Monotonic Stack** is a stack whose elements are always increasing or always decreasing (strictly or not, depending on whether equal values get popped).
 
 This is an advanced pattern that turns $O(N^2)$ brute-force solutions into brilliant $O(N)$ solutions. Once you learn to recognize this pattern, a whole category of "next greater/smaller element" problems becomes trivial.
 
@@ -192,8 +192,8 @@ Across ALL iterations combined, it runs at most N times total.
 
 ### 6. Variations
 
-**Next Greater Element:** Use a strictly decreasing stack (pop when `curr > top`).
-**Next Smaller Element:** Use a strictly increasing stack (pop when `curr < top`).
+**Next Greater Element:** Use a decreasing stack (pop when `curr > top`; equal values stay, so it is non-increasing).
+**Next Smaller Element:** Use an increasing stack (pop when `curr < top`; equal values stay, so it is non-decreasing).
 
 **Next Smaller Element Example:**
 ```cpp

@@ -1,4 +1,4 @@
-# Part 0, Topic 0: The Bridge: Python Foundations
+# Part 0, Topic 2: The Bridge: Python Foundations
 ## Chapter 3: Class & Object Refresher
 
 **Prerequisite Knowledge:** Basic Python functions and variables.

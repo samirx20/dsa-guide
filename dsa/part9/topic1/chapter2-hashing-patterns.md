@@ -182,8 +182,8 @@ string frequencySort(string s) {
     return result;
 }
 // Example: "tree" → counts={t:1, r:1, e:2}
-// Sorted pairs: [('e',2), ('t',1), ('r',1)]
-// Result: "eetr"
+// Sorted pairs: [('e',2), ('t',1), ('r',1)] (tie order of 't'/'r' depends on unordered_map order)
+// Result: "eetr" (or "eert"; both are valid answers)
 ```
 
 ---

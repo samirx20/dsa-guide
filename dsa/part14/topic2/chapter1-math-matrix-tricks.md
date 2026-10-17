@@ -246,9 +246,9 @@ Process bits from right to left:
 | 4 | 1 | 1 | 6561 | 243*6561=1594323 | result *= base |
 | 5 | 0 | — | — | — | done |
 
-Wait, let me recalculate. 3^13 = 1594323. That's correct for 3^13.
+The final result, 3^13 = 1594323, is correct.
 
-Actually, 3^13 = 1594323? Let me verify: 3^1=3, 3^2=9, 3^3=27, 3^4=81, 3^5=243, 3^6=729, 3^7=2187, 3^8=6561, 3^9=19683, 3^10=59049, 3^11=177147, 3^12=531441, 3^13=1594323. Yes.
+To verify by repeated multiplication: 3^1=3, 3^2=9, 3^3=27, 3^4=81, 3^5=243, 3^6=729, 3^7=2187, 3^8=6561, 3^9=19683, 3^10=59049, 3^11=177147, 3^12=531441, 3^13=1594323, as expected.
 
 ```cpp
 long long power(long long base, long long exp) {

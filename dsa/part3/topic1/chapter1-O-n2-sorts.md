@@ -585,8 +585,9 @@ void insertionSortAdaptive(vector<int>& arr) {
             arr[j + 1] = arr[j];
             j--;
             shifts++;
+            comparisons++; // arr[j] > key was true
         }
-        comparisons++; // Count how many times we checked
+        if (j >= 0) comparisons++; // the arr[j] > key check that stopped the loop
         
         arr[j + 1] = key;
     }

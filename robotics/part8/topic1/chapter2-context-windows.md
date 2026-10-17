@@ -109,7 +109,7 @@ print(f"Tokens: {token_count}")  # 10 tokens
 
 ### 2. What Happens When You Exceed the Context
 
-When your messages exceed the model's context window, the API either truncates older messages or returns an error.
+When your messages exceed the model's context window, the API returns an error (OpenAI Chat Completions: HTTP 400 `context_length_exceeded`). Some other APIs, or SDK/framework options, truncate older messages instead.
 
 ```python
 import tiktoken
@@ -162,8 +162,8 @@ if total_tokens > model_limit * 0.9:
     #     Never use 100% - leave room for the AI's response!
 
 # What happens if you exceed the limit:
-# Option 1: API truncates oldest messages (silently!)
-# Option 2: API returns an error
+# Option 1: Some APIs/SDK options truncate oldest messages (silently!)
+# Option 2: API returns an error (OpenAI Chat Completions does this)
 # Either way, you lose context or crash
 ```
 
@@ -182,21 +182,21 @@ if total_tokens > model_limit * 0.9:
 # Scenario: You have a 200-page document and ask the AI to summarize it
 # The document alone exceeds the context window!
 
-document = "This is page 1 of the document... " * 10000  # Very long text
+document = "This is page 1 of the document... " * 20000  # Very long text (~180,000 tokens > 128k)
 
 messages = [
     {"role": "system", "content": "Summarize this document."},
     {"role": "user", "content": document},
 ]
 
-# This will FAIL or TRUNCATE
+# This will FAIL (or TRUNCATE, on APIs that truncate)
 response = client.chat.completions.create(
     model="gpt-4o",
     messages=messages,
 )
 # Possible errors:
-# - openai.BadRequestError: max_tokens is too large
-# - Silent truncation of oldest messages
+# - openai.BadRequestError (400, context_length_exceeded): maximum context length is 128000 tokens
+# - Silent truncation of oldest messages (other APIs / SDK options)
 # - Incomplete summary (AI only sees part of document)
 
 # FIX: Use chunking or summarization strategies

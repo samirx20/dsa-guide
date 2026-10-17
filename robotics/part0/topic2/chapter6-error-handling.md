@@ -1,4 +1,4 @@
-# Part 0, Topic 1: Python Systems Basics
+# Part 0, Topic 2: Python Systems Basics
 ## Chapter 3: Error Handling
 
 **Prerequisite Knowledge:** Basic Python syntax, understanding of functions, and general awareness of what an error or "crash" is in programming.
@@ -274,6 +274,7 @@ def timer(label: str):
         print(f"{label}: {elapsed:.3f}s")
 
 # Step 2: Use the context manager with the 'with' keyword
+# (shown at top level for brevity; 'await' must be inside an async def in a .py script)
 with timer("LLM call"):
     # Control jumps to the 'yield' above, runs this, then jumps back
     result = await call_llm("What is the engine temperature?")
@@ -424,8 +425,9 @@ match validate_temperature(42.5):
     case Err(error=msg):
         # msg = the error string
         print(f"Validation failed: {msg}")
-# The match statement FORCES you to handle both cases!
-# If you forget one, mypy will warn you
+# Matching on Ok/Err makes you think about both cases.
+# mypy only warns about a forgotten one if you add `case _: assert_never(...)`
+# (or the function would fall through without returning)
 ```
 
 **Result vs Exceptions — when to use which:**

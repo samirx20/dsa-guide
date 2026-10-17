@@ -1,4 +1,4 @@
-# Part 0, Topic 1: Python Systems Basics
+# Part 0, Topic 2: Python Systems Basics
 ## Chapter 2: Advanced Type Hinting
 
 **Prerequisite Knowledge:** Basic Python variables and functions, introductory understanding of type hints (like `int`, `str`, `list`).

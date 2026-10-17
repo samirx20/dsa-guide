@@ -58,8 +58,7 @@ def status(config: dict = Depends(get_config)) -> dict:
     # Now `config` has whatever get_config() returned!
     return {"config": config}
 
-async def main() -> None:
-    from asgiref.sync import sync_to_async
+def main() -> None:
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
@@ -581,8 +580,8 @@ def dashboard(
 # RIGHT: FastAPI automatically creates a new generator per endpoint call
 # Each endpoint gets its own fresh database connection
 
-# If you WANT to share a dependency across multiple endpoints:
-# Use a class-based dependency
+# Wrapping the resource in a class does NOT share it across endpoints:
+# get_db() below still yields a fresh DatabaseSession per request
 class DatabaseSession:
     def __init__(self):
         self.connection = create_connection()

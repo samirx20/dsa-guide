@@ -1,4 +1,4 @@
-# Part 0, Topic 0: The Bridge: Python Foundations
+# Part 0, Topic 2: The Bridge: Python Foundations
 ## Chapter 1: Introduction to Type Hinting
 
 **Prerequisite Knowledge:** Basic understanding of Python functions, variables, and data types (strings, integers, lists).
@@ -243,8 +243,8 @@ avg = calculate_average(temps)
 print(avg)  # Outputs: 22.85
 
 # Dictionary with specific types (sensor config)
-def get_sensor_config(config: dict[str, float]) -> str:
-    # config: dict[str, float] means: keys are strings, values are floats
+def get_sensor_config(config: dict[str, str | float]) -> str:
+    # config: dict[str, str | float] means: keys are strings, values are strings or floats
     name = config.get("name", "unknown")
     threshold = config.get("threshold", 0.0)
     return f"Sensor {name} threshold: {threshold}"

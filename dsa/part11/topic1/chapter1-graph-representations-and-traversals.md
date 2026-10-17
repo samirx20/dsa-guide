@@ -76,11 +76,10 @@ Usually, this is a `vector<bool> visited(numNodes, false)` or an `unordered_set<
 #### Why Visited is Critical: Infinite Loop Example
 
 ```
-Graph: 0 -- 1 -- 2
+Graph: 0 -- 1 -- 2 -- 3
        |         |
-       +----+----+
-            |
-            3
+       +---------+
+       (edges: 0-1, 1-2, 2-0, 2-3)
 
 Without visited:
 DFS(0) -> DFS(1) -> DFS(2) -> DFS(0) -> DFS(1) -> ... INFINITE LOOP
@@ -319,8 +318,9 @@ Step | (r,c) | Grid State          | Action
 4    | (0,0) | 0  1  0 / 0 0 0 / 0 0 1 | Already visited, return
 5    | (1,1) | 0  1  0 / 0 0 0 / 0 0 1 | Water, return
 6    | (1,-1)| 0  1  0 / 0 0 0 / 0 0 1 | Out of bounds, return
-7    | (0,1) | 0  0  0 / 0 0 0 / 0 0 1 | Mark (0,1) visited
-8    | (1,1) | 0  0  0 / 0 0 0 / 0 0 1 | Water, return
+7    | (-1,0)| 0  1  0 / 0 0 0 / 0 0 1 | Out of bounds, return
+8    | (0,1) | 0  0  0 / 0 0 0 / 0 0 1 | Mark (0,1) visited
+9    | (1,1) | 0  0  0 / 0 0 0 / 0 0 1 | Water, return
 ...   ...   | ...                  | Continue until all reachable done
 
 Island found! Next unvisited '1' is at (2,2) -> second island.

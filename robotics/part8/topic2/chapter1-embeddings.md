@@ -1,4 +1,4 @@
-# Part 8, Topic 1: Vector Search & Embeddings
+# Part 8, Topic 2: Vector Search & Embeddings
 ## Chapter 1: Embeddings
 
 **Prerequisite Knowledge:** Basic understanding of API calls and lists in Python.
@@ -317,7 +317,7 @@ cache["Pump maintenance"] = embedding
 cache["Pump maintenance "] = embedding  # trailing space = different key!
 cache["pump maintenance"] = embedding   # different case = different key!
 
-# Hash is normalized:
+# Hashing alone does NOT normalize:
 text1 = "Pump maintenance"
 text2 = " pump maintenance "
 hash1 = hashlib.sha256(text1.encode()).hexdigest()
@@ -366,7 +366,7 @@ def get_embedding_persistent(text, model="text-embedding-3-small"):
     return embedding
 ```
 
-For production systems, persist the cache to a file or database so it survives restarts. The hash-based key ensures that identical texts always hit the cache regardless of whitespace or encoding differences.
+For production systems, persist the cache to a file or database so it survives restarts. The hash-based key gives a short, fixed-length key, so identical texts always hit the cache; it is the `strip().lower()` normalization above (not the hash) that lets texts differing only in case or leading/trailing whitespace share an entry.
 
 ---
 

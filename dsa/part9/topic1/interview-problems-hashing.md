@@ -31,7 +31,7 @@ Because Hash Maps are so fast, they are often used as the underlying storage mec
 | Group Anagrams | O(N*K log K) | Map of Groups | O(N*K log K) | O(N*K) |
 | Top K Frequent | O(N log N) | Frequency + Heap | O(N log K) | O(N) |
 | Longest Consecutive | O(N log N) | Hash Set | O(N) | O(N) |
-| 4Sum | O(N⁴) | Pair Sum Map | O(N²) | O(N²) |
+| 4Sum | O(N⁴) | Pair Sum Map | O(N²) avg, O(N⁴) worst | O(N²) |
 | Subarray Sum K | O(N²) | Prefix Sum Map | O(N) | O(N) |
 
 ---
@@ -107,7 +107,7 @@ bool canConstruct(string ransomNote, string magazine) {
 // Not enough 'a's → return false
 ```
 
-**Dry Run Table:**
+**Dry Run Table** (ransomNote = "aaa", magazine = "aab"):
 
 | Step | Char | Magazine Count | Available? | Action |
 |------|------|----------------|------------|--------|
@@ -271,7 +271,7 @@ int longestConsecutive(vector<int>& nums) {
 
 ### 6. 4Sum (Medium)
 **Trigger:** Find all unique quadruplets that sum to a target.
-**Intuition:** You can do this with $O(N^3)$ nested loops and Two Pointers (like 3Sum), but you can also use a Hash Map to do it in $O(N^2)$ average time.
+**Intuition:** You can do this with $O(N^3)$ nested loops and Two Pointers (like 3Sum), but you can also use a Hash Map to do it in $O(N^2)$ average time (worst case $O(N^4)$: e.g. if all numbers are equal, every pair has the same sum, so each lookup returns a list of ~$N^2/2$ pairs to check).
 Create a Hash Map where the Key is the sum of a pair `A+B`, and the Value is a list of pairs `(i, j)`.
 Iterate through the array again to find `C+D`. Check if `Target - (C+D)` exists in the map. If it does, you have four numbers that sum to the target! (You must add logic to ensure the indices `i, j, k, l` are all unique and handle duplicates).
 
@@ -451,7 +451,7 @@ int lengthOfLongestSubstring(string s) {
 | Group Anagrams | O(NK log K) | O(NK) | Grouping |
 | Top K Frequent | O(N log K) | O(N) | Frequency + Heap |
 | Longest Consecutive | O(N) | O(N) | Set + Sequence Start |
-| 4Sum | O(N²) | O(N²) | Pair Sum Map |
+| 4Sum | O(N²) avg, O(N⁴) worst | O(N²) | Pair Sum Map |
 | Valid Sudoku | O(1) | O(1) | Hash Set per row/col/box |
 | Longest Substring | O(N) | O(min(N,M)) | Sliding Window + Map |
 

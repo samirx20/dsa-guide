@@ -1,4 +1,4 @@
-# Part 8, Topic 1: Vector Search & Embeddings
+# Part 8, Topic 2: Vector Search & Embeddings
 ## Chapter 3: Chunking Strategies
 
 **Prerequisite Knowledge:** Basic understanding of strings, lists, and loops in Python.
@@ -38,7 +38,7 @@ Embedding models have a maximum input length, and even if they did not, embeddin
 
 ### 1. Why Chunking Is Necessary
 
-An equipment manual might be 50 pages long. The `text-embedding-3-small` model accepts up to 8191 tokens — roughly 30,000 characters. Beyond that, text is silently truncated, losing critical information. Even within the limit, embedding an entire document produces one vector that averages out all topics, making it useless for searching specific procedures:
+An equipment manual might be 50 pages long. The `text-embedding-3-small` model accepts up to 8191 tokens — roughly 30,000 characters. Beyond that, the OpenAI API rejects the request with a 400 error (some providers, such as Voyage, silently truncate by default instead), and cutting the text down yourself loses critical information. Even within the limit, embedding an entire document produces one vector that averages out all topics, making it useless for searching specific procedures:
 
 ```python
 manual = open("pump_manual.txt").read()
@@ -54,7 +54,7 @@ short_manual = manual[:30000]  # Silently truncated!
 ```python
 manual = open("pump_manual.txt").read()
 # Reads entire file into one string: 45,000 chars ≈ 11,250 tokens
-# Embedding model limit is 8,191 tokens → text is silently truncated
+# Embedding model limit is 8,191 tokens → the API rejects it, so it must be cut down
 # manual[:30000] drops everything after char 30,000
 # If the seal replacement procedure is on page 40, it's GONE
 #
@@ -72,7 +72,7 @@ Chunking solves both problems: each chunk stays within token limits, and each ch
 | `text-embedding-3-small` | 8,191 | ~32,000 | 800-1,500 chars |
 | `text-embedding-3-large` | 8,191 | ~32,000 | 800-1,500 chars |
 | `text-embedding-ada-002` | 8,191 | ~32,000 | 800-1,500 chars |
-| `voyage-2` | 32,000 | ~128,000 | 1,000-2,000 chars |
+| `voyage-2` | 4,000 | ~16,000 | 1,000-2,000 chars |
 
 ### 2. Fixed-Size Chunking
 

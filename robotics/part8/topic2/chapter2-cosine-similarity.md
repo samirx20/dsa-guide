@@ -1,4 +1,4 @@
-# Part 8, Topic 1: Vector Search & Embeddings
+# Part 8, Topic 2: Vector Search & Embeddings
 ## Chapter 2: Cosine Similarity
 
 **Prerequisite Knowledge:** Basic understanding of arrays/lists and the concept of a coordinate system.

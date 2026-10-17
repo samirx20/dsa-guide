@@ -405,7 +405,7 @@ Look at **Step 4** physically:
 - **Fix**: Memorize the block inverse identity: $\mathbf{T}^{-1} = \begin{bmatrix} \mathbf{R}^T & -\mathbf{R}^T\mathbf{t} \\ \mathbf{0}^T & 1 \end{bmatrix}$. You must rotate $-\mathbf{t}$ into the child frame using $\mathbf{R}^T$!
 
 ### Mistake 2: Applying a Point Transform ($w = 1$) to a Velocity or Normal Vector ($w = 0$)
-- **Symptom**: Your robot is at $(x = 100\text{ m}, y = 50\text{ m})$ moving at $1\text{ m/s}$. You transform the velocity vector using `transform_point`, and the robot's velocity suddenly becomes $101\text{ m/s}$!
+- **Symptom**: Your robot is at $(x = 100\text{ m}, y = 50\text{ m})$ moving at $1\text{ m/s}$. You transform the velocity vector using `transform_point`, and the robot's velocity $(1, 0)$ (heading $0$) suddenly becomes $(101, 50)$, about $113\text{ m/s}$!
 - **Fix**: Positions/points use homogeneous coordinate $w = 1$ ($\mathbf{R}\mathbf{p} + \mathbf{t}$). Free vectors (velocities, accelerations, forces, surface normals) use $w = 0$ ($\mathbf{R}\mathbf{v}$ only).
 
 ### Mistake 3: Multiplying Transforms in Wrong Subscript Order (`T_BS * T_WB`)

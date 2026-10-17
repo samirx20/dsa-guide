@@ -66,24 +66,22 @@ You are "cutting" a branch off the tree, saving massive amounts of computation.
 #### Decision Tree: Combination Sum `[2,3,6,7]` target = `7`
 
 ```
-                        [] (sum=0)
-                     /    |    \
-                   /      |      \
-                [2]      [3]      [7]
-              sum=2     sum=3     sum=7 ← ✓ FOUND
-               / \       | \
-             /   |       |   \
-         [2,2] [2,3]  [3,3] [3,6]
-         sum=4 sum=5  sum=6 sum=9
-           |     |      |     ✂
-         [2,2,2]  ✂   [3,3,3]
-         sum=6  sum=8  sum=9
-           |           ✂
-      [2,2,2,2]      ✂
-      sum=8>7 ✂
+                            [] (sum=0)
+                  /          |          \          \
+               [2]          [3]          [6]         [7]
+              sum=2        sum=3        sum=6       sum=7 ← ✓ FOUND
+              /   \         /   \          |
+         [2,2]   [2,3]  [3,3]  [3,6]    [6,6]
+         sum=4   sum=5  sum=6  sum=9 ✂  sum=12 ✂
+         /    \      \      \
+   [2,2,2]  [2,2,3]  [2,3,3]  [3,3,3]
+   sum=6    sum=7 ✓  sum=8 ✂  sum=9 ✂
+      |
+  [2,2,2,2]
+  sum=8>7 ✂
 
   Solutions: [2,2,3] ✓   [7] ✓
-  Nodes with pruning: ~15    Without: ~25
+  Nodes (recursive calls) with pruning: 10    Without: 28
 ```
 
 ---
@@ -215,13 +213,15 @@ With pruning: skips directly past all invalid elements.
 
 | Input | Target | Nodes Without Pruning | Nodes With Pruning | Reduction |
 |-------|--------|----------------------|-------------------|-----------|
-| [2,3,6,7] | 7 | ~25 | 15 | 40% |
-| [2,3,5] | 8 | ~20 | 10 | 50% |
-| [2,3,7] | 18 | ~40 | 15 | 63% |
-| [1,2,3] | 6 | ~15 | 8 | 47% |
-| [2,4,6,8] | 10 | ~30 | 12 | 60% |
+| [2,3,6,7] | 7 | 28 | 10 | 64% |
+| [2,3,5] | 8 | 23 | 13 | 43% |
+| [2,3,7] | 18 | 93 | 57 | 39% |
+| [1,2,3] | 6 | 35 | 23 | 34% |
+| [2,4,6,8] | 10 | 38 | 18 | 53% |
 
-**As the target grows relative to the smallest element, pruning becomes MORE effective.**
+(A "node" is one call to `backtrack`, root included. "Without pruning" is the Section 4 version, which only returns once `sum > target`; "with pruning" is the sorted + `break` code above.)
+
+**As the target grows relative to the smallest element, pruning saves MORE calls in absolute terms, though the percentage saved shrinks** (e.g. `[2,3,6,7]`: target 7 saves 18 of 28 calls, target 20 saves 105 of 223).
 
 ---
 
@@ -367,8 +367,9 @@ void backtrack(vector<int>& nums, int target, int index,
 
 **What's happening:**
 ```
-Without early termination: enter recursion, then check sum > target, then return
-With early termination: check sum > target BEFORE recursion → saves function call overhead
+Without early termination: sum keeps growing and the loop recurses forever
+With early termination: check sum > target at the top of the call, BEFORE the loop → the call returns at once
+(The sorted + break version checks BEFORE the recursive call, so it also saves the call itself)
 ```
 
 ---
@@ -457,8 +458,8 @@ if (currentSum + nums[i] > target) continue;
 
 | Problem | Without Pruning | With Pruning | Pruning Type |
 |---------|----------------|--------------|--------------|
-| **Combination Sum** | O(2^N * target) | O(2^(N/2)) avg | Sum + early termination |
-| **Combination Sum II** | O(2^N * target) | O(2^(N/2)) avg | Sum + duplicate |
+| **Combination Sum** | O(N^(T/M)) (T=target, M=min) | O(N^(T/M)) worst, better avg | Sum + early termination |
+| **Combination Sum II** | O(2^N) | O(2^N) worst, better avg | Sum + duplicate |
 | **Subsets II** | O(2^N) | O(2^N) worst, better avg | Duplicate |
 | **Permutations** | O(N!) | O(N!) worst, better avg | Visited check |
 
@@ -475,7 +476,7 @@ if (currentSum + nums[i] > target) continue;
 | **Duplicate pruning** | Sort + `i > index && nums[i] == nums[i-1]` |
 | **Remaining sum** | Can remaining elements reach the target? |
 | **Bounds pruning** | Compute min/max possible from remaining elements |
-| **Impact** | Can reduce $O(2^N)$ to $O(2^{N/2})$ or better |
+| **Impact** | Same worst-case Big-O, but far fewer nodes explored in practice |
 
 ---
 

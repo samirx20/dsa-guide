@@ -27,7 +27,7 @@ VALUES
 
 -- Insert with all columns (not recommended - order matters)
 INSERT INTO users
-VALUES (DEFAULT, 'dave', 'dave@email.com', DEFAULT, DEFAULT, DEFAULT);
+VALUES (DEFAULT, 'dave', 'dave@email.com', DEFAULT, DEFAULT, DEFAULT, DEFAULT);
 ```
 
 **What's happening:**

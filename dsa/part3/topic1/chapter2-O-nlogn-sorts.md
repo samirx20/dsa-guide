@@ -352,7 +352,7 @@ int partition(vector<int>& arr, int left, int right) {
         if (arr[j] < pivot) {
 //              ^     ^
 //              |     └── Compare with pivot
-//              |       Strict less than (not <= for stability)
+//              |       Strict less than (Lomuto is unstable with < or <=)
 //              └── Current element
             
             i++;
@@ -564,7 +564,7 @@ int medianOfThree(vector<int>& arr, int left, int right) {
 *   **Time Complexity:** 
     *   **Average & Best Case:** $O(N \log N)$.
     *   **Worst Case:** $O(N^2)$. This happens if the array is already sorted and you always pick the last element as the pivot (the partition tree becomes a straight line of depth $N$). This is mitigated in reality by picking a random pivot.
-*   **Space Complexity:** $O(\log N)$ Auxiliary Space (for the recursive call stack). **It sorts in-place!**
+*   **Space Complexity:** $O(\log N)$ Auxiliary Space on average (for the recursive call stack; $O(N)$ worst case for this naive recursion). **It sorts in-place!**
 *   **Stability:** Not stable (partitioning swaps elements across wide gaps).
 
 ---

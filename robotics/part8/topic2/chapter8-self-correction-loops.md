@@ -1,4 +1,4 @@
-# Part 8, Topic 1: State Machines & Memory
+# Part 8, Topic 2: State Machines & Memory
 ## Chapter 3: Self-Correction Loops
 
 **Prerequisite Knowledge:** Basic understanding of Try/Except blocks, Pydantic, and JSON.
@@ -314,7 +314,7 @@ print(f"Errors: {output['errors']}")
   Validation passes -> return result
 ```
 
-The first attempt fails because `priority` is "high" (a string, not an int). `estimated_hours` is "4" (a string), but Pydantic's default lax mode coerces numeric strings to float, so it passes. The error message is appended to the prompt, giving the LLM explicit feedback to fix.
+The first attempt fails because `priority` is "high" (a string, not an int). `estimated_hours` is "4" (a string), but Pydantic's default lax mode coerces numeric strings to float, so it passes. The error message is appended to the prompt, giving the LLM explicit feedback to fix. (The dummy `call_llm` ignores the prompt and returns the same JSON every time, so running this code as-is prints `Attempts: 3` with the same `priority` error three times; a real LLM is what makes attempt 2 succeed.)
 
 ### 4. Logging Correction Attempts
 
@@ -364,7 +364,9 @@ for entry in correction_log:
 
 **What's happening:**
 ```
-  correction_log after 3 attempts:
+  correction_log after 3 attempts (with a real LLM; the dummy call_llm
+  above returns the same JSON every time, so it logs 3 identical
+  priority errors and never succeeds):
   =================================
 
   Attempt 1: 1 error
@@ -372,7 +374,7 @@ for entry in correction_log:
     (estimated_hours "4" is coerced to 4.0 in lax mode - no error)
 
   Attempt 2: 1 error
-    - machine_id: String should have at least 1 character
+    - estimated_hours: Input should be a valid number, unable to parse string as a number
 
   Attempt 3: 0 errors (SUCCESS!)
 ```

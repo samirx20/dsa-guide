@@ -108,10 +108,10 @@ The `async with` block creates a connection pool that reuses TCP connections acr
 # │ Feature          │ requests           │ httpx.AsyncClient  │
 # ├──────────────────┼────────────────────┼────────────────────┤
 # │ Blocking?        │ Yes                │ No (async)         │
-# │ Connection pool  │ Manual             │ Automatic          │
+# │ Connection pool  │ Via Session        │ Automatic          │
 # │ HTTP/2 support   │ No                 │ Yes                │
 # │ Timeouts         │ Basic              │ Granular           │
-# │ Retry support    │ Via adapter        │ Built-in           │
+# │ Retry support    │ Via adapter        │ Connect only       │
 # │ Type hints       │ Partial            │ Full               │
 # └──────────────────┴────────────────────┴────────────────────┘
 ```

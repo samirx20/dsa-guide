@@ -130,7 +130,7 @@ A heuristic $h(n)$ is called **Admissible** if it **never overestimates** the tr
 
 $$0 \le h(n) \le h^*(n) \quad \forall n$$
 
-Why does admissibility matter? Because if $h(n)$ never overestimates the remaining distance, $f(n) = g(n) + h(n)$ is a guaranteed lower bound on any complete path through $n$. Therefore, the moment $A^*$ pops the `Goal` node from the Min-Heap, **it is mathematically impossible for any unexpanded node to lead to a shorter path!**
+Why does admissibility matter? Because if $h(n)$ never overestimates the remaining distance, $f(n) = g(n) + h(n)$ is a guaranteed lower bound on any complete path through $n$. Therefore, the moment $A^*$ pops the `Goal` node from the Min-Heap, **it is mathematically impossible for any unexpanded node to lead to a shorter path!** (The C++ code below also uses a closed set that never re-opens a node; that shortcut additionally needs a **consistent** heuristic, $h(n) \le c(n, n') + h(n')$. Manhattan, Octile and Euclidean are all consistent on their grids.)
 
 Match your heuristic to your robot's allowed grid movements:
 1. **Manhattan Distance (For 4-Connected Grids: Up/Down/Left/Right only):**

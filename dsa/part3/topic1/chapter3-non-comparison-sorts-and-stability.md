@@ -304,7 +304,7 @@ void bucketSort(vector<float>& arr) {
 
     // Sort each bucket (insertion sort for small buckets)
     for (auto& bucket : buckets) {
-        sort(bucket.begin(), bucket.end());
+        stable_sort(bucket.begin(), bucket.end());
     }
 
     // Concatenate all buckets

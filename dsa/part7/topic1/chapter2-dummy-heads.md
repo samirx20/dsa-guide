@@ -229,7 +229,7 @@ You should instantiate a Dummy Node in almost **every** Linked List problem wher
 | Reordering/Partitioning | Building a new list from parts of the original | Odd-Even Linked List |
 | Reversing Sub-lists | Head of the reversed portion changes | Reverse Nodes in k-Group |
 | Removing Duplicates | Head might be duplicated | Remove Duplicates from Sorted List II |
-| Intersection Point | Both lists might be modified | Intersection of Two Linked Lists |
+| Building a Result List | No head exists until the first node is created | Add Two Numbers |
 
 ### Example: Merge Two Sorted Lists (Without Dummy)
 

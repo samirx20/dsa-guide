@@ -1,4 +1,4 @@
-# Part 8, Topic 2: Function Routing
+# Part 8, Topic 1: Function Routing
 ## Chapter 2: Dynamic Execution
 
 **Prerequisite Knowledge:** The Chat Completions API, Tool Calling, and basic Python error handling.
@@ -261,12 +261,15 @@ def timeout_platform(seconds: int):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(func, *args, **kwargs)
-                try:
-                    return future.result(timeout=seconds)
-                except FuturesTimeout:
-                    raise TimeoutError(f"Function timed out after {seconds}s")
+            executor = ThreadPoolExecutor(max_workers=1)
+            future = executor.submit(func, *args, **kwargs)
+            try:
+                return future.result(timeout=seconds)
+            except FuturesTimeout:
+                raise TimeoutError(f"Function timed out after {seconds}s")
+            finally:
+                executor.shutdown(wait=False)  # A `with` block would wait here for func to finish
+                # (the worker thread itself keeps running in the background; threads can't be killed)
         return wrapper
     return decorator
 

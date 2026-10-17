@@ -34,7 +34,7 @@ In legacy **ROS1**, every node required a central coordinator process called `ro
 **ROS2** eliminated the central master completely by building on **DDS (Data Distribution Service)**—an industrial real-time pub/sub standard used in spacecraft, air-traffic control, and autonomous vehicles:
 - **Zero Single Point of Failure:** Nodes discover each other automatically using UDP multicast discovery.
 - **Language Interoperability:** You can write your $500\text{ Hz}$ motor controller and $A^*$ planner in **C++ (`rclcpp`)** for deterministic speed, and your Vision-Language-Action (VLA) model in **Python (`rclpy` + PyTorch)**—and both talk over the exact same binary DDS topics!
-- **Zero-Copy Shared Memory (Iceoryx / Intra-Process):** When two C++ ROS2 nodes run on the same machine, DDS can pass a `std::unique_ptr` or shared-memory pointer in sub-microsecond time without serializing bytes over the network stack!
+- **Zero-Copy Shared Memory (Iceoryx / Intra-Process):** When two C++ ROS2 nodes run in the same process, `rclcpp` intra-process comms pass a `std::unique_ptr` straight past DDS; across processes on the same machine, a shared-memory transport (Iceoryx / loaned messages) passes a shared-memory pointer—both in sub-microsecond time without serializing bytes over the network stack!
 
 ---
 

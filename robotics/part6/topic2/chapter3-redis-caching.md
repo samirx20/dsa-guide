@@ -1,4 +1,4 @@
-# Part 6, Topic 3: Caching & Performance
+# Part 6, Topic 2: Caching & Performance
 ## Chapter 2: Redis Caching Patterns
 
 ### What You'll Learn

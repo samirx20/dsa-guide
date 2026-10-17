@@ -90,30 +90,31 @@ Step 3: Pop B (dist=4)
   Relax E: 4+7=11 < 6? NO → E stays at 6
   
   Distances: A=0  B=4   C=6   D=1   E=6   F=INF
-  Min-Heap:  [(6,E), (6,C)]
+  Min-Heap:  [(6,C), (6,E)]
   Visited:   {A, D, B}
 
-Step 4: Pop E (dist=6)   [tie broken by heap order]
-  Neighbors: F (weight=1)
-  Relax F: 6+1=7 < INF → update F=7, push (7,F)
-  
-  Distances: A=0  B=4   C=6   D=1   E=6   F=7
-  Min-Heap:  [(6,C), (7,F)]
-  Visited:   {A, D, B, E}
-
-Step 5: Pop C (dist=6)
+Step 4: Pop C (dist=6)   [tie on 6: pair compares node next, C < E]
   Neighbors: F (weight=3)
-  Relax F: 6+3=9 < 7? NO → F stays at 7
+  Relax F: 6+3=9 < INF → update F=9, push (9,F)
+  
+  Distances: A=0  B=4   C=6   D=1   E=6   F=9
+  Min-Heap:  [(6,E), (9,F)]
+  Visited:   {A, D, B, C}
+
+Step 5: Pop E (dist=6)
+  Neighbors: F (weight=1)
+  Relax F: 6+1=7 < 9 → update F=7, push (7,F)
   
   Distances: A=0  B=4   C=6   D=1   E=6   F=7
-  Min-Heap:  [(7,F)]
-  Visited:   {A, D, B, E, C}
+  Min-Heap:  [(7,F), (9,F)]
+  Visited:   {A, D, B, C, E}
 
 Step 6: Pop F (dist=7)
   Neighbors: none
+  (The leftover (9,F) is popped later and skipped as stale: 9 > 7.)
   
   FINAL:     A=0  B=4   C=6   D=1   E=6   F=7
-  Visited:   {A, D, B, E, C, F}
+  Visited:   {A, D, B, C, E, F}
 ```
 
 **Key insight:** The relaxation step at E was critical. B→E costs 11, but D→E costs 6. Dijkstra correctly keeps E=6 because it processes D before B (smaller distance).

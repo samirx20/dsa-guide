@@ -245,8 +245,10 @@ for row in cur.fetchall():
 #   %s::vector = cast the string to vector type
 #
 # WHERE machine_id = 'P101'
-#   Pre-filter: only search P101 chunks
-#   This is faster than searching ALL chunks then filtering
+#   Filter: only P101 chunks can be returned
+#   With no vector index this is an exact scan of P101 rows. With the ivfflat index,
+#   pgvector applies the filter AFTER the approximate index scan, so you may get < 3 rows
+#   (pgvector 0.8+ can fix this with iterative index scans)
 #
 # ORDER BY embedding <=> %s::vector
 #   Sort by cosine distance (lowest distance first = most similar)
@@ -255,7 +257,7 @@ for row in cur.fetchall():
 #   Return only top 3 results
 ```
 
-The `<=>` operator computes cosine distance (lower is more similar). The `1 - distance` conversion gives you similarity scores. Filtering by `machine_id` before the vector search means you only search relevant documents.
+The `<=>` operator computes cosine distance (lower is more similar). The `1 - distance` conversion gives you similarity scores. Filtering by `machine_id` means only relevant documents come back. With an approximate index such as `ivfflat`, though, pgvector applies the filter after the index scan, so a selective filter can return fewer rows than `LIMIT`.
 
 ### Common Mistake: Converting Embedding to String Incorrectly
 
@@ -450,7 +452,8 @@ class InMemoryVectorStore:
 # Shape mismatch: Vector dimension 768 doesn't match index dimension 1536
 #   → Ensure all vectors use the same embedding model
 #   → Don't mix ada-002 (1536-dim) with text-embedding-3-small (1536-dim)
-#     — actually they match, but older models had different dims
+#     — the dims match, so no error is raised, but the two models' vector
+#       spaces are different and similarity scores between them are meaningless
 ```
 
 ### Quick Reference

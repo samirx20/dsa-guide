@@ -353,7 +353,7 @@ sort(nums.begin(), nums.end(), [](int a, int b) { return a < b; });
 // MISTAKE 3: Forgetting to dereference max_element/min_element
 vector<int> nums = {5, 9, 2};
 int maxVal = max_element(nums.begin(), nums.end());
-// WRONG: maxVal is an iterator (pointer), not the value!
+// WRONG: max_element returns an iterator, not the value — compile error!
 
 int maxVal = *max_element(nums.begin(), nums.end()); // 9 ✓
 

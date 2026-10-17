@@ -154,6 +154,7 @@ public:
         P_[1][2] += F12 * P_[2][2]; P_[2][1] = P_[1][2];
         P_[2][2] += q_th;
         // ^^^ Propagate P = F * P * F^T + Q concisely; uncertainty grows on every 10ms tick
+        //     (the x-y cross term P_[0][1] is held at 0, matching the diagonal S used in updateGPS)
     }
 
     bool updateGPS(double z_x, double z_y, double r_var) {
@@ -180,6 +181,8 @@ public:
         x_[2] = wrapToPi(x_[2] + K20 * y0 + K21 * y1);
         // ^^^ Fuse GPS innovation into [x, y, theta]
 
+        P_[2][2] -= K20 * P_[0][2] + K21 * P_[1][2];
+        // ^^^ Heading variance shrinks too (uses P_[0][2], P_[1][2] before they are scaled below)
         P_[0][0] *= (1.0 - K00);
         P_[1][1] *= (1.0 - K11);
         P_[0][2] *= (1.0 - K00); P_[2][0] = P_[0][2];

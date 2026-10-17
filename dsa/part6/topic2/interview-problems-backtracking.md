@@ -9,7 +9,7 @@ These are the quintessential Backtracking problems. If you master these 6 proble
 
 | # | Problem | Difficulty | Pattern | Time | Space | Key Insight |
 |---|---------|------------|---------|------|-------|-------------|
-| 1 | Subsets | Medium | Subset template | O(2^n) | O(n) | Start loop at index, recurse with i+1 |
+| 1 | Subsets | Medium | Subset template | O(n*2^n) | O(n) | Start loop at index, recurse with i+1 |
 | 2 | Permutations | Medium | Permutation template | O(n*n!) | O(n) | Use visited array, loop from 0 |
 | 3 | Combination Sum | Medium | Combination with reuse | O(2^target) | O(target) | Pass i (not i+1) to reuse numbers |
 | 4 | Word Search | Medium | 2D backtracking | O(m*n*4^L) | O(L) | Mark visited by changing char |
@@ -261,7 +261,7 @@ Start at (0,0) char='A' matches word[0]='A'
 | 6 | (0,0) | 'A' | Restore | [['A','B'],['C','D']] | 0 |
 
 **Alternative Approach: BFS with Queue**
-BFS explores level by level using a queue. Store `(r, c, index)` state. More memory but avoids deep recursion. Same choose/unchosen pattern with `board[r][c] = '#'`.
+BFS explores level by level using a queue. Store `(r, c, index)` state. More memory but avoids deep recursion. The in-place `board[r][c] = '#'` choose/unchoose trick does NOT work here (BFS interleaves different paths), so each queue entry must carry its own path's visited set (e.g. a bitmask of used cells).
 
 ---
 
@@ -455,7 +455,7 @@ This systematic approach ensures clear thinking in interviews.
 
 | Problem | Template | Key Line | Pruning | Time |
 |---------|----------|----------|---------|------|
-| Subsets | Subset | `backtrack(nums, i+1, ...)` | None | O(2^n) |
+| Subsets | Subset | `backtrack(nums, i+1, ...)` | None | O(n*2^n) |
 | Permutations | Permutation | `if (!visited[i])` | Visited | O(n*n!) |
 | Combination Sum | Combination | `backtrack(cands, target, i, ...)` | sum>target | O(2^target) |
 | Word Search | 2D backtracking | `board[r][c] = '#'` | Bounds | O(m*n*4^L) |

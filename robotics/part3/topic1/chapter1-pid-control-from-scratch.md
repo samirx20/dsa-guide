@@ -234,7 +234,7 @@ Let's watch what happens when the robot arm gets stuck at $94^\circ$ ($e = +6^\c
 - What happens once the arm finally reaches $y = 100.0^\circ$ ($e = 0^\circ$)?
   - The Proportional term drops to $u_P = K_p \cdot 0 = 0\text{ V}$.
   - The Derivative term is $u_D = -K_d \cdot 0 = 0\text{ V}$.
-  - **What about the Integral term?** When $e = 0^\circ$, we add $0 \cdot \Delta t = 0$ to `integral`. That means `integral` **does not reset to zero**—it freezes at whatever value it accumulated ($1.5\text{ deg}\cdot\text{s}$, so $u_I = 2.0 \times 1.5 = +3.0\text{ V}$)!
+  - **What about the Integral term?** When $e = 0^\circ$, we add $0 \cdot \Delta t = 0$ to `integral`. That means `integral` **does not reset to zero**—it freezes at whatever value it has settled to. In steady state that is $1.5\text{ deg}\cdot\text{s}$, so $u_I = 2.0 \times 1.5 = +3.0\text{ V}$ (any surplus beyond that, such as the $3\text{ deg}\cdot\text{s}$ above, pushes the arm slightly past $100^\circ$, and the negative error there drains it back down)!
 
 **Physical Intuition:** The Integral term is the controller's **persistent memory of past stubborn errors**. It automatically learns the exact baseline offset voltage ($+3.0\text{ V}$) needed to cancel constant external forces like gravity, friction, or headwinds, allowing $e(t)$ to reach $0.000^\circ$!
 

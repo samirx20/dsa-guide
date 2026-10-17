@@ -1,4 +1,4 @@
-# Part 8, Topic 1: State Machines & Memory
+# Part 8, Topic 2: State Machines & Memory
 ## Chapter 1: The State Dictionary
 
 **Prerequisite Knowledge:** Basic understanding of Python dictionaries and functions.
@@ -162,6 +162,8 @@ class DiagnosticState(TypedDict):
     confidence: float
     response: str
     error_message: str
+    collected_facts: list[str]  # Used by gather_input/analyze from Sections 1-2
+    analysis_result: str
 
 def initialize_state() -> DiagnosticState:
     return {
@@ -172,7 +174,9 @@ def initialize_state() -> DiagnosticState:
         "diagnosis": "",
         "confidence": 0.0,
         "response": "",
-        "error_message": ""
+        "error_message": "",
+        "collected_facts": [],
+        "analysis_result": ""
     }
 
 state = initialize_state()
@@ -194,6 +198,8 @@ class DiagnosticState(TypedDict):
     confidence: float  # Confidence score 0.0-1.0
     response: str
     error_message: str
+    collected_facts: list[str]  # Used by gather_input/analyze from Sections 1-2
+    analysis_result: str
 
 def initialize_state() -> DiagnosticState:
     return {
@@ -204,7 +210,9 @@ def initialize_state() -> DiagnosticState:
         "diagnosis": "",
         "confidence": 0.0,  # Zero confidence until analysis
         "response": "",
-        "error_message": ""
+        "error_message": "",
+        "collected_facts": [],
+        "analysis_result": ""
     }
 ```
 
@@ -258,8 +266,8 @@ def run_diagnostic(user_input, sensor_data=None):
         elif state["phase"] == "analyzing":
             state = respond(state)
         else:
-            state["phase"] = "error"
             state["error_message"] = f"Unknown phase: {state['phase']}"
+            state["phase"] = "error"
 
     return state
 
@@ -284,8 +292,8 @@ def run_diagnostic(user_input, sensor_data=None):
         elif state["phase"] == "analyzing":
             state = respond(state)  # Generate response
         else:
-            state["phase"] = "error"  # Handle unknown phase
             state["error_message"] = f"Unknown phase: {state['phase']}"
+            state["phase"] = "error"  # Handle unknown phase (after recording it)
     return state  # Return final state
 ```
 
@@ -308,8 +316,8 @@ def run_diagnostic_safe(user_input, sensor_data=None):
             elif state["phase"] == "analyzing":
                 state = respond(state)
             else:
-                state["phase"] = "error"
                 state["error_message"] = f"Unknown phase: {state['phase']}"
+                state["phase"] = "error"
     except Exception as e:
         state["phase"] = "error"
         state["error_message"] = f"Unexpected error: {str(e)}"

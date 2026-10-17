@@ -1,4 +1,4 @@
-# Part 8, Topic 1: State Machines & Memory
+# Part 8, Topic 2: State Machines & Memory
 ## Chapter 2: Session Management
 
 **Prerequisite Knowledge:** Basic understanding of dictionaries, JSON, and what an API request is.

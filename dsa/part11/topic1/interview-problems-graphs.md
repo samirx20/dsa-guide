@@ -454,9 +454,9 @@ wordList = ["hot","dot","dog","lot","log","cog"]
 
 Step | Queue       | Level | Transformations tried        | Found
 -----|-------------|-------|------------------------------|------
-1    | [hit]       | 1     | h->*: ait,bit,...,zit        | hot
+1    | [hit]       | 1     | i->*: hat,hbt,...,hzt        | hot
 2    | [hot]       | 2     | h->*: aot,...,zot            | dot,lot
-3    | [dot,lot]   | 3     | d->*: dog; l->*: log         | dog,log
+3    | [dot,lot]   | 3     | t->*: dog; t->*: log         | dog,log
 4    | [dog,log]   | 4     | d->*: cog; l->*: cog         | cog!
 
 Return level + 1 = 5: hit -> hot -> dot -> dog -> cog (or hot->lot->log->cog), 5 words

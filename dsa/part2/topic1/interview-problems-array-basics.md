@@ -255,11 +255,12 @@ int maxProfit(vector<int>& prices) {
 
 #### Error Scenario: Starting at Index 0
 ```cpp
-// WRONG: Not updating minPrice before calculating profit
+// WRONG: starting minPrice at 0 instead of prices[0] (or INT_MAX)
+int minPrice = 0, maxProfit = 0;
 for (int i = 0; i < prices.size(); i++) {
-    int currentProfit = prices[i] - minPrice; // Bug: uses old minPrice
+    int currentProfit = prices[i] - minPrice; // Bug: "buys" at a fake price of 0
     maxProfit = max(maxProfit, currentProfit);
-    minPrice = min(minPrice, prices[i]); // Should be BEFORE profit calc
+    minPrice = min(minPrice, prices[i]); // stays 0, so this returns max(prices) (7, not 5)
 }
 ```
 
@@ -455,6 +456,7 @@ vector<int> productExceptSelf(vector<int>& nums) {
     int totalProduct = 1;
     for (int num : nums) totalProduct *= num;
     
+    int n = nums.size();
     vector<int> result(n);
     for (int i = 0; i < n; i++) {
         result[i] = totalProduct / nums[i]; // BUG: division by zero!

@@ -79,12 +79,12 @@ print(safe_execute_wrapper(good_command))
 ```
 
 **What's happening:**
-- **Line 20-21:** `real_execute_command` is the dangerous action we want to protect. It assumes the command is valid.
-- **Line 24:** `safe_execute_wrapper` receives the raw AI command.
-- **Line 26-28:** Pre-check validates the command structure. If `action` is missing, we reject immediately—no side effects occur.
-- **Line 31-32:** Only if pre-check passes do we call the real function.
-- **Line 34-36:** Post-check verifies the result. If execution returned an error, we intercept and reject.
-- **Line 42-43:** We call the wrapper, not the real function directly.
+- **Line 2-3:** `real_execute_command` is the dangerous action we want to protect. It assumes the command is valid.
+- **Line 6:** `safe_execute_wrapper` receives the raw AI command.
+- **Line 7-10:** Pre-check validates the command structure. If `action` is missing, we reject immediately—no side effects occur.
+- **Line 12-15:** Only if pre-check passes do we call the real function.
+- **Line 17-20:** Post-check verifies the result. If execution returned an error, we intercept and reject.
+- **Line 25-26:** We call the wrapper, not the real function directly.
 
 **Output:**
 ```
@@ -130,8 +130,8 @@ def execute_with_try(command: dict) -> dict:
 ```
 
 **What's happening:**
-- **Line 8-10:** Wrapping execution in `try/except` catches crashes that the post-check alone would miss.
-- **Line 12-13:** The `except` block converts a Python exception into a clean rejection dict instead of letting the error propagate up to the AI.
+- **Line 7-10:** Wrapping execution in `try/except` catches crashes that the post-check alone would miss.
+- **Line 9-10:** The `except` block converts a Python exception into a clean rejection dict instead of letting the error propagate up to the AI.
 
 ---
 
@@ -168,12 +168,12 @@ print(execute_command(good_command))
 ```
 
 **What's happening:**
-- **Line 55:** `action_interceptor` is a decorator factory. It takes a function and returns a new function.
-- **Line 57:** `wrapper` is the new function that replaces the original. It receives the same arguments.
-- **Line 58-59:** Pre-check: reject if no `action` key.
-- **Line 61:** `func_to_wrap(command)` calls the original function only if pre-check passes.
-- **Line 63-64:** Post-check: reject if execution returned an error.
-- **Line 71-72:** The `@action_interceptor` syntax tells Python: "Pass `execute_command` into `action_interceptor`, and replace the original with the returned `wrapper`."
+- **Line 4:** `action_interceptor` is a decorator factory. It takes a function and returns a new function.
+- **Line 6:** `wrapper` is the new function that replaces the original. It receives the same arguments.
+- **Line 7-8:** Pre-check: reject if no `action` key.
+- **Line 10:** `func_to_wrap(command)` calls the original function only if pre-check passes.
+- **Line 12-13:** Post-check: reject if execution returned an error.
+- **Line 20-21:** The `@action_interceptor` syntax tells Python: "Pass `execute_command` into `action_interceptor`, and replace the original with the returned `wrapper`."
 
 **Output:**
 ```
@@ -242,10 +242,10 @@ for cmd in commands:
 ```
 
 **What's happening:**
-- **Line 96-98:** `MotorCommand` is a Pydantic model that enforces constraints: `motor_id` must be non-empty, `speed_rpm` must be between 0 and 3600.
-- **Line 100-105:** `pre_validate` tries to parse the raw dict into the model. If validation fails, it returns `False` with the error message.
-- **Line 107-111:** We test three commands: one valid, one with excessive speed, one with empty ID.
-- **Line 113-115:** Each command is validated and the result printed.
+- **Line 3-6:** `MotorCommand` is a Pydantic model that enforces constraints: `motor_id` must be non-empty, `speed_rpm` must be between 0 and 3600.
+- **Line 8-13:** `pre_validate` tries to parse the raw dict into the model. If validation fails, it returns `False` with the error message.
+- **Line 15-19:** We test three commands: one valid, one with excessive speed, one with empty ID.
+- **Line 21-23:** Each command is validated and the result printed.
 
 **Output:**
 ```
@@ -284,8 +284,8 @@ class StrictMotorCommand(BaseModel):
 ```
 
 **What's happening:**
-- **Line 2:** By default, Pydantic ignores unknown fields. This is usually fine, but in safety-critical systems, extra fields might indicate a compromised command.
-- **Line 7-10:** Setting `extra="forbid"` makes the model reject any field not defined in the schema.
+- **Line 1-4:** By default, Pydantic ignores unknown fields. This is usually fine, but in safety-critical systems, extra fields might indicate a compromised command.
+- **Line 9-10:** Setting `extra="forbid"` makes the model reject any field not defined in the schema.
 
 ### Common Mistake: Not Handling Validation Errors Gracefully
 
@@ -305,8 +305,8 @@ def pre_validate_safe(command: dict) -> tuple[bool, str]:
 ```
 
 **What's happening:**
-- **Line 2:** If the command is invalid, `ValidationError` is raised. If this bubbles up uncaught, the AI might see a Python stack trace instead of a clean rejection.
-- **Line 8-10:** The safe version catches the error and returns a structured result.
+- **Line 3:** If the command is invalid, `ValidationError` is raised. If this bubbles up uncaught, the AI might see a Python stack trace instead of a clean rejection.
+- **Line 8-12:** The safe version catches the error and returns a structured result.
 
 ---
 
@@ -341,10 +341,10 @@ print(checked_bad)
 ```
 
 **What's happening:**
-- **Line 130-131:** Only check successful results. If the command already failed, pass it through.
-- **Line 133-134:** Extract target and actual values from the command and result.
-- **Line 135-140:** If the temperature drift exceeds 5 degrees, reject. This catches sensor failures, calibration issues, or sluggish heating elements.
-- **Line 143-144:** Result with 195° (5° drift) passes. Result with 150° (50° drift) fails.
+- **Line 2-3:** Only check successful results. If the command already failed, pass it through.
+- **Line 6-7:** Extract target and actual values from the command and result.
+- **Line 8-12:** If the temperature drift exceeds 5 degrees, reject. This catches sensor failures, calibration issues, or sluggish heating elements.
+- **Line 16-23:** Result with 195° (5° drift) passes. Result with 150° (50° drift) fails.
 
 **Output:**
 ```
@@ -391,7 +391,7 @@ def post_sanity_check_robust(command: dict, result: dict) -> dict:
 ```
 
 **What's happening:**
-- **Line 7-9:** If `actual_temperature` is missing from the result, we return a warning instead of silently passing. This catches cases where the sensor reporting fails.
+- **Line 9-14:** If `actual_temperature` is missing from the result, we return a warning instead of silently passing. This catches cases where the sensor reporting fails.
 
 ---
 
@@ -433,12 +433,12 @@ print(execute(cmd3))
 ```
 
 **What's happening:**
-- **Line 168-171:** `log_interceptor` logs the action before execution. It always passes the command through.
-- **Line 174-180:** `safety_interceptor` checks if the value exceeds 500. Emergency stops bypass this check.
-- **Line 183-184:** `@log_interceptor` is applied first (inner), `@safety_interceptor` second (outer). Python applies decorators bottom-up, so at call time the outer `safety_interceptor` runs first.
-- **Line 188-189:** `cmd1` (value=100): passes both checks.
-- **Line 191-192:** `cmd2` (value=999): safety interceptor rejects it.
-- **Line 194-195:** `cmd3` (emergency_stop): bypasses value limit.
+- **Line 3-7:** `log_interceptor` logs the action before execution. It always passes the command through.
+- **Line 9-16:** `safety_interceptor` checks if the value exceeds 500. Emergency stops bypass this check.
+- **Line 18-19:** `@log_interceptor` is applied first (inner), `@safety_interceptor` second (outer). Python applies decorators bottom-up, so at call time the outer `safety_interceptor` runs first.
+- **Line 23-24:** `cmd1` (value=100): passes both checks.
+- **Line 26-27:** `cmd2` (value=999): safety interceptor rejects it.
+- **Line 29-30:** `cmd3` (emergency_stop): bypasses value limit.
 
 **Output:**
 ```
@@ -512,14 +512,13 @@ print(audit.history)
 ```
 
 **What's happening:**
-- **Line 197-199:** The interceptor is now an instance method. It stores command history in `self.history`.
-- **Line 200-202:** After execution, the history entry is updated with the actual status.
-- **Line 209-210:** Each call appends to the audit trail.
+- **Line 5-11:** The interceptor is now an instance method. It stores command history in `self.history`.
+- **Line 12-13:** After execution, the history entry is updated with the actual status.
+- **Line 22-23:** Each call appends to the audit trail.
 
 **Output:**
 ```
-[{'action': 'start', 'timestamp': '2025-01-15T10:00:00Z', 'status': 'ok'},
- {'action': 'stop', 'timestamp': '2025-01-15T10:01:00Z', 'status': 'ok'}]
+[{'action': 'start', 'timestamp': '2025-01-15T10:00:00Z', 'status': 'ok'}, {'action': 'stop', 'timestamp': '2025-01-15T10:01:00Z', 'status': 'ok'}]
 ```
 
 ---
@@ -567,12 +566,12 @@ print(boundary.execute({"value": 50}))
 ```
 
 **What's happening:**
-- **Line 214-217:** `TrustBoundary` holds lists of pre-checks and post-checks.
-- **Line 219-222:** `add_pre_check` appends a function. Returns `self` for chaining.
-- **Line 224-227:** `add_post_check` same pattern.
-- **Line 229-231:** Execute runs all pre-checks. If any returns non-None, that's a rejection.
-- **Line 233:** Only if all pre-checks pass do we simulate execution.
-- **Line 235-238:** Post-checks run in order. If any rejects, we stop and return the rejection.
+- **Line 1-4:** `TrustBoundary` holds lists of pre-checks and post-checks.
+- **Line 6-8:** `add_pre_check` appends a function. Returns `self` for chaining.
+- **Line 10-12:** `add_post_check` same pattern.
+- **Line 14-18:** Execute runs all pre-checks. If any returns non-None, that's a rejection.
+- **Line 20:** Only if all pre-checks pass do we simulate execution.
+- **Line 22-25:** Post-checks run in order. If any rejects, we stop and return the rejection.
 
 **Output:**
 ```
@@ -624,7 +623,7 @@ def good_pre_check(command: dict):
 ```
 
 **What's happening:**
-- The `TrustBoundary.execute` checks `if result is not None` to decide if a pre-check rejected. If you return `True` for rejection, it's treated as a rejection dict (which works by accident). If you return `False` for pass, it's treated as a rejection (which breaks everything).
+- The `TrustBoundary.execute` checks `if result is not None` to decide if a pre-check rejected. If you return `True` for rejection, execution does stop, but `execute` returns the bare `True` instead of a rejection dict, so any caller doing `result.get("status")` crashes with `AttributeError`. If you return `False` for pass, it's treated as a rejection (which breaks everything).
 
 ---
 
@@ -647,7 +646,7 @@ print(safe_parse(bad_input))
 ```
 
 **What's happening:**
-- **Line 229-232:** `json.loads` throws `JSONDecodeError` for malformed input. We catch it and return a clean rejection.
+- **Line 3-6:** `json.loads` throws `JSONDecodeError` for malformed input. We catch it and return a clean rejection.
 
 **Output:**
 ```
@@ -679,7 +678,7 @@ print(robust_execute({"no_action": True}))
 ```
 
 **What's happening:**
-- **Line 237-249:** The entire interceptor chain is wrapped in `try/except`. If any interceptor crashes, we return a clean error instead of a Python traceback.
+- **Line 2-16:** The entire interceptor chain is wrapped in `try/except`. If any interceptor crashes, we return a clean error instead of a Python traceback.
 
 **Output:**
 ```
@@ -713,8 +712,8 @@ def slow_execute(command: dict) -> dict:
 print(slow_execute({"action": "calibrate"}))
 ```
 
-**What's hanging:**
-- **Line 253-260:** The wrapper times the execution. If it exceeds the limit, we reject.
+**What's happening:**
+- **Line 4-13:** The wrapper times the execution. If it exceeds the limit, we reject.
 
 **Output:**
 ```
@@ -772,9 +771,9 @@ for i in range(5):
 ```
 
 **What's happening:**
-- **Line 276-283:** Tracks call timestamps per action. Removes entries older than the window.
-- **Line 285-289:** If count exceeds the limit, returns a rejection.
-- **Line 291:** Otherwise returns `None` (pass).
+- **Line 8-15:** Tracks call timestamps per action. Removes entries older than the window.
+- **Line 17-21:** If count exceeds the limit, returns a rejection.
+- **Line 24:** Otherwise returns `None` (pass).
 
 **Output:**
 ```
@@ -812,9 +811,9 @@ def audit_interceptor(func: Callable, log_file: str = "audit.log") -> Callable:
 ```
 
 **What's happening:**
-- **Line 297-300:** Creates an audit entry before execution.
-- **Line 302-305:** Records the result after execution.
-- **Line 307-308:** Appends the entry to a log file. This creates an immutable record of every command and its outcome.
+- **Line 6-11:** Creates an audit entry before execution.
+- **Line 13-15:** Records the result after execution.
+- **Line 17-18:** Appends the entry to a log file. This creates an immutable record of every command and its outcome.
 
 ---
 

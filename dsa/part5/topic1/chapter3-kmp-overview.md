@@ -42,8 +42,8 @@ Naive approach worst case:
 Text:    "AAAAAAAAB"
 Pattern: "AAAAAB"
 
-Every position matches 5 chars then fails on the 6th.
-We do 5 comparisons × (N-M+1) positions = O(N × M) work.
+Every position matches 5 chars then fails on the 6th (the last position matches all 6).
+We do 6 comparisons × (N-M+1) positions = O(N × M) work.
 ```
 
 **Dry-run comparison:**
@@ -51,7 +51,7 @@ We do 5 comparisons × (N-M+1) positions = O(N × M) work.
 Approach     Comparisons for "AAAAAAAAB" vs "AAAAAB"
 ──────────   ──────────────────────────────────────
 Naive        6 × 4 = 24 comparisons
-KMP          ~10 comparisons (linear!)
+KMP          12 comparisons (linear!)
 ```
 
 ---
@@ -350,7 +350,7 @@ bool isRotation(string s1, string s2) {
     // Concatenate s1 with itself: if s2 is a rotation, it's a substring
     string combined = s1 + s1;
     // Use KMP (or string::find) to check if s2 is substring of combined
-    return kmpSearchReturnBool(combined, s2);
+    return !findAllOccurrences(combined, s2).empty();  // Problem 1 above
 }
 // "abcde" + "abcde" = "abcdeabcde"
 // "cdeab" is a substring → YES, it's a rotation

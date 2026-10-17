@@ -17,7 +17,7 @@ You must understand the subtle differences in the `for` loop and the recursive c
 | **Recursive call** | `i + 1` | `i + 1` | (no index) |
 | **Extra tracking** | None | None | `visited[]` array |
 | **Save when** | Every call | `current.size() == K` | `current.size() == N` |
-| **Time complexity** | $O(N \cdot 2^N)$ | $O(C(N,K))$ | $O(N \cdot N!)$ |
+| **Time complexity** | $O(N \cdot 2^N)$ | $O(K \cdot C(N,K))$ | $O(N \cdot N!)$ |
 
 ---
 
@@ -584,7 +584,7 @@ The check: if (i > 0 && nums[i] == nums[i-1] && !visited[i-1])
 | **Loop start** | `index` | `index` | `0` |
 | **Recurse with** | `i + 1` | `i + 1` | (no index) |
 | **Save condition** | Every call | `size == K` | `size == N` |
-| **Time complexity** | O(N * 2^N) | O(C(N,K)) | O(N * N!) |
+| **Time complexity** | O(N * 2^N) | O(K * C(N,K)) | O(N * N!) |
 | **Output count** | 2^N | C(N,K) | N! |
 
 ---

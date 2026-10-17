@@ -474,7 +474,7 @@ int minCostConnectPoints(vector<vector<int>>& points) {
 | DSU initialization | O(N) |
 | Single find/unite | O(α(N)) ≈ O(1) |
 | Full Kruskal's | O(E log E) |
-| Accounts Merge | O(E log E) |
+| Accounts Merge | O(NK log NK) (N accounts, K emails each; sorting emails dominates) |
 
 ---
 

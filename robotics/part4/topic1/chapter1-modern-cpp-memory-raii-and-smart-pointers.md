@@ -69,7 +69,7 @@ Latency (ms)
              1   2   3   4   5   6   7   8   9  10  11  12  13  14   Tick (k)
 
   Legend:
-    * = High-Throughput Managed Runtime (Avg = 0.22 ms, Max = 18.0 ms -> CRASH)
+    * = High-Throughput Managed Runtime (Avg = 0.20 ms, Max = 18.0 ms -> CRASH)
     o = Deterministic Real-Time C++     (Avg = 1.20 ms, Max = 1.30 ms -> SAFE)
 ================================================================================
 ```

@@ -24,8 +24,8 @@ Here is the strategic intuition and optimal code for the core Prefix Sum problem
 | Running Sum        | O(N²) nested loops  | ✅ O(N) in-place     | Not needed           |
 | Pivot Index        | O(N²) left/right    | Not needed           | Not needed           |
 | Range Sum Query    | O(N) per query      | ✅ O(1) per query    | Not needed           |
-| Subarray Sum = K   | O(N²) all subarrays | O(N) prefix only     | ✅ O(N) with map     |
-| Contiguous Array   | O(N²) all subarrays | O(N) prefix only     | ✅ O(N) with map     |
+| Subarray Sum = K   | O(N²) all subarrays | O(N²) prefix pairs   | ✅ O(N) with map     |
+| Contiguous Array   | O(N²) all subarrays | O(N²) prefix pairs   | ✅ O(N) with map     |
 
 ---
 

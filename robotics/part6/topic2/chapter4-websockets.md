@@ -1,4 +1,4 @@
-# Part 6, Topic 4: Real-time Communication
+# Part 6, Topic 2: Real-time Communication
 ## Chapter 1: WebSocket Protocol
 
 ### What You'll Learn

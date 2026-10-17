@@ -39,7 +39,7 @@ Mastering the Monotonic pattern is the key to passing Hard array problems.
 
 **Trigger:** Determine if `()[]{}` is valid.
 
-**Intuition:** Classic Stack. Iterate through characters. If it's an opening bracket, push the *closing* equivalent to the stack. If it's a closing bracket, check if the stack is empty or if the top doesn't match. If valid, pop. At the end, return `stack.empty()`.
+**Intuition:** Classic Stack. Iterate through characters. If it's an opening bracket, push the *closing* equivalent to the stack. If it's a closing bracket, check if the stack is empty or if the top doesn't match. If valid, pop. At the end, return `stack.empty()`. (The walkthrough below follows this push-the-closer idea; the code after it uses the equivalent variant that pushes the *opening* bracket and checks the pair when popping.)
 
 **Step-by-Step Walkthrough for `"{[()]}"`:**
 

@@ -1,4 +1,4 @@
-# Part 8, Topic 2: Function Routing
+# Part 8, Topic 1: Function Routing
 ## Chapter 3: The Real Agent Loop
 
 **Prerequisite Knowledge:** The Chat Completions API, Tool Calling, Tool Message Role, FunctionRouter, and JSON Schema Generation.
@@ -196,8 +196,8 @@ Final answer: Server looks healthy. CPU is at 45.2% across 8 cores, and memory u
     │                                                      │
     │  Exit 3: Error                                      │
     │    API call throws exception                         │
-    │    → try/except catches and logs                     │
-    │    → break out of loop                               │
+    │    → try/except catches it (Section 4 loop)          │
+    │    → continue to the next round (not break)          │
     │                                                      │
     └──────────────────────────────────────────────────────┘
 ```

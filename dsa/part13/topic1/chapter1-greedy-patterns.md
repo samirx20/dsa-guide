@@ -233,7 +233,7 @@ Answer: 4 meetings
 
 ### Pattern 3: Sort by Value/Weight
 - **When:** Maximizing value with constraints
-- **Examples:** Jump Game, Gas Station, Task Scheduler
+- **Examples:** Fractional Knapsack (sort by value/weight ratio), Boats to Save People, Task Scheduler
 
 ### Pattern 4: Priority Queue (Heap)
 - **When:** Need to always pick the "best" from a dynamic set

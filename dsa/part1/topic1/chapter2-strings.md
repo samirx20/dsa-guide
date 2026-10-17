@@ -306,7 +306,7 @@ reverse(t.begin(), t.end()); // "olleh"
 // MISTAKE 1: Forgetting string::npos
 string s = "hello";
 int pos = s.find("xyz");
-if (pos == -1) { ... }  // WRONG: npos is not always -1!
+if (pos == -1) { ... }  // FRAGILE: npos is size_t(-1); this only works because int pos narrows it to -1
 if (pos != string::npos) { ... }  // CORRECT: always compare to npos
 
 // MISTAKE 2: substr in tight loops

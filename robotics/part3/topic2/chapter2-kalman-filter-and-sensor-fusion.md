@@ -6,7 +6,7 @@
 
 ### Why This Matters
 
-In May 1960, Rudolf E. Kálmán published a paper describing a recursive algorithm to estimate the true state of a dynamic system from noisy measurements. Months later, he visited NASA Ames Research Center, where engineers were struggling to navigate the **Apollo spacecraft** to the Moon:
+In March 1960, Rudolf E. Kálmán published a paper describing a recursive algorithm to estimate the true state of a dynamic system from noisy measurements. Months later, he visited NASA Ames Research Center, where engineers were struggling to navigate the **Apollo spacecraft** to the Moon:
 - Their **onboard physics model & inertial guidance** drifted over time.
 - Their **sextant and radar measurements** were noisy and intermittent.
 

@@ -1,4 +1,4 @@
-# Part 8, Topic 1: System Integration
+# Part 8, Topic 2: System Integration
 ## Project 1: Factory Diagnostic Agent OS
 
 This is the capstone. Build a complete multi-agent diagnostic API that orchestrates RAG retrieval, tool calling, physics validation, and LLM synthesis into a single FastAPI endpoint.

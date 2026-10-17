@@ -32,7 +32,7 @@ class SensorReading(BaseModel):
 
 #### 2. Add Custom Validators
 
-Add a `@field_validator` for temperature that rejects values below absolute zero context (below -273.15 even though range allows -40). Add a `@model_validator` that enforces: if temperature exceeds 100.0, pressure must also be above 20.0 (high heat implies pressurized system).
+Add a `@field_validator` for temperature that rejects values below absolute zero context (below -273.15; note that `Field(ge=-40.0)` runs first and already rejects anything below -40, so with this range the check is only a backstop that never fires). Add a `@model_validator` that enforces: if temperature exceeds 100.0, pressure must also be above 20.0 (high heat implies pressurized system).
 
 ```python
 from pydantic import field_validator, model_validator

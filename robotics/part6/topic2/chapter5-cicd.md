@@ -1,4 +1,4 @@
-# Part 6, Topic 1: SDK Design & Distribution
+# Part 6, Topic 2: SDK Design & Distribution
 ## Chapter 4: CI/CD with GitHub Actions
 
 ### What You'll Learn

@@ -49,7 +49,7 @@ Complete:                NOT Complete:
     2   3                    2   3
    / \ /                    / \   \
   4  5 6                   4  5   6
-                            ↑ gap at 6's left!
+                                ↑ gap: 3's left child is missing!
 Every level filled         Last level not left-aligned
 except possibly last,
 filled left to right

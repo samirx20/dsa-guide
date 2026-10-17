@@ -1,4 +1,4 @@
-# Part 0, Topic 1: Python Systems Basics
+# Part 0, Topic 2: Python Systems Basics
 ## Chapter 1: Virtual Environments
 
 **Prerequisite Knowledge:** Knowing how to open a terminal/command prompt and run basic commands.
@@ -337,7 +337,7 @@ pip install fastapi    # Installs latest version
 # Next week: new version breaks your code!
 
 # FIX: Use uv add or requirements.txt with pinned versions
-uv add fastapi        # Pins to pyproject.toml
+uv add fastapi        # Adds "fastapi>=<ver>" to pyproject.toml; exact pin goes in uv.lock
 pip freeze > requirements.txt  # Or pin after install
 ```
 
@@ -365,7 +365,7 @@ source .venv/bin/activate   # Mac/Linux
 # Step 4: Install dependencies
 pip install fastapi httpx pydantic    # Standard way
 # OR
-uv add fastapi httpx pydantic        # Modern way (pins to pyproject.toml)
+uv add fastapi httpx pydantic        # Modern way (adds to pyproject.toml, pins in uv.lock)
 
 # Step 5: Save dependencies
 pip freeze > requirements.txt        # Standard way

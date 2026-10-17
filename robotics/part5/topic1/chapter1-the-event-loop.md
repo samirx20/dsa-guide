@@ -74,7 +74,7 @@ asyncio.run(say_hello())     # Creates event loop → runs coroutine → closes 
 
 ### 2. Coroutines vs Threads
 
-Threads are OS-managed and preempted at arbitrary points (in CPython the GIL still lets only one run Python bytecode at a time), and they share memory which causes race conditions. Coroutines are managed by Python and run concurrently on one thread — no race conditions, no locks needed. For I/O-bound workloads (APIs, databases), coroutines are simpler and faster.
+Threads are OS-managed and preempted at arbitrary points (in CPython the GIL still lets only one run Python bytecode at a time), and they share memory which causes race conditions. Coroutines are managed by Python and run concurrently on one thread — they can only switch at `await`, so races are much rarer and locks are rarely needed (state read before an `await` and written after it can still race). For I/O-bound workloads (APIs, databases), coroutines are simpler and faster.
 
 ```
 ┌──────────────────── THREADS ────────────────────┐
@@ -138,7 +138,7 @@ async def fetch_data_async():
 
 # Coroutines: Python decides when to switch (at 'await' points)
 #             Only ONE coroutine runs at any instant
-#             No race conditions because switching only happens at known points
+#             Far fewer races because switching only happens at known points (await)
 #             No locks needed for most I/O-bound work
 ```
 
