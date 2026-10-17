@@ -362,6 +362,222 @@ In C++, `new T` pairs with `delete ptr`, while `new T[N]` pairs with `delete[] p
 
 ---
 
+## Practice & Self-Check
+
+Use the same Stack/Heap table as Section 6. The key habit: for every `{`, ask "what is constructed here?", and for every `}`, ask "what is destroyed here, and in what order?"
+
+### Predict the Output / Trace by Hand
+
+**Q1. Re-trace `SimpleVector` with a smaller start.** Using the `SimpleVector` class from Section 4, trace:
+
+```cpp
+{
+    SimpleVector v(1);
+    for (int i = 1; i <= 5; i++) {
+        v.push_back(i * 10);
+    }
+    cout << "v[4] = " << v[4] << "\n";
+}
+```
+
+(a) How many `[Resize]` lines are printed, and with which capacities? (b) What are `size()` and `capacity()` just before `}`? (c) How many element copies (`newBlock[i] = data_[i]`) happen in total? (d) What does the destructor line say?
+
+**Q2. Construction and destruction order.** What does this print (all on one line)?
+
+```cpp
+struct Tracer {
+    char id;
+    Tracer(char c) : id(c) { cout << "+" << id << " "; }
+    ~Tracer() { cout << "-" << id << " "; }
+};
+
+int main() {
+    Tracer a('A');
+    {
+        Tracer b('B');
+        Tracer c('C');
+    }
+    Tracer d('D');
+}
+```
+
+**Q3. Dot or Arrow?** Using the `ListNode` struct from Section 1:
+
+```cpp
+ListNode* first = new ListNode(1);
+first->next = new ListNode(2);
+first->next->next = new ListNode(3);
+ListNode n = *first;   // a COPY of the first node (on the Stack)
+```
+
+For each expression, say whether it compiles, and if so, its value: (A) `first.val` (B) `(*first).val` (C) `first->next->val` (D) `n.next->val` (E) `first->next->next->val`.
+
+**Q4. `unique_ptr` lifetimes.** Using `RobotArm` from Section 5, what is printed, line by line?
+
+```cpp
+{
+    unique_ptr<RobotArm> arm1 = make_unique<RobotArm>(6);
+    {
+        unique_ptr<RobotArm> arm2 = make_unique<RobotArm>(3);
+    }
+    cout << "Middle\n";
+}
+```
+
+**Q5. Why `= delete` the copy constructor?** Suppose the line `SimpleVector(const SimpleVector&) = delete;` were removed, and we wrote:
+
+```cpp
+{
+    SimpleVector a(2);
+    SimpleVector b = a;   // default copy: copies data_, size_, capacity_
+}
+```
+
+How many Heap buffers exist, how many times is `delete[]` called at `}`, and what goes wrong?
+
+### Coding Exercises
+
+**E1 (Easy). A `Rect` struct.** Write a `struct Rect` with `int` fields `x, y, w, h` (top-left corner plus width and height), a constructor using a member initializer list, and two `const` member functions: `int area() const` and `bool contains(int px, int py) const` (a point is inside if $x \le px < x + w$ and $y \le py < y + h$).
+- `Rect r(0, 0, 4, 3);` gives `r.area() == 12`
+- `r.contains(3, 2) == true`, `r.contains(4, 2) == false`
+
+**E2 (Easy–Medium). Extend `SimpleVector`.** Add three members to the Section 4 class: `void pop_back()` (removes the last element; does not shrink capacity), `int back() const` (returns the last element), and `bool empty() const`.
+- push `10, 20, 30` into `SimpleVector v(2)`, then `v.pop_back()`: `v.back() == 20`, `v.size() == 2`, `v.capacity() == 4`
+- `SimpleVector w;` gives `w.empty() == true`
+
+**E3 (Medium). An RAII linked list.** Write a `class IntList` that owns a singly linked list of `ListNode`s. It needs `push_front(int v)`, `int sum() const`, and a **destructor that deletes every node** (so the user never calls `delete`). Disable copying like `SimpleVector` does.
+- `push_front(3); push_front(2); push_front(1);` gives the list `1 -> 2 -> 3` and `sum() == 6`
+- At the closing `}`, all 3 nodes are freed with zero leaks
+
+#### Dry-Run: Answers
+
+**Q1.** (a) **3** resize lines: capacity 2, then 4, then 8. (b) `size() == 5`, `capacity() == 8`. (c) **7** copies. (d) `[Destructor]  Freed Heap buffer of capacity 8!`
+
+| Call | `size_` before | `capacity_` before | Resize? | Copies | `capacity_` after | `size_` after |
+|------|----------------|--------------------|---------|--------|-------------------|---------------|
+| `push_back(10)` | 0 | 1 | no | 0 | 1 | 1 |
+| `push_back(20)` | 1 | 1 | yes, to 2 | 1 | 2 | 2 |
+| `push_back(30)` | 2 | 2 | yes, to 4 | 2 | 4 | 3 |
+| `push_back(40)` | 3 | 4 | no | 0 | 4 | 4 |
+| `push_back(50)` | 4 | 4 | yes, to 8 | 4 | 8 | 5 |
+
+Total copies $= 1 + 2 + 4 = 7$, fewer than $2N = 10$ — this is why doubling gives amortized $O(1)$ `push_back`. `v[4]` prints `v[4] = 50`.
+
+**Q2.** Prints `+A +B +C -C -B +D -D -A`.
+- `a` is born first. Entering the inner `{`, `b` then `c` are born.
+- At the inner `}`, locals die in **reverse** order of construction: `c` first, then `b`.
+- `d` is born, and at the end of `main` the remaining objects die in reverse order: `d`, then `a`.
+
+The Stack is LIFO, so destruction is always the mirror image of construction within a scope.
+
+**Q3.**
+
+| Expr | Compiles? | Value | Why |
+|------|-----------|-------|-----|
+| (A) `first.val` | No | — | `first` is a pointer; Mistake 2 |
+| (B) `(*first).val` | Yes | `1` | dereference, then dot |
+| (C) `first->next->val` | Yes | `2` | arrow twice |
+| (D) `n.next->val` | Yes | `2` | `n` is an object (dot), but `n.next` is a pointer (arrow); the copy kept the same `next` address |
+| (E) `first->next->next->val` | Yes | `3` | three hops |
+
+**Q4.** Prints:
+
+```text
+RobotArm(6-DOF) online!
+RobotArm(3-DOF) online!
+RobotArm safely powered down & freed!
+Middle
+RobotArm safely powered down & freed!
+```
+
+`arm2` dies at the inner `}` (before `Middle`); `arm1` dies at the outer `}` (after `Middle`).
+
+**Q5.** Only **one** Heap buffer exists, but there are **two** `SimpleVector` objects whose `data_` hold the same address. At `}`, `b` is destroyed first and calls `delete[]` on that address, then `a` is destroyed and calls `delete[]` on the **same** address again: **2** deletes of one buffer. That is the **double free** from Section 4, which corrupts the Heap and typically crashes. Deleting the copy constructor turns this runtime crash into a compile-time error.
+
+**E1 — reference solution**
+
+```cpp
+struct Rect {
+    int x, y, w, h;
+
+    Rect(int x_, int y_, int w_, int h_) : x(x_), y(y_), w(w_), h(h_) {}
+
+    int area() const { return w * h; }
+
+    bool contains(int px, int py) const {
+        return px >= x && px < x + w && py >= y && py < y + h;
+    }
+};
+```
+
+$O(1)$ per call. `contains(4, 2)` fails because $4 < 0 + 4$ is false (the right edge is exclusive).
+
+**E2 — reference solution** (add inside the `public:` section of `SimpleVector`)
+
+```cpp
+void pop_back() {
+    if (size_ > 0) size_--;   // keep the Heap buffer; just forget the last slot
+}
+
+int back() const {
+    return data_[size_ - 1]; // caller must ensure !empty()
+}
+
+bool empty() const {
+    return size_ == 0;
+}
+```
+
+All $O(1)$. Trace: after pushing `10, 20, 30`, `size_ = 3`, `capacity_ = 4`. `pop_back()` makes `size_ = 2`; `back()` reads `data_[1] = 20`. Capacity stays 4, exactly like `std::vector::pop_back`.
+
+**E3 — reference solution**
+
+```cpp
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int v) : val(v), next(nullptr) {}
+};
+
+class IntList {
+private:
+    ListNode* head_;
+
+public:
+    IntList() : head_(nullptr) {}
+
+    ~IntList() {
+        ListNode* curr = head_;
+        while (curr != nullptr) {
+            ListNode* nxt = curr->next; // save the arrow BEFORE deleting
+            delete curr;
+            curr = nxt;
+        }
+    }
+
+    IntList(const IntList&) = delete;
+    IntList& operator=(const IntList&) = delete;
+
+    void push_front(int v) {
+        ListNode* node = new ListNode(v);
+        node->next = head_;
+        head_ = node;
+    }
+
+    int sum() const {
+        int total = 0;
+        for (ListNode* curr = head_; curr != nullptr; curr = curr->next) {
+            total += curr->val;
+        }
+        return total;
+    }
+};
+```
+
+`push_front` is $O(1)$; `sum` and the destructor are $O(N)$. The destructor must read `curr->next` **before** `delete curr`, otherwise it would follow a dangling pointer. Pushing `3, 2, 1` to the front builds `1 -> 2 -> 3`, and $1 + 2 + 3 = 6$.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Blueprint for Claude

@@ -424,6 +424,158 @@ int main() {
 
 ---
 
+## Practice & Self-Check
+
+Work through these with pen and paper first. Picture RAM as numbered 1-byte boxes, then check yourself against the answers at the end.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Counting bytes.** On a 64-bit system (same sizes as the Quick Reference table), what does this print?
+
+```cpp
+bool ready = false;
+char tag = 'Q';
+int lives = 3;
+long long steps = 5000000000LL;
+double speed = 2.5;
+cout << sizeof(ready) + sizeof(tag) + sizeof(lives) << " "
+     << sizeof(steps) + sizeof(speed) << "\n";
+```
+
+**Q2. The unsigned odometer.** What does this print?
+
+```cpp
+unsigned int stock = 2;
+unsigned int left = stock - 5;
+cout << left << "\n";
+```
+
+**Q3. Overflow before the cast.** This is a smaller version of Mistake 2. On a typical x86/ARM machine (where signed overflow wraps), what are `badArea` and `goodArea`?
+
+```cpp
+int width = 50000;
+int height = 50000;
+long long badArea  = width * height;
+long long goodArea = 1LL * width * height;
+```
+
+**Q4. Re-trace the stack frames.** In the Section 6 program, change `main` to call `sumOfSquares(2, 5)` instead of `sumOfSquares(3, 4)`. Fill in the blanks:
+
+| Step | Active Function | Top Frame Variables |
+|------|-----------------|---------------------|
+| 4 | `square()` (first call) | `n=2, result=?` |
+| 5 | `sumOfSquares()` | `a=2, b=5, sqA=?` |
+| 6 | `square()` (second call) | `n=5, result=?` |
+| 7 | `main()` | `total=?` |
+
+Also: what is the **maximum** number of stack frames alive at the same moment, and how many frames are pushed in total over the whole run?
+
+**Q5. Stack or Heap?** For the function below, say where `p` lives, where the value `7` lives, and what happens to each one when `leaky()` returns.
+
+```cpp
+void leaky() {
+    int* p = new int(7);
+    cout << *p << "\n";
+}   // no delete!
+```
+
+### Coding Exercises
+
+**E1 (Easy). Safe area.** Write `long long safeArea(int w, int h)` that returns $w \times h$ without 32-bit overflow.
+- `safeArea(100000, 100000)` returns `10000000000`
+- `safeArea(3, 4)` returns `12`
+
+**E2 (Easy–Medium). Print all but the last element.** Write `void printAllButLast(const vector<int>& v)` that prints every element except the last one, separated by spaces. It must behave correctly on an empty vector (remember that `v.size() - 1` is an unsigned `size_t`).
+- `{4, 8, 15}` prints `4 8`
+- `{}` prints nothing (and does not crash or loop billions of times)
+
+**E3 (Medium). Overflow detector.** Write `bool addWouldOverflow(int a, int b)` that returns `true` if `a + b` would leave the range $[-2^{31},\ 2^{31}-1]$ — **without ever computing the overflowing sum** (since signed overflow is Undefined Behavior).
+- `addWouldOverflow(INT_MAX, 1)` returns `true`
+- `addWouldOverflow(-5, 3)` returns `false`
+- `addWouldOverflow(INT_MIN, -1)` returns `true`
+
+#### Dry-Run: Answers
+
+**Q1.** Prints `6 16`.
+
+| Variable | Type | Bytes |
+|----------|------|-------|
+| `ready` | `bool` | 1 |
+| `tag` | `char` | 1 |
+| `lives` | `int` | 4 |
+| `steps` | `long long` | 8 |
+| `speed` | `double` | 8 |
+
+First sum: $1 + 1 + 4 = 6$. Second sum: $8 + 8 = 16$. Note that `sizeof` depends only on the **type**, never on the value — `false` and `true` both take 1 byte, and `2.5` takes the same 8 bytes as `3.14159265`.
+
+**Q2.** Prints `4294967293`. Unsigned arithmetic wraps modulo $2^{32}$: $2 - 5 = -3 \equiv 2^{32} - 3 = 4{,}294{,}967{,}296 - 3 = 4{,}294{,}967{,}293$. Think of the odometer rolling backward past `0` three steps: `UINT_MAX` ($4{,}294{,}967{,}295$), then $...294$, then $...293$.
+
+**Q3.** `badArea = -1794967296`, `goodArea = 2500000000`.
+- The true product is $50{,}000 \times 50{,}000 = 2{,}500{,}000{,}000$, which is larger than `INT_MAX` ($2{,}147{,}483{,}647$).
+- `width * height` is computed in 32-bit `int` math **first**, so it wraps: $2{,}500{,}000{,}000 - 2^{32} = 2{,}500{,}000{,}000 - 4{,}294{,}967{,}296 = -1{,}794{,}967{,}296$. Only then is that already-wrong value copied into the `long long`.
+- `1LL * width` is a `long long`, so the whole chain is done in 64-bit math and stays exact.
+
+**Q4.**
+
+| Step | Active Function | Top Frame Variables |
+|------|-----------------|---------------------|
+| 4 | `square()` (first call) | `n=2, result=4` |
+| 5 | `sumOfSquares()` | `a=2, b=5, sqA=4` |
+| 6 | `square()` (second call) | `n=5, result=25` |
+| 7 | `main()` | `total=29` |
+
+Maximum depth is **3 frames** (`[main] -> [sumOfSquares] -> [square]`), reached twice — once per `square` call. The two `square` frames are never alive together: the first is popped before the second is pushed. Frames pushed in total: **4** (`main`, `sumOfSquares`, `square(2)`, `square(5)`).
+
+**Q5.**
+- `p` is a local variable, so the **8-byte pointer lives on the Stack** inside `leaky()`'s frame.
+- `new int(7)` puts the **4-byte integer `7` on the Heap**.
+- At the closing `}`, the frame is popped and `p` is gone. The Heap block is **not** freed automatically, and now nothing holds its address — that is a **memory leak** of 4 bytes per call. Fix: `delete p;` before returning, or better, use an RAII owner (covered in Part 0, Topic 2).
+
+**E1 — reference solution**
+
+```cpp
+long long safeArea(int w, int h) {
+    return 1LL * w * h;   // promote to 64-bit BEFORE multiplying
+}
+```
+
+$O(1)$ time and space. Writing `(long long)w * h` works too; `(long long)(w * h)` does **not**, because the parentheses force the 32-bit multiply to happen first.
+
+**E2 — reference solution**
+
+```cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+
+void printAllButLast(const vector<int>& v) {
+    // i + 1 < v.size() never subtracts, so it is safe when v is empty.
+    for (size_t i = 0; i + 1 < v.size(); i++) {
+        if (i > 0) cout << " ";
+        cout << v[i];
+    }
+    cout << "\n";
+}
+```
+
+$O(N)$ time, $O(1)$ extra space. The buggy version `i < v.size() - 1` computes `0 - 1` on an empty vector, which wraps to $18{,}446{,}744{,}073{,}709{,}551{,}615$, so the loop would read far past the end of the (empty) buffer.
+
+**E3 — reference solution**
+
+```cpp
+#include <climits>
+
+bool addWouldOverflow(int a, int b) {
+    if (b > 0 && a > INT_MAX - b) return true;  // too big
+    if (b < 0 && a < INT_MIN - b) return true;  // too small
+    return false;
+}
+```
+
+$O(1)$. Why it is safe: when `b > 0`, `INT_MAX - b` cannot overflow; when `b < 0`, `INT_MIN - b` cannot overflow. Checks: `(INT_MAX, 1)`: $a = 2{,}147{,}483{,}647 > 2{,}147{,}483{,}646$, so `true`. `(-5, 3)`: $-5 > 2{,}147{,}483{,}644$ is false, so `false`. `(INT_MIN, -1)`: $INT\_MIN - (-1) = -2{,}147{,}483{,}647$ and $-2{,}147{,}483{,}648 < -2{,}147{,}483{,}647$, so `true`.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Blueprint for Claude

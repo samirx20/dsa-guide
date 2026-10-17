@@ -412,6 +412,200 @@ void printPointedSafe(int* p) {
 
 ---
 
+## Practice & Self-Check
+
+For every question, draw the boxes: one box per variable, an arrow for each pointer, and two name tags on one box for each reference.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Re-run the Section 6 trace with new numbers.** What does this print? Build the same kind of memory table as Section 6 (`a`, `b`/`r`, `p`, `*p`) as you go.
+
+```cpp
+int a = 3;
+int b = 7;
+int* p = &a;
+int& r = b;
+
+*p = *p * r;
+p = &b;
+*p = 10;
+r += a;
+cout << a << " " << b << " " << *p << " " << r << "\n";
+```
+
+**Q2. Value vs. reference.** Using `brokenSwap` and `workingSwap` from Section 4, plus the helper below, what are the three printed lines?
+
+```cpp
+void addTen(int a, int& b) {
+    a += 10;
+    b += 10;
+}
+
+int x = 4, y = 6;
+brokenSwap(x, y);
+cout << x << " " << y << "\n";
+workingSwap(x, y);
+cout << x << " " << y << "\n";
+addTen(x, y);
+cout << x << " " << y << "\n";
+```
+
+**Q3. Pointer arithmetic.** Assume `arr` starts at address `0x1000` and `int` is 4 bytes.
+
+```cpp
+int arr[5] = {10, 20, 30, 40, 50};
+int* p = arr + 1;
+cout << *(p + 2) << " " << p[1] << " " << *p + 5 << "\n";
+```
+
+What is printed, and what address does `p + 2` hold?
+
+**Q4. Sizes of pointers vs. references.** On a 64-bit machine, what does this print?
+
+```cpp
+char c = 'A';
+char* cp = &c;
+char& cr = c;
+cout << sizeof(c) << " " << sizeof(cp) << " " << sizeof(cr) << "\n";
+```
+
+**Q5. How many bytes get copied?** `big` is a `vector<int>` holding $1{,}000{,}000$ integers. For each call, how many bytes of element data are copied into the callee's parameter?
+
+```cpp
+void f(vector<int> v);
+void g(const vector<int>& v);
+void h(const int* data);
+
+f(big);
+g(big);
+h(big.data());
+```
+
+### Coding Exercises
+
+**E1 (Easy). Two answers through references.** Write `void minMax(const vector<int>& v, int& mn, int& mx)` that stores the smallest and largest element into the caller's variables. Assume `v` is non-empty.
+- `v = {7, 2, 9, 4}` leaves `mn == 2`, `mx == 9`
+- `v = {5}` leaves `mn == 5`, `mx == 5`
+
+**E2 (Easy–Medium). Reverse with two pointers.** Write `void reverseRange(int* arr, int n)` that reverses the array in place using two pointers (`int* left`, `int* right`) and pointer arithmetic — no indices.
+- `{10, 20, 30, 40}` becomes `{40, 30, 20, 10}`
+- `{1, 2, 3}` becomes `{3, 2, 1}`
+
+**E3 (Medium). Find and return a pointer.** Write `int* findFirst(int* begin, int* end, int target)` that returns a pointer to the first element in `[begin, end)` equal to `target`, or `nullptr` if none matches. Then show how a caller safely uses the result to overwrite the found value with `0`.
+- `arr = {5, 8, 3, 8}`, `findFirst(arr, arr + 4, 8)` returns `arr + 1`; after `*res = 0`, `arr` is `{5, 0, 3, 8}`
+- `findFirst(arr, arr + 4, 7)` returns `nullptr` (caller must not dereference)
+
+#### Dry-Run: Answers
+
+**Q1.** Prints `21 31 31 31`.
+
+| Statement | `a` | `b` / `r` | `p` | `*p` |
+|-----------|-----|-----------|-----|------|
+| `int a = 3;` | `3` | — | — | — |
+| `int b = 7;` | `3` | `7` | — | — |
+| `int* p = &a;` | `3` | `7` | `&a` | `3` |
+| `int& r = b;` | `3` | `7` | `&a` | `3` |
+| `*p = *p * r;` | **`21`** | `7` | `&a` | `21` |
+| `p = &b;` | `21` | `7` | **`&b`** | `7` |
+| `*p = 10;` | `21` | **`10`** | `&b` | `10` |
+| `r += a;` | `21` | **`31`** | `&b` | `31` |
+
+At the end `p` points at `b`, and `r` is `b`, so `b`, `*p` and `r` are three ways to read the same box.
+
+**Q2.** Prints:
+
+```text
+4 6
+6 4
+6 14
+```
+
+- `brokenSwap` swaps its private photocopies, so `x` and `y` are untouched.
+- `workingSwap` binds `a` to `x` and `b` to `y`, so the caller's boxes really swap: `x = 6`, `y = 4`.
+- `addTen(x, y)`: `a` is a copy of `x` (the `+= 10` is lost), but `b` is an alias for `y`, so `y = 4 + 10 = 14`.
+
+**Q3.** Prints `40 30 25`; `p + 2` holds `0x100C`.
+
+| Expression | Element | Address | Value |
+|------------|---------|---------|-------|
+| `p` | `arr[1]` | $0x1000 + 1 \times 4 = 0x1004$ | `20` |
+| `p + 2` | `arr[3]` | $0x1004 + 2 \times 4 = 0x100C$ | `40` |
+| `p[1]` = `*(p + 1)` | `arr[2]` | `0x1008` | `30` |
+| `*p + 5` | — | — | $20 + 5 = 25$ |
+
+`*p + 5` is `(*p) + 5` because unary `*` binds tighter than `+`; it is **not** `*(p + 5)`.
+
+**Q4.** Prints `1 8 1`. `c` is a 1-byte `char`. `cp` is a pointer, and every pointer on a 64-bit machine is 8 bytes. `sizeof` applied to a reference gives the size of the object it refers to (a reference is just another name for `c`), so `sizeof(cr)` is 1.
+
+**Q5.**
+
+| Call | Parameter type | Element bytes copied |
+|------|----------------|----------------------|
+| `f(big)` | `vector<int>` (by value) | $1{,}000{,}000 \times 4 = 4{,}000{,}000$ bytes, plus a new Heap allocation |
+| `g(big)` | `const vector<int>&` | 0 (alias to `big`) |
+| `h(big.data())` | `const int*` | 0 element bytes; only the 8-byte address is copied |
+
+`f` is the silent $O(N)$-per-call trap from Mistake 1.
+
+**E1 — reference solution**
+
+```cpp
+#include <vector>
+using namespace std;
+
+void minMax(const vector<int>& v, int& mn, int& mx) {
+    mn = v[0];
+    mx = v[0];
+    for (int x : v) {
+        if (x < mn) mn = x;
+        if (x > mx) mx = x;
+    }
+}
+```
+
+$O(N)$ time, $O(1)$ extra space. `const vector<int>&` avoids copying the input; the two `int&` parameters let one function hand back two results.
+
+**E2 — reference solution**
+
+```cpp
+void reverseRange(int* arr, int n) {
+    if (n <= 1) return;
+    int* left = arr;
+    int* right = arr + n - 1;   // last element
+    while (left < right) {
+        int temp = *left;
+        *left = *right;
+        *right = temp;
+        left++;                 // moves forward by sizeof(int) bytes
+        right--;
+    }
+}
+```
+
+$O(N)$ time, $O(1)$ space. Trace on `{10, 20, 30, 40}`: swap `arr[0]`/`arr[3]` giving `{40, 20, 30, 10}`, then swap `arr[1]`/`arr[2]` giving `{40, 30, 20, 10}`, then `left > right`, so stop. For odd `n` the middle element is left alone when `left == right`.
+
+**E3 — reference solution**
+
+```cpp
+int* findFirst(int* begin, int* end, int target) {
+    for (int* it = begin; it != end; it++) {
+        if (*it == target) return it;
+    }
+    return nullptr;
+}
+
+// Caller:
+int arr[4] = {5, 8, 3, 8};
+int* res = findFirst(arr, arr + 4, 8);
+if (res != nullptr) {
+    *res = 0;   // arr is now {5, 0, 3, 8}
+}
+```
+
+$O(N)$ time, $O(1)$ space. Returning a pointer into the **caller's** array is safe (that memory outlives the function), unlike returning `&localVar` in Mistake 2. The half-open range `[begin, end)` is exactly how STL algorithms such as `std::find` work.
+
+---
+
 ## Interactive Visualization & shadcn/ui Specification
 
 ### Component Blueprint for Claude
