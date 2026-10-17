@@ -527,6 +527,187 @@ Self-correction loops catch LLM output errors using Pydantic validation and feed
 
 ---
 
+## Practice & Self-Check
+
+Answers below were checked against Pydantic v2 (default "lax" mode).
+
+### Predict the Output / Trace by Hand
+
+**Q1. The stubbed loop, exactly.** Run the Section 3 code as written. `call_llm` is a stub that **always** returns the same JSON, `{"priority": "high", "estimated_hours": "4", ...}`. What are `output['attempts']` and `output['errors']`? Does `"estimated_hours": "4"` produce an error?
+
+**Q2. Collect every error.** Which errors (field, `type`, message) does this raise, and how many?
+
+```python
+DiagnosticResult(machine_id="", severity="mega",
+                 action="check", estimated_downtime_hours=-1)
+```
+
+**Q3. Retriable or not?** Using `classify_error` from Section 5, what does it return for (a) the `ValidationError` from Q2, and (b) the error from the Q1 payload?
+
+**Q4. Count the LLM calls.** `smart_self_correction(prompt, MaintenancePlan, max_retries=3)` with the same always-bad stub from Q1. How many times is `call_llm` invoked, and does the function return `None` or raise?
+
+**Q5. `for ... else`.** In the "RIGHT" version of Mistake 2 (`MAX_RETRIES = 5`), when exactly does `raise RuntimeError(...)` run? Trace two cases: (a) `valid(result)` first becomes `True` on attempt index 2; (b) it is never `True`.
+
+### Coding Exercises
+
+**E1 (Easy).** Write `format_errors(e: ValidationError) -> list[str]` that turns each error into `"dotted.loc: msg"`, including list indices in the path.
+
+```python
+class SensorReading(BaseModel):
+    sensor_id: str = Field(min_length=1)
+    value: float
+
+class FactoryReport(BaseModel):
+    machine_id: str
+    readings: List[SensorReading]
+```
+
+- Validating `{"machine_id": "P101", "readings": [{"sensor_id": "T1", "value": 1.5}, {"sensor_id": "", "value": "hot"}]}` → `["readings.1.sensor_id: String should have at least 1 character", "readings.1.value: Input should be a valid number, unable to parse string as a number"]`
+
+**E2 (Easy–Medium).** Make the loop testable with a **scripted** fake LLM. Write `self_correct(llm_fn, model_class, prompt, max_retries=3)` returning `{"result", "attempts", "history"}`, where `history` is a list of per-attempt error lists. Also write `scripted(outputs)`, which returns an `llm_fn` that yields the outputs in order.
+
+- `[bad_priority, good]` → `attempts == 2`, `history == [["priority: Input should be a valid integer, unable to parse string as an integer"]]`, `result.priority == 5`
+- `[bad, bad, bad]` → `attempts == 3`, `len(history) == 3`, `result is None`
+
+**E3 (Medium).** Write `guarded_correct(llm_fn, model_class, prompt, max_retries=5)` that returns a status dict and stops early:
+
+- `"non_retriable"` as soon as any error type is in `{"enum", "value_error", "assertion_error"}`
+- `"no_progress"` if this attempt's error signature (sorted `(loc, type)` pairs) equals the previous attempt's
+- `"ok"` on success, `"exhausted"` after `max_retries`
+
+Examples: an always-bad priority stops at attempt **2** with `"no_progress"`. `severity: "mega"` stops at attempt **1** with `"non_retriable"`. The sequence `[bad_priority, missing_hours, good]` gives `"ok"` at attempt **3**, because the signatures differ.
+
+#### Dry-Run: Answers
+
+**Q1.** `attempts == 3`, and `errors` holds the **same message three times**:
+
+```
+['priority: Input should be a valid integer, unable to parse string as an integer',
+ 'priority: Input should be a valid integer, unable to parse string as an integer',
+ 'priority: Input should be a valid integer, unable to parse string as an integer']
+```
+
+The stub ignores the growing prompt, so every attempt fails identically, and the function falls through to `return {"result": None, "attempts": max_retries, ...}`. `"estimated_hours": "4"` does **not** fail: in lax mode, Pydantic v2 coerces the numeric string `"4"` to `4.0`. Only `"high"` fails, with error type `int_parsing`. The chapter's "What's happening" trace shows attempt 2 succeeding, but that requires a real LLM that reads the feedback.
+
+**Q2.** Pydantic reports **all 4** errors at once:
+
+| loc | type | msg |
+|-----|------|-----|
+| `machine_id` | `string_too_short` | String should have at least 1 character |
+| `severity` | `enum` | Input should be 'low', 'medium', 'high' or 'critical' |
+| `action` | `string_too_short` | String should have at least 10 characters |
+| `estimated_downtime_hours` | `greater_than_equal` | Input should be greater than or equal to 0 |
+
+Note that `"check"` has 5 characters, which is under 10. The chapter's own `"inspect bearings"` has 16, which is why its example validates.
+
+**Q3.** (a) **`False`**: the error types include `"enum"`, which is in `non_retriable`. (b) **`True`**: the only type is `"int_parsing"`, which is not in `non_retriable`. `classify_error` only checks the non-retriable set; any other type, such as `greater_than_equal`, counts as retriable by default.
+
+**Q4.** It calls the LLM **3 times** and then **raises** `ValueError("Non-retriable or exhausted: ...")`:
+
+| attempt | error retriable? | `attempt == max_retries - 1`? | action |
+|---------|------------------|-------------------------------|--------|
+| 0 | yes | no | append fix, loop |
+| 1 | yes | no | append fix, loop |
+| 2 | yes | **yes** | raise |
+
+The final `return None` is unreachable whenever every attempt fails, because the last failure always raises.
+
+**Q5.** The `else` of a `for` loop runs only when the loop finishes **without `break`**. (a) On index 2 `valid(result)` is `True`, so the loop hits `break` and the `else` is skipped. That takes 3 LLM calls and **no raise**. (b) All 5 iterations complete without `break`, so the `else` runs and raises **`RuntimeError: Failed after 5 attempts`**.
+
+**E1 — reference solution**
+
+```python
+from typing import List
+from pydantic import BaseModel, Field, ValidationError
+
+class SensorReading(BaseModel):
+    sensor_id: str = Field(min_length=1)
+    value: float
+
+class FactoryReport(BaseModel):
+    machine_id: str
+    readings: List[SensorReading]
+
+def format_errors(e: ValidationError) -> list[str]:
+    return [f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in e.errors()]
+
+raw = ('{"machine_id": "P101", "readings": [{"sensor_id": "T1", "value": 1.5}, '
+       '{"sensor_id": "", "value": "hot"}]}')
+try:
+    FactoryReport.model_validate_json(raw)
+except ValidationError as e:
+    print(format_errors(e))
+# ['readings.1.sensor_id: String should have at least 1 character',
+#  'readings.1.value: Input should be a valid number, unable to parse string as a number']
+```
+
+`loc` is a tuple like `('readings', 1, 'sensor_id')`, and `str(p)` turns the list index into `"1"`. That path tells the LLM exactly which reading to fix.
+
+**E2 — reference solution**
+
+```python
+def scripted(outputs):
+    it = iter(outputs)
+    return lambda prompt: next(it)
+
+def self_correct(llm_fn, model_class, prompt, max_retries=3):
+    history = []
+    for attempt in range(1, max_retries + 1):
+        raw = llm_fn(prompt)
+        try:
+            return {"result": model_class.model_validate_json(raw),
+                    "attempts": attempt, "history": history}
+        except ValidationError as e:
+            msgs = format_errors(e)
+            history.append(msgs)
+            prompt += f"\n\nAttempt {attempt} errors:\n" + "\n".join(f"- {m}" for m in msgs)
+    return {"result": None, "attempts": max_retries, "history": history}
+
+bad = '{"machine_id": "P101", "task": "Replace seals", "priority": "high", "estimated_hours": 4}'
+good = '{"machine_id": "P101", "task": "Replace seals", "priority": 5, "estimated_hours": 4}'
+r = self_correct(scripted([bad, good]), MaintenancePlan, "extract")
+print(r["attempts"], r["history"], r["result"].priority)
+# 2 [['priority: Input should be a valid integer, unable to parse string as an integer']] 5
+r = self_correct(scripted([bad, bad, bad]), MaintenancePlan, "extract")
+print(r["attempts"], len(r["history"]), r["result"])   # 3 3 None
+```
+
+Scripting the LLM makes the loop deterministic, so each branch can be unit-tested without API calls.
+
+**E3 — reference solution**
+
+```python
+NON_RETRIABLE = {"enum", "value_error", "assertion_error"}
+
+def guarded_correct(llm_fn, model_class, prompt, max_retries=5):
+    prev_signature = None
+    for attempt in range(1, max_retries + 1):
+        raw = llm_fn(prompt)
+        try:
+            return {"status": "ok", "attempts": attempt,
+                    "result": model_class.model_validate_json(raw)}
+        except ValidationError as e:
+            errs = e.errors()
+            if any(err["type"] in NON_RETRIABLE for err in errs):
+                return {"status": "non_retriable", "attempts": attempt, "errors": format_errors(e)}
+            signature = sorted((tuple(err["loc"]), err["type"]) for err in errs)
+            if signature == prev_signature:
+                return {"status": "no_progress", "attempts": attempt, "errors": format_errors(e)}
+            prev_signature = signature
+            prompt += "\nFix:\n" + "\n".join(format_errors(e))
+    return {"status": "exhausted", "attempts": max_retries}
+
+print(guarded_correct(scripted([bad] * 5), MaintenancePlan, "p")["status"])          # no_progress (attempts=2)
+sev_bad = '{"machine_id":"P101","severity":"mega","action":"inspect bearings","estimated_downtime_hours":1}'
+print(guarded_correct(scripted([sev_bad]), DiagnosticResult, "p")["status"])         # non_retriable (attempts=1)
+missing = '{"machine_id": "P101", "task": "Replace seals", "priority": 5}'
+print(guarded_correct(scripted([bad, missing, good]), MaintenancePlan, "p")["status"])  # ok (attempts=3)
+```
+
+Trace for the last case: the signatures go `[(('priority',), 'int_parsing')]`, then `[(('estimated_hours',), 'missing')]`, then success. They differ each time, so the loop keeps going. Detecting no progress saves the remaining paid API calls when the model is stuck.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

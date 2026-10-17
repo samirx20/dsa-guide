@@ -746,6 +746,162 @@ Tool calling follows a strict message sequence: user -> assistant (with tool_cal
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Run the mock tool.** Using the chapter's `read_sensor` (with its `mock_data` for T-01 and T-02), what do these lines print?
+
+```python
+r = read_sensor(**json.loads('{"sensor_id":"T-02","metric":"pressure"}'))
+print(r)
+print(json.dumps(r))
+print(read_sensor("T-09", "temperature"))
+```
+
+**Q2. `str()` vs `json.dumps()`.** A tool returns `result = {"temperature": 72.5, "ok": True, "alarm": None}`. What is `str(result)`, what is `json.dumps(result)`, and which one belongs in a `tool` message's `content`?
+
+**Q3. ToolExecutor error paths.** With `executor = ToolExecutor().register("read_sensor", read_sensor)`, give the exact `content` string returned for each tool call. Each one is a fake with `.id`, `.function.name` and `.function.arguments`.
+
+| Call | `function.name` | `function.arguments` |
+|---|---|---|
+| (a) | `"readSensor"` | `'{"sensor_id":"T-01","metric":"humidity"}'` |
+| (b) | `"read_sensor"` | `'{"sensor_id": "T-01"}'` |
+| (c) | `"read_sensor"` | `'{"sensor_id":"T-01","metric":"humidity","unit":"C"}'` |
+| (d) | `"read_sensor"` | `"{'sensor_id': 'T-01', 'metric': 'humidity'}"` |
+
+**Q4. What is sent next?** The conversation so far is `[system, user]`. The model replies with an assistant message containing two tool calls, `call_001` and `call_002`. List the roles (and `tool_call_id`s) of the messages you send on the **next** API call, in order. How long is the list? Then: what is wrong with sending `[system, user, tool(call_001), tool(call_002)]`?
+
+### Coding Exercises
+
+**E1 (Easy).** Write `extract_calls(assistant_msg: dict) -> list[tuple[str, str, dict]]`. It returns `(id, name, parsed_args)` for every tool call in a dict-form assistant message, or `[]` if there are none (or `tool_calls` is missing or `None`).
+
+- `extract_calls(full_conversation[2])` → `[('call_001', 'read_sensor', {'sensor_id': 'T-01', 'metric': 'temperature'}), ('call_002', 'read_sensor', {'sensor_id': 'T-02', 'metric': 'humidity'})]`
+- `extract_calls(full_conversation[5])` → `[]`
+
+**E2 (Easy–Medium).** Write `run_tool_calls(assistant_msg: dict, registry: dict[str, Callable]) -> list[dict]`. It returns one `tool` message per tool call, **in the same order**, and never raises. Any failure (unknown tool, bad JSON, bad arguments, an exception inside the tool) becomes `{"error": "<ExcName>: <msg>"}` as JSON content.
+
+- Calls `c1 = read_sensor(T-02, temperature)` and `c2 = set_alarm({})`, with only `read_sensor` registered →
+  `{'role': 'tool', 'tool_call_id': 'c1', 'content': '{"sensor_id": "T-02", "temperature": 68.3}'}`, then
+  `{'role': 'tool', 'tool_call_id': 'c2', 'content': '{"error": "LookupError: Unknown tool: set_alarm"}'}`
+
+**E3 (Medium).** Write `validate_transcript(messages: list[dict]) -> list[str]`. It checks the protocol rule from this chapter: every `tool_call` id in an assistant message must be answered by a `tool` message *before the next non-tool message*, and every `tool` message must answer a pending id. Report:
+- `"message {i}: tool result for unknown id {id!r}"`
+- `"message {i}: missing tool results for {pending_list}"`, at the first non-tool message after unanswered calls
+- `"end: missing tool results for {pending_list}"`, if the transcript ends with unanswered calls
+
+Examples:
+- `validate_transcript(full_conversation)` → `[]`
+- `[system, user, {"role": "tool", "tool_call_id": "call_abc123", ...}]`, which is the "Forgetting the Assistant Message" mistake → `["message 2: tool result for unknown id 'call_abc123'"]`
+- `full_conversation` with message 4 (the `call_002` result) removed → `["message 4: missing tool results for ['call_002']"]`
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+```
+{'sensor_id': 'T-02', 'pressure': 14.5}
+{"sensor_id": "T-02", "pressure": 14.5}
+{'sensor_id': 'T-09', 'temperature': 0}
+```
+
+The dict key is the *value* of `metric` (`{..., metric: ...}`), so the key is `'pressure'`. `json.dumps` uses double quotes and a space after `:` and `,`. For the unknown sensor `T-09`, `.get(sensor_id, {})` returns `{}` and `.get(metric, 0)` returns `0`. The tool **silently reports 0 °C** instead of an error, and the model will happily repeat that. Return an explicit `{"error": "Unknown sensor T-09"}` instead.
+
+**Q2.**
+- `str(result)` → `{'temperature': 72.5, 'ok': True, 'alarm': None}`. This is Python syntax (single quotes, `True`, `None`) and is **not** valid JSON.
+- `json.dumps(result)` → `{"temperature": 72.5, "ok": true, "alarm": null}`. This is valid JSON.
+
+Use `json.dumps(result)`. `content` must be a string, and JSON is what the model (and any downstream parser) expects.
+
+**Q3.**
+
+| Call | Path taken | `content` |
+|---|---|---|
+| (a) | name not registered | `{"error": "Unknown tool: readSensor"}` |
+| (b) | JSON is fine; `read_sensor(**args)` raises `TypeError` | `{"error": "read_sensor() missing 1 required positional argument: 'metric'"}` |
+| (c) | extra key, so `TypeError` | `{"error": "read_sensor() got an unexpected keyword argument 'unit'"}` |
+| (d) | single quotes are not JSON, so `JSONDecodeError` | `{"error": "Invalid JSON: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"}` |
+
+All four return a well-formed `tool` message with the original `tool_call_id`. The executor turns every failure into data the model can read and react to, instead of a crash. (The exact `TypeError` wording comes from CPython 3.13 and may differ slightly between Python versions.)
+
+**Q4.** **5 messages**:
+
+| # | role | detail |
+|---|---|---|
+| 0 | `system` | |
+| 1 | `user` | |
+| 2 | `assistant` | `content: None`, `tool_calls: [call_001, call_002]` |
+| 3 | `tool` | `tool_call_id: "call_001"` |
+| 4 | `tool` | `tool_call_id: "call_002"` |
+
+The four-message version omits the assistant message. The `tool` results then refer to ids that never appeared in the transcript, so the model cannot tell what was requested, and the API rejects it with a `BadRequestError`. Both tool results are also required: every `tool_call_id` in the assistant message must be answered.
+
+**E1 — reference solution**
+
+```python
+import json
+
+def extract_calls(assistant_msg: dict) -> list[tuple[str, str, dict]]:
+    calls = []
+    for tc in assistant_msg.get("tool_calls") or []:     # handles missing key AND None
+        fn = tc["function"]
+        calls.append((tc["id"], fn["name"], json.loads(fn["arguments"])))
+    return calls
+```
+
+$O(k)$ for $k$ calls, plus JSON parsing. `or []` matters because the key is often present but set to `None`.
+
+**E2 — reference solution**
+
+```python
+import json
+from typing import Any, Callable
+
+def run_tool_calls(assistant_msg: dict, registry: dict[str, Callable[..., Any]]) -> list[dict]:
+    out = []
+    for tc in assistant_msg.get("tool_calls") or []:
+        name = tc["function"]["name"]
+        try:
+            if name not in registry:
+                raise LookupError(f"Unknown tool: {name}")
+            args = json.loads(tc["function"]["arguments"])
+            result = registry[name](**args)
+        except Exception as e:                     # one handler for every failure mode
+            result = {"error": f"{type(e).__name__}: {e}"}
+        out.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(result)})
+    return out
+```
+
+$O(k)$ calls. Each call is isolated in its own `try`, so one bad call cannot prevent the others from returning a result. That matters because *every* id needs an answer (Q4).
+
+**E3 — reference solution**
+
+```python
+def validate_transcript(messages: list[dict]) -> list[str]:
+    problems: list[str] = []
+    pending: list[str] = []
+    for i, m in enumerate(messages):
+        if m["role"] == "tool":
+            cid = m.get("tool_call_id")
+            if cid in pending:
+                pending.remove(cid)
+            else:
+                problems.append(f"message {i}: tool result for unknown id {cid!r}")
+            continue
+        if pending:                                   # a non-tool message arrived too early
+            problems.append(f"message {i}: missing tool results for {pending}")
+            pending = []
+        if m["role"] == "assistant":
+            pending = [tc["id"] for tc in m.get("tool_calls") or []]
+    if pending:
+        problems.append(f"end: missing tool results for {pending}")
+    return problems
+```
+
+Trace for the third example: message 2 opens `pending = ['call_001', 'call_002']`, message 3 answers `call_001`, and message 4 is now the final `assistant` while `['call_002']` is still pending, so that is reported. $O(n \cdot k)$ ($O(n)$ with a `set` for `pending`). Running this before every API call catches protocol bugs locally, before they cost a round trip.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

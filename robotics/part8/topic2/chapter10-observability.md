@@ -667,6 +667,216 @@ Observability turns a black-box agentic system into a diagnosable one. Structure
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Count the asterisks.** What do these calls return? How many `*` characters are in the first result? Compare with the comment in "Common Mistake: Logging Secrets".
+
+```python
+redact("sk-1234567890abcdef")
+redact("abc")
+redact("abcd")
+redact("abcde")
+```
+
+**Q2. Percentiles from `TimingTracker.stats`.** After recording these timings for one function, what are `avg_ms`, `p50_ms`, `p95_ms` and `max_ms`? Repeat for `[5, 7]`.
+
+```python
+times = [10, 20, 30, 40, 50, 60, 70, 80, 90, 1000]
+```
+
+**Q3. Token cost.** With `TokenTracker` (input 0.003 USD per 1K tokens, output 0.015 USD per 1K tokens), you call `record(1200, 300, "m")` then `record(800, 500, "m")`. What is each call's `estimated_cost_usd`, and what is `summary()["total_cost_usd"]`?
+
+**Q4. Budget alert.** `t = MultiModelTracker(budget_usd=0.05)`, then `t.record(10000, 2000, "gpt-4o")` and `t.record(10000, 2000, "gpt-4o-mini")`. What does `t.check_budget()` return? Which pricing would `"llama-3"` use?
+
+**Q5. Does the exception escape?** What gets logged, and is `"after with"` printed?
+
+```python
+with pipeline_trace("q", "R1") as errors:
+    errors.append("pre-check failed")
+    raise ValueError("sensor offline")
+print("after with")
+```
+
+Bonus: `validator_with_logging([{"result": {"temp_c": 98.2, "pressure_psi": 210.3}}])` (default `max_retries=3`) — how many `validation_attempt` logs, and how long is the returned `all_errors`?
+
+### Coding Exercises
+
+**E1 (Easy).** The `p95` expression `sorted(times)[int(len(times) * 0.95)]` is off for small samples. Write a nearest-rank `percentile(values, p)` where $\text{rank} = \lceil \tfrac{p}{100} \cdot n \rceil$ and the result is `sorted(values)[rank - 1]`. Raise `ValueError` for empty input or `p` outside $(0, 100]$.
+
+- For the Q2 `times`: `percentile(times, 50)` → `50`, `percentile(times, 90)` → `90`, `percentile(times, 95)` → `1000`
+- `percentile([3, 1, 2], 100)` → `3`
+
+**E2 (Easy–Medium).** Combine `timed_safe` and `TimingTracker`. Write the decorator factory `timed_into(tracker, clock=time.perf_counter)`. It records elapsed ms (2 dp) into `tracker` and logs `tool_executed` with `status` `"success"` or `"error"`. It re-raises exceptions and preserves `__name__`. Inject `clock` for testing.
+
+- With a fake clock that ticks `0.0, 0.05, 1.0, 1.2`, call `get_status("P1")` once (success) and then `get_status("BAD")` once (raises). The tracker holds `{"get_status": [50.0, 200.0]}`, the log statuses are `["success", "error"]`, and `get_status.__name__ == "get_status"`.
+
+**E3 (Medium).** Write `summarize_logs(logs) -> dict` that turns a `StructuredLogger.logs` list into a dashboard summary: counts per `event`, and for `tool_executed` events, per-function `calls`, `errors` (where `status == "error"`) and `avg_ms`.
+
+```python
+logs = [
+    {"event": "pipeline_start"},
+    {"event": "tool_executed", "function": "get_machine_status", "elapsed_ms": 52.3, "status": "success"},
+    {"event": "tool_executed", "function": "get_machine_status", "elapsed_ms": 47.7, "status": "error"},
+    {"event": "tool_executed", "function": "get_recent_alerts", "elapsed_ms": 30.0, "status": "success"},
+    {"event": "pipeline_end"},
+]
+# → {"events": {"pipeline_start": 1, "tool_executed": 3, "pipeline_end": 1},
+#    "tools": {"get_machine_status": {"calls": 2, "errors": 1, "avg_ms": 50.0},
+#              "get_recent_alerts": {"calls": 1, "errors": 0, "avg_ms": 30.0}}}
+```
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| call | `len` | result |
+|------|-------|--------|
+| `redact("sk-1234567890abcdef")` | 19 | `"***************cdef"` (**15** asterisks) |
+| `redact("abc")` | 3 ≤ 4 | `"****"` |
+| `redact("abcd")` | 4 ≤ 4 | `"****"` (fully hidden) |
+| `redact("abcde")` | 5 | `"*bcde"` |
+
+`"sk-1234567890abcdef"` has 19 characters, so the stars number $19 - 4 = 15$. The comment in the chapter shows 12. Notice that `redact("abcde")` reveals 4 of 5 characters, so very short secrets need a different rule, such as always masking at least half.
+
+**Q2.** With `n = 10`:
+
+- `avg_ms` $= 1450 / 10 = 145$
+- `p50_ms` is the median, $(50 + 60)/2 = 55.0$
+- `p95_ms` uses index `int(10 * 0.95) = int(9.5) = 9`, which is `sorted(times)[9] = 1000`
+- `max_ms` $= 1000$
+
+A single 1000 ms outlier pulls the mean far above the median, which is why dashboards show p50 and p95 rather than just averages.
+
+For `[5, 7]`: `avg_ms = 6`, `p50_ms = 6.0`, and `p95_ms` uses index `int(1.9) = 1`, giving `7`. `max_ms = 7`.
+
+**Q3.** Each cost is $(\text{in} \cdot 0.003 + \text{out} \cdot 0.015) / 1000$.
+
+- Call 1: $(1200 \cdot 0.003 + 300 \cdot 0.015)/1000 = (3.6 + 4.5)/1000 = \mathbf{0.0081}$
+- Call 2: $(800 \cdot 0.003 + 500 \cdot 0.015)/1000 = (2.4 + 7.5)/1000 = \mathbf{0.0099}$
+- `total_cost_usd` $= \text{round}(0.018, 4) = \mathbf{0.018}$
+
+Output tokens cost 5× as much as input tokens, so call 2 costs more despite having fewer total tokens.
+
+**Q4.** The per-call costs are:
+
+- gpt-4o: $(10000 \cdot 0.0025 + 2000 \cdot 0.010)/1000 = (25 + 20)/1000 = 0.045$
+- gpt-4o-mini: $(10000 \cdot 0.00015 + 2000 \cdot 0.0006)/1000 = (1.5 + 1.2)/1000 = 0.0027$
+
+The total is $0.0477$.
+
+```python
+{"budget_usd": 0.05, "spent_usd": 0.0477, "remaining_usd": 0.0023,
+ "pct_used": 95.4, "alert": True}
+```
+
+$0.0477 / 0.05 = 95.4\% > 80\%$, so `alert` is `True`. An unknown model like `"llama-3"` falls back to `{"input": 0.003, "output": 0.015}`.
+
+**Q5.** The exception does **not** escape, and `"after with"` **is printed**. When the `with` body raises, the exception is thrown into the generator at `yield`. The `except Exception` there catches it and does not re-raise, so the context manager swallows it. The logged events, in order:
+
+1. `pipeline_start`
+2. `pipeline_error` with `error="sensor offline"`
+3. `pipeline_end` with `error_count=2`, counting `"pre-check failed"` and `"sensor offline"`
+
+This is useful for tracing, but dangerous if callers expect the exception. Add `raise` after logging to propagate it.
+
+Bonus: the input never changes between attempts, so every attempt finds the same 2 errors. That gives **3** `validation_attempt` logs, `all_errors` of length **6**, and the original `results` returned. The "attempt 1: errors []" example in the chapter can only happen if something, such as an LLM correction, changes the data between attempts.
+
+**E1 — reference solution**
+
+```python
+import math
+
+def percentile(values, p):
+    if not values:
+        raise ValueError("empty input")
+    if not 0 < p <= 100:
+        raise ValueError("p must be in (0, 100]")
+    s = sorted(values)
+    rank = math.ceil(p / 100 * len(s))     # 1-based nearest rank
+    return s[rank - 1]
+
+times = [10, 20, 30, 40, 50, 60, 70, 80, 90, 1000]
+print(percentile(times, 50), percentile(times, 90), percentile(times, 95))  # 50 90 1000
+print(percentile([3, 1, 2], 100))                                           # 3
+```
+
+The cost is $O(n \log n)$ for the sort. For p50 with $n = 10$, the rank is $\lceil 5 \rceil = 5$, so the result is the 5th value, `50`. Nearest-rank always returns an observed sample; it never interpolates the way `statistics.median` does.
+
+**E2 — reference solution**
+
+```python
+import time
+from functools import wraps
+
+def timed_into(tracker, clock=time.perf_counter):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start = clock()
+            status = "success"
+            try:
+                return func(*args, **kwargs)
+            except Exception:
+                status = "error"
+                raise
+            finally:                                   # runs on both paths
+                ms = round((clock() - start) * 1000, 2)
+                tracker.record(func.__name__, ms)
+                logger.log("tool_executed", function=func.__name__,
+                           elapsed_ms=ms, status=status)
+        return wrapper
+    return decorator
+
+ticks = iter([0.0, 0.05, 1.0, 1.2])
+tracker = TimingTracker()
+
+@timed_into(tracker, clock=lambda: next(ticks))
+def get_status(serial):
+    if serial == "BAD":
+        raise ValueError("unknown serial")
+    return {"ok": True}
+
+get_status("P1")
+try:
+    get_status("BAD")
+except ValueError:
+    pass
+print(tracker.timings, get_status.__name__)   # {'get_status': [50.0, 200.0]} get_status
+```
+
+`finally` guarantees exactly one timing and one log per call, whether the call succeeds or raises. `@wraps` keeps `__name__` so the logs name the real function.
+
+**E3 — reference solution**
+
+```python
+def summarize_logs(logs):
+    out = {"events": {}, "tools": {}}
+    for entry in logs:
+        ev = entry["event"]
+        out["events"][ev] = out["events"].get(ev, 0) + 1
+        if ev == "tool_executed":
+            t = out["tools"].setdefault(entry["function"],
+                                        {"calls": 0, "errors": 0, "total_ms": 0.0})
+            t["calls"] += 1
+            t["total_ms"] += entry["elapsed_ms"]
+            if entry.get("status") == "error":
+                t["errors"] += 1
+    for t in out["tools"].values():
+        t["avg_ms"] = round(t.pop("total_ms") / t["calls"], 2)
+    return out
+
+print(summarize_logs(logs))
+# {'events': {'pipeline_start': 1, 'tool_executed': 3, 'pipeline_end': 1},
+#  'tools': {'get_machine_status': {'calls': 2, 'errors': 1, 'avg_ms': 50.0},
+#            'get_recent_alerts': {'calls': 1, 'errors': 0, 'avg_ms': 30.0}}}
+```
+
+`get_machine_status` averages $(52.3 + 47.7)/2 = 50.0$. One pass is $O(n)$. This kind of aggregation is only possible because the logs are structured JSON rather than `print()` text.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

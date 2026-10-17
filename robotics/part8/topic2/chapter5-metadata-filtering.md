@@ -461,6 +461,152 @@ Metadata filtering narrows the search space to relevant documents before or afte
 
 ---
 
+## Practice & Self-Check
+
+All questions use the chapter's three `chunks` (P101 maintenance p.12 `[0.9, 0.1, 0.0]`, P101 specifications p.8 `[0.8, 0.2, 0.0]`, C201 maintenance p.15 `[0.1, 0.8, 0.1]`) and the query `[0.85, 0.15, 0.0]`.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Pre-filter on a different field.** Which chunks does `pre_filter_search(chunks, [0.85, 0.15, 0.0], filters={"section_type": "maintenance"})` return, in what order, and with what scores (4 decimals)?
+
+**Q2. The type trap.** What does this return, and why?
+
+```python
+multi_filter_search(chunks, [0.85, 0.15, 0.0],
+                    filters={"machine_id": "P101", "page": "12"})
+```
+
+**Q3. Hybrid scores.** Compute the `combined` score for each result of the chapter's `hybrid_search(chunks, [0.85, 0.15, 0.0], filters={"machine_id": "P101"})`. Which keywords from `["pump", "seal", "maintenance", "replace", "vibration"]` fire for each chunk?
+
+**Q4. Weighted hybrid with the cap.** In `weighted_hybrid_search`, a chunk has text `"Safety warning: critical maintenance procedure"` and vector similarity `v_score = 0.8`. What are the raw `k_score`, the capped `k_score`, and the `combined` score with the default weights? Bonus: what is `k_score` for the text `"Vibration threshold is 5 mm/s peak (see specifications)"`?
+
+**Q5. Hidden side effect.** Starting from fresh `chunks` (no `"score"` keys), you run only `pre_filter_search(chunks, [0.85, 0.15, 0.0], {"machine_id": "P101"})`. What is `chunks[2].get("score")` afterwards? What is `chunks[0].get("score")` (rounded)?
+
+### Coding Exercises
+
+**E1 (Easy).** The chapter says "For OR logic, run separate searches and merge results." Do it in one pass: write `or_filter_search(chunks, query_vector, field, values, top_k=3)` that keeps chunks whose `metadata[field]` is in `values`, scores them, and returns dicts `{"text", "score" (4 dp), field}` sorted by score.
+
+- `or_filter_search(chunks, [0.85, 0.15, 0.0], "page", [8, 15])` → P101 specifications (0.9975, page 8), then C201 (0.2924, page 15)
+
+**E2 (Easy–Medium).** Write `matches(meta: dict, filters: dict) -> bool` supporting Pinecone-style operators `$eq, $ne, $in, $nin, $gt, $gte, $lt, $lte`. A bare value means `$eq`. All conditions are ANDed, and a range operator on a missing field is `False`.
+
+- `{"asset_type": "pump", "page": {"$gte": 10}}` → matches only page 12
+- `{"page": {"$gt": 8, "$lte": 15}}` → matches pages 12 and 15
+
+**E3 (Medium).** Score-adding hybrid search mixes incompatible scales. Write **Reciprocal Rank Fusion**: `rrf(vector_ranking, keyword_ranking, k=60, top_k=3)` where each ranking is a list of doc ids (best first). Each doc's score is $\sum_{\text{lists}} \frac{1}{k + \text{rank}}$ with rank starting at 1. Return `(doc_id, score rounded to 5 dp)` sorted by score descending, ties broken by id.
+
+- `rrf(["A", "B", "C", "D"], ["C", "A", "E"])` → `[("A", 0.03252), ("C", 0.03227), ("B", 0.01613)]`
+- `rrf(["A", "B"], ["B", "C"], k=1)` → `[("B", 0.83333), ("A", 0.5), ("C", 0.33333)]`
+
+#### Dry-Run: Answers
+
+**Q1.** The filter keeps chunk 0 (P101) and chunk 2 (C201) and drops chunk 1, which is `specifications`. With $\|q\| = \sqrt{0.745} \approx 0.8631$:
+
+| chunk | dot | $\|q\|\,\|c\|$ | score |
+|-------|-----|----------------|-------|
+| 0 `[0.9, 0.1, 0]` | $0.765 + 0.015 = 0.780$ | $0.8631 \times 0.9055 \approx 0.7816$ | **0.9980** |
+| 2 `[0.1, 0.8, 0.1]` | $0.085 + 0.120 = 0.205$ | $0.8631 \times 0.8124 \approx 0.7012$ | **0.2924** |
+
+Order: **P101 maintenance (0.9980), then C201 maintenance (0.2924)**. The filter cannot rescue relevance: C201 is returned even though it scores low, because nothing else matches.
+
+**Q2.** It returns **`[]`**. The stored `page` is the **integer** `12`, and `12 == "12"` is `False` in Python, so `all(...)` fails for every chunk. With `"page": 12` the result is the seal chunk. This is why the chapter insists on a consistent metadata schema: the types must match, not just the values.
+
+**Q3.** Both P101 chunks pass the filter.
+
+| chunk | v_score | keywords hit | keyword_score | combined |
+|-------|---------|--------------|---------------|----------|
+| "Replace the mechanical seal every 5000 hours" | 0.9980 | `seal`, `replace` | $0.15 \times 2 = 0.30$ (cap 0.3) | **1.2980** |
+| "Vibration threshold is 5 mm/s peak" | 0.9975 | `vibration` | 0.15 | **1.1475** |
+
+The seal chunk ranks first. The vector scores differ by only 0.0005, so the keyword bonus decides the order.
+
+**Q4.** Lowercased, the text contains `safety` (0.15), `warning` (0.15), `critical` (0.15), `maintenance` (0.10) and `procedure` (0.10). The raw `k_score` is **0.65**, which is **capped to 0.5**. The combined score is $0.7 \times 0.8 + 0.3 \times 0.5 = 0.56 + 0.15 = \mathbf{0.71}$.
+
+Bonus: `"specification" in "...specifications)"` is a **substring** match, so `k_score = 0.1`. `in` on strings does not respect word boundaries.
+
+**Q5.** `chunks[2].get("score")` is **`None`**. The C201 chunk was filtered out, so `chunk["score"] = ...` never ran on it. `chunks[0].get("score")` is **≈ 0.998**. `pre_filter_search` writes `"score"` **into the shared chunk dicts**, mutating the caller's data, so a later search can see stale scores. Returning `{**chunk, "score": s}` copies avoids this.
+
+**E1 — reference solution**
+
+```python
+def or_filter_search(chunks, query_vector, field, values, top_k=3):
+    allowed = set(values)
+    out = []
+    for c in chunks:
+        if c["metadata"].get(field) in allowed:          # OR across values
+            out.append({"text": c["text"],
+                        "score": round(cosine_sim(query_vector, c["vector"]), 4),
+                        field: c["metadata"][field]})
+    out.sort(key=lambda r: r["score"], reverse=True)
+    return out[:top_k]
+
+print(or_filter_search(chunks, [0.85, 0.15, 0.0], "page", [8, 15]))
+# [{'text': 'Vibration threshold is 5 mm/s peak', 'score': 0.9975, 'page': 8},
+#  {'text': 'Compressor oil change interval is 10000 hours', 'score': 0.2924, 'page': 15}]
+```
+
+A single pass is $O(n \cdot d)$, and the result is sorted in $O(m \log m)$. A `set` makes each membership test $O(1)$. The function returns new dicts, so the input is not mutated.
+
+**E2 — reference solution**
+
+```python
+def matches(meta: dict, filters: dict) -> bool:
+    for field, cond in filters.items():
+        val = meta.get(field)
+        if not isinstance(cond, dict):
+            cond = {"$eq": cond}                         # bare value = equality
+        for op, arg in cond.items():
+            if op == "$eq":
+                ok = val == arg
+            elif op == "$ne":
+                ok = val != arg
+            elif op == "$in":
+                ok = val in arg
+            elif op == "$nin":
+                ok = val not in arg
+            elif op in ("$gt", "$gte", "$lt", "$lte"):
+                if val is None:
+                    return False
+                ok = {"$gt": val > arg, "$gte": val >= arg,
+                      "$lt": val < arg, "$lte": val <= arg}[op]
+            else:
+                raise ValueError(f"unknown operator {op}")
+            if not ok:
+                return False                             # AND: fail fast
+    return True
+
+metas = [c["metadata"] for c in chunks]
+print([m["page"] for m in metas if matches(m, {"asset_type": "pump", "page": {"$gte": 10}})])  # [12]
+print([m["page"] for m in metas if matches(m, {"page": {"$gt": 8, "$lte": 15}})])            # [12, 15]
+```
+
+The cost is $O(\text{number of conditions})$ per chunk. The `None` guard prevents `TypeError` from comparisons like `None >= 10`.
+
+**E3 — reference solution**
+
+```python
+def rrf(vector_ranking, keyword_ranking, k=60, top_k=3):
+    scores = {}
+    for ranking in (vector_ranking, keyword_ranking):
+        for rank, doc in enumerate(ranking, start=1):
+            scores[doc] = scores.get(doc, 0.0) + 1.0 / (k + rank)
+    ordered = sorted(scores.items(), key=lambda x: (-x[1], x[0]))
+    return [(doc, round(s, 5)) for doc, s in ordered][:top_k]
+
+print(rrf(["A", "B", "C", "D"], ["C", "A", "E"]))
+# [('A', 0.03252), ('C', 0.03227), ('B', 0.01613)]
+```
+
+Trace with $k = 60$:
+
+- A scores $\frac{1}{61} + \frac{1}{62} = 0.016393 + 0.016129 = 0.032522$.
+- C scores $\frac{1}{63} + \frac{1}{61} = 0.015873 + 0.016393 = 0.032266$.
+- B scores $\frac{1}{62} = 0.016129$.
+
+RRF uses only ranks, so a cosine of 0.99 and a keyword count of 3 never have to share a scale. It runs in $O(n \log n)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

@@ -614,6 +614,144 @@ Context windows are finite and expensive. Count tokens with `tiktoken` before se
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Odd-sized window.** Using the chapter's `sliding_window` and its 21-message fake history (system plus `Message 0` to `Message 19`, alternating user/assistant starting with user), what is returned by `sliding_window(messages, max_messages=5)`? List the length and each message's role and content. What is wrong with the first non-system message?
+
+**Q2. `summarize_old_messages` with different `keep_recent`.** Using the chapter's 7-message sensor conversation, how many messages does each call return, and what is the role/content of the message right after the system prompt?
+
+```python
+summarize_old_messages(messages, keep_recent=3)   # (a)
+summarize_old_messages(messages, keep_recent=6)   # (b)
+summarize_old_messages(messages, keep_recent=0)   # (c)  careful: think about [-0:]
+```
+
+**Q3. Budget check.** Using the chapter's rates (\$0.0025 per 1K input, \$0.01 per 1K output):
+(a) What is the cost of a call with 40,000 input tokens and 800 output tokens?
+(b) Does `cost_aware_chat(messages, max_cost=0.10)` send a 40,000-token prompt? It assumes 500 output tokens. If it does not send, what is the error string?
+
+**Q4. The 90% guard on a smaller model.** Re-run the chapter's "exceed the context" loop with `model_limit = 16384`. The system prompt is 6 tokens, and pretend every padded message is exactly 1,000 tokens. What does the warning line print, and what is the final message count?
+
+### Coding Exercises
+
+**E1 (Easy).** Write `trim_to_budget(messages, max_tokens, count=approx_tokens) -> list[dict]`. `approx_tokens(m) = len(m["content"]) // 4` is the chapter's "about 4 characters per token" rule. Always keep the system message(s). Drop the **oldest** non-system messages one at a time until the total fits, but never drop the final message.
+
+- System content `"s" * 40` (10 tokens) plus 6 messages of 100 characters each (25 tokens each), with `max_tokens=110` → keeps system plus the last 4 messages, total exactly 110
+- Same input with `max_tokens=10` → 2 messages (system plus the last message)
+
+**E2 (Easy–Medium).** Write `window_pairs(messages, max_pairs) -> list[dict]`. It keeps the system prompt, the last `max_pairs` *complete* user→assistant exchanges, and a trailing unanswered `user` message if there is one. The first kept non-system message must be a `user`.
+
+- 21-message history, `max_pairs=2` → `system, Message 16, 17, 18, 19`
+- The same history plus a final user `"Message 20"` → `system, Message 16, 17, 18, 19, 20`
+
+**E3 (Medium).** Write `window_with_pins(messages, max_recent) -> list[dict]`. This fixes "Common Mistake: Dropping Important Context". Keep every `system` message, every message with `"pinned": True`, and the last `max_recent` *other* messages. Preserve the original order.
+
+```python
+conv = [
+    {"role": "system", "content": "Never expose API keys."},
+    {"role": "user", "content": "Safety rule: never exceed 3600 rpm.", "pinned": True},
+    {"role": "assistant", "content": "Understood."},
+    {"role": "user", "content": "Start M-01 at 1200 rpm."},
+    {"role": "assistant", "content": "M-01 running at 1200 rpm."},
+    {"role": "user", "content": "Increase to 3000 rpm."},
+    {"role": "assistant", "content": "M-01 at 3000 rpm."},
+]
+```
+
+- `window_with_pins(conv, 2)` → `["Never expose API keys.", "Safety rule: never exceed 3600 rpm.", "Increase to 3000 rpm.", "M-01 at 3000 rpm."]`
+- `max_recent=0` → only the system message and the pinned message (2)
+
+#### Dry-Run: Answers
+
+**Q1.** Length **6**: `[system] You are a sensor assistant.`, `[assistant] Message 15`, `[user] Message 16`, `[assistant] Message 17`, `[user] Message 18`, `[assistant] Message 19`.
+
+`other_msgs` has 20 entries (indices 0 to 19), and `[-5:]` takes `Message 15` to `Message 19`. Odd messages are `assistant`, so the window **starts on an orphaned assistant reply** whose question was dropped. Use an even window size, or trim to whole exchanges (E2).
+
+**Q2.** `other_msgs` has 6 messages: u1, a1, u2, a2, u3, a3.
+
+| Call | Old (summarized) | Recent (kept) | Returned length | Message after system |
+|---|---|---|---|---|
+| (a) `keep_recent=3` | u1, a1, u2 | a2, u3, a3 | $1 + 1 + 3 = 5$ | `user`: `Previous conversation summary: User asked about What is the temperature of sensor T-01?. Assistant responded with info. User asked about How does that compare to T-02?. ` |
+| (b) `keep_recent=6` | none | (early return) | **7**, unchanged | `user`: `What is the temperature of sensor T-01?` |
+| (c) `keep_recent=0` | `other[:-0]` = `other[:0]` = `[]` | `other[-0:]` = `other[0:]` = **all 6** | $1 + 1 + 6 = 8$ | `user`: `Previous conversation summary: ` (empty summary) |
+
+(c) is a classic Python slicing trap: `-0 == 0`. Asking to keep zero messages **grows** the list by one empty summary message. Guard against it with `if keep_recent <= 0:` before slicing.
+
+**Q3.**
+(a) $\frac{40000}{1000} \times 0.0025 + \frac{800}{1000} \times 0.01 = 0.100 + 0.008 = \$0.108$.
+(b) Estimate $= 0.100 + \frac{500}{1000} \times 0.01 = 0.100 + 0.005 = 0.105 > 0.10$, so it is **not sent**. It returns `success=False` with `"Cost $0.1050 exceeds budget $0.10"` (and `input_tokens: 40000`).
+
+**Q4.** The threshold is $0.9 \times 16384 = 14745.6$. After processing loop index $i$, the total is $6 + 1000(i+1)$.
+
+| `i` | total | > 14745.6? |
+|---|---|---|
+| 13 | 14006 | no (appended) |
+| 14 | 15006 | **yes**, so break |
+
+It prints `Warning at message 14: 15006 tokens (91.6% of limit)` (since $15006 / 16384 = 0.9159$), then `Final message count: 15`: the system message plus 14 appended messages for $i = 0$ to $13$.
+
+**E1 — reference solution**
+
+```python
+from typing import Callable
+
+def approx_tokens(msg: dict) -> int:
+    return len(msg.get("content", "")) // 4
+
+def trim_to_budget(messages: list[dict], max_tokens: int,
+                   count: Callable[[dict], int] = approx_tokens) -> list[dict]:
+    system_msgs = [m for m in messages if m["role"] == "system"]
+    other_msgs = [m for m in messages if m["role"] != "system"]
+    total = sum(count(m) for m in system_msgs + other_msgs)
+    start = 0
+    while total > max_tokens and start < len(other_msgs) - 1:   # never drop the last message
+        total -= count(other_msgs[start])
+        start += 1
+    return system_msgs + other_msgs[start:]
+```
+
+Trace: $10 + 6 \times 25 = 160$, then drop two messages ($160 \to 135 \to 110$) and stop. $O(n)$: each message is counted once and dropped at most once. Pass `count=lambda m: len(enc.encode(m["content"]))` for exact `tiktoken` counts.
+
+**E2 — reference solution**
+
+```python
+def window_pairs(messages: list[dict], max_pairs: int) -> list[dict]:
+    system_msgs = [m for m in messages if m["role"] == "system"]
+    other_msgs = [m for m in messages if m["role"] != "system"]
+    tail: list[dict] = []
+    if other_msgs and other_msgs[-1]["role"] == "user":        # pending question
+        tail = [other_msgs[-1]]
+        other_msgs = other_msgs[:-1]
+    kept = other_msgs[-2 * max_pairs:] if max_pairs > 0 else []  # avoids the [-0:] trap
+    while kept and kept[0]["role"] != "user":                  # never start on an orphan
+        kept = kept[1:]
+    return system_msgs + kept + tail
+```
+
+$O(n)$. Slicing `2 * max_pairs` messages keeps whole exchanges, the `while` strips any leading orphan, and the `max_pairs > 0` guard avoids the slicing trap from Q2(c).
+
+**E3 — reference solution**
+
+```python
+def window_with_pins(messages: list[dict], max_recent: int) -> list[dict]:
+    keep: set[int] = set()
+    unpinned = []
+    for i, m in enumerate(messages):
+        if m["role"] == "system" or m.get("pinned"):
+            keep.add(i)                      # anchors are always kept
+        else:
+            unpinned.append(i)
+    if max_recent > 0:
+        keep.update(unpinned[-max_recent:])  # most recent ordinary messages
+    return [messages[i] for i in sorted(keep)]   # original order
+```
+
+Working with **indices** instead of message dicts keeps the original order trivially and avoids comparing dicts. $O(n \log n)$ because of the sort ($O(n)$ if you rebuild in a single pass with a boolean mask).
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

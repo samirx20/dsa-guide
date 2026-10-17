@@ -578,6 +578,212 @@ This pattern is the foundation for building reliable, maintainable AI agents in 
 
 ---
 
+## Practice & Self-Check
+
+Unless stated otherwise, use the Section 1–2 versions of `gather_input`, `analyze` and `respond`, and this fresh state:
+
+```python
+def fresh():
+    return {"phase": "idle", "user_input": "", "collected_facts": [],
+            "analysis_result": "", "response": ""}
+```
+
+### Predict the Output / Trace by Hand
+
+**Q1. Trace the transitions.** Fill in `phase` and `analysis_result` after each call, and give the final `response`.
+
+```python
+state = fresh()
+state = gather_input(state, "Bearing Temperature is 92C")
+state = analyze(state)
+state = respond(state)
+```
+
+**Q2. Skipping a step.** What are `state["phase"]` and `repr(state["response"])` after this?
+
+```python
+state = gather_input(fresh(), "Pump P101 has high vibration")
+state = respond(state)          # analyze() was skipped
+```
+
+**Q3. Mistake 1, run for real.** The chapter says the broken function leaves the phase "Still idle". Actually run it: what happens on the `print` line?
+
+```python
+state = fresh()
+state = gather_input_broken(state, "Pump issue")   # no return statement
+print(state["phase"])
+```
+
+**Q4. The unknown-phase message.** Using the loop from `run_diagnostic`, what is `state["error_message"]` after this?
+
+```python
+state = fresh()
+state["phase"] = "paused"
+while state["phase"] not in ("responding", "error"):
+    if state["phase"] == "gathering":
+        state = analyze(state)
+    elif state["phase"] == "analyzing":
+        state = respond(state)
+    else:
+        state["phase"] = "error"
+        state["error_message"] = f"Unknown phase: {state['phase']}"
+print(state["error_message"])
+```
+
+**Q5. Shallow copy, two kinds of write.** What do the three prints show?
+
+```python
+import copy
+state = fresh()
+state["symptoms"] = ["high vibration"]
+shallow = copy.copy(state)
+shallow["symptoms"].append("temperature")   # mutate a nested list
+shallow["phase"] = "error"                  # rebind a top-level key
+print(state["symptoms"])
+print(state["phase"])
+print(shallow["phase"])
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Guard clauses silently ignore bad calls. Make illegal moves loud instead: write `transition(state, new_phase, allowed=ALLOWED)` that raises `ValueError(f"illegal transition {cur} -> {new_phase}")` unless `new_phase` is in `allowed[cur]`.
+
+```python
+ALLOWED = {"idle": {"gathering"}, "gathering": {"analyzing", "error"},
+           "analyzing": {"responding", "error"}, "responding": set(), "error": set()}
+```
+
+- `{"phase": "idle"}` → `transition(..., "gathering")` → phase becomes `"gathering"`
+- then `transition(..., "responding")` → `ValueError: illegal transition gathering -> responding`
+
+**E2 (Easy–Medium).** Write a table-driven engine `run_machine(state, handlers, terminal=("responding", "error"), max_steps=10) -> (state, history)`. `handlers` maps phase → function. Record every phase visited in `history`. If no handler exists, set `phase="error"` and `error_message=f"Unknown phase: {old_phase}"` (avoid the Q4 bug). If `max_steps` handler calls pass without reaching a terminal phase, end in `"error"` with `"Exceeded {max_steps} steps"`.
+
+- Handlers `{"gathering": analyze, "analyzing": respond}` after `gather_input(fresh(), "Pump P101 has high vibration")` → history `["gathering", "analyzing", "responding"]`
+- Phase `"paused"` → history `["paused", "error"]`, message `"Unknown phase: paused"`
+- A handler that never changes `"gathering"`, `max_steps=3` → history `["gathering", "gathering", "gathering", "gathering", "error"]`
+
+**E3 (Medium).** Write `fork_and_merge(state, branch_fns)` that runs every branch on its own `deepcopy` of `state`, then returns a **new** state whose `symptoms` is the original list followed by every new symptom from the branches, in branch order, without duplicates. The input state must not change.
+
+- `state = {"phase": "gathering", "symptoms": ["noise"]}`. One branch appends `"vibration"`, the other appends `"temperature"` and then `"vibration"`. The merged symptoms are `["noise", "vibration", "temperature"]` and `state["symptoms"]` is still `["noise"]`.
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| after | `phase` | `analysis_result` | `collected_facts` |
+|-------|---------|-------------------|-------------------|
+| `fresh()` | `idle` | `""` | `[]` |
+| `gather_input` | `gathering` | `""` | `["User reported: Bearing Temperature is 92C"]` |
+| `analyze` | `analyzing` | `"Temperature alert."` | same |
+| `respond` | `responding` | same | same |
+
+`"vibration"` is not in the fact, so the first branch is skipped. `"temperature"` matches the lowercased fact, so the `elif` fires. The final `response` is **`"Analysis: Temperature alert."`**
+
+**Q2.** `phase` is **`"gathering"`** and the response is **`''`**. `respond` checks `if state["phase"] != "analyzing": return state`, so it hands back the state untouched. The guard does not raise; it silently does nothing. E1 shows how to make this kind of mistake loud.
+
+**Q3.** It raises **`TypeError: 'NoneType' object is not subscriptable`**. A function with no `return` returns `None`, so `state = gather_input_broken(...)` rebinds `state` to `None`, and `None["phase"]` fails. The original dict was mutated to `"gathering"`, but the name `state` no longer points at it. The phase is not "still idle"; the reference to the dict is lost.
+
+**Q4.** It prints **`Unknown phase: error`**. The `else` branch overwrites `state["phase"] = "error"` **before** building the f-string, so the message reports the new value rather than `"paused"`. The fix is to capture the old phase first: `bad = state["phase"]; state["phase"] = "error"; state["error_message"] = f"Unknown phase: {bad}"`.
+
+**Q5.**
+
+```
+['high vibration', 'temperature']
+idle
+error
+```
+
+`copy.copy` creates a new outer dict whose values are the **same objects**. Appending to `shallow["symptoms"]` mutates the list that `state` also holds, which is the bug. Assigning `shallow["phase"] = "error"` rebinds a key in the new outer dict only, so `state["phase"]` stays `"idle"`.
+
+**E1 — reference solution**
+
+```python
+ALLOWED = {"idle": {"gathering"}, "gathering": {"analyzing", "error"},
+           "analyzing": {"responding", "error"}, "responding": set(), "error": set()}
+
+def transition(state, new_phase, allowed=ALLOWED):
+    cur = state["phase"]
+    if new_phase not in allowed.get(cur, set()):
+        raise ValueError(f"illegal transition {cur} -> {new_phase}")
+    state["phase"] = new_phase
+    return state
+
+s = {"phase": "idle"}
+transition(s, "gathering")
+print(s)                                   # {'phase': 'gathering'}
+try:
+    transition(s, "responding")
+except ValueError as e:
+    print(e)                               # illegal transition gathering -> responding
+```
+
+$O(1)$. The `ALLOWED` table doubles as documentation of the state machine.
+
+**E2 — reference solution**
+
+```python
+def run_machine(state, handlers, terminal=("responding", "error"), max_steps=10):
+    history = [state["phase"]]
+    for _ in range(max_steps):
+        if state["phase"] in terminal:
+            return state, history
+        handler = handlers.get(state["phase"])
+        if handler is None:
+            bad = state["phase"]                      # capture BEFORE overwriting
+            state["phase"] = "error"
+            state["error_message"] = f"Unknown phase: {bad}"
+        else:
+            state = handler(state)
+        history.append(state["phase"])
+    if state["phase"] not in terminal:
+        state["phase"] = "error"
+        state["error_message"] = f"Exceeded {max_steps} steps"
+        history.append("error")
+    return state, history
+
+handlers = {"gathering": analyze, "analyzing": respond}
+s, h = run_machine(gather_input(fresh(), "Pump P101 has high vibration"), handlers)
+print(h, s["response"])   # ['gathering', 'analyzing', 'responding'] Analysis: Vibration anomaly detected.
+
+p = fresh(); p["phase"] = "paused"
+p, h = run_machine(p, handlers)
+print(h, p["error_message"])   # ['paused', 'error'] Unknown phase: paused
+
+g = fresh(); g["phase"] = "gathering"
+g, h = run_machine(g, {"gathering": lambda s: s}, max_steps=3)
+print(h, g["error_message"])   # ['gathering', 'gathering', 'gathering', 'gathering', 'error'] Exceeded 3 steps
+```
+
+The loop is bounded by `max_steps`, so a handler that never advances cannot hang the agent; that is Mistake 5, solved permanently. The cost is $O(\text{max\_steps})$ handler calls.
+
+**E3 — reference solution**
+
+```python
+import copy
+
+def fork_and_merge(state, branch_fns):
+    results = [fn(copy.deepcopy(state)) for fn in branch_fns]   # isolated branches
+    merged = copy.deepcopy(state)
+    seen = set(merged["symptoms"])
+    for r in results:
+        for sym in r["symptoms"]:
+            if sym not in seen:
+                seen.add(sym)
+                merged["symptoms"].append(sym)
+    return merged
+
+base = {"phase": "gathering", "symptoms": ["noise"]}
+def branch_a(s): s["symptoms"].append("vibration"); return s
+def branch_b(s): s["symptoms"] += ["temperature", "vibration"]; return s
+
+merged = fork_and_merge(base, [branch_a, branch_b])
+print(merged["symptoms"], base["symptoms"])   # ['noise', 'vibration', 'temperature'] ['noise']
+```
+
+Each branch mutates only its own deep copy, so `base` is untouched. The `seen` set keeps the merge at $O(\text{total symptoms})$ while preserving order.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

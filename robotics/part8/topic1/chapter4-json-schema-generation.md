@@ -423,6 +423,210 @@ JSON schema generation introspects Python functions to produce OpenAI-compatible
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Introspection loop.** Run the chapter's section 1 loop (`has_default` / `default`) on this function. What are the four printed lines?
+
+```python
+def move_joint(joint: str, angle_deg: float, speed: float = 0.5, dry_run: bool = False) -> dict:
+    """Move one robot joint to an absolute angle."""
+    return {}
+```
+
+**Q2. Generated parameters.** What is `function_to_tool(move_joint)["function"]["parameters"]`, written as JSON? What is the `description`, character for character?
+
+**Q3. Where the simple generator breaks.** Using the chapter's `function_to_tool`, what are the `properties` and `required` for each function?
+
+```python
+def set_mode(pump_id: str, mode: Literal["start", "stop"] = "stop") -> bool:
+    return True
+
+def ping(host, retries: int = 3):        # host has no annotation, and there is no docstring
+    return True
+```
+
+**Q4. `advanced_type_to_schema` as written.** Predict each result. Compare (a) with the chapter's printed output for `Optional[float]`.
+
+```python
+advanced_type_to_schema(Optional[float])           # (a)
+advanced_type_to_schema(list[Literal["a", "b"]])   # (b)
+advanced_type_to_schema(list)                      # (c)  bare list, no [..]
+advanced_type_to_schema(Literal[1, 2, 3])          # (d)
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Write `schema_for(annotation) -> dict` using `typing.get_origin` / `get_args`. It must handle:
+- primitives (`str`, `int`, `float`, `bool`, bare `list`, bare `dict`);
+- `Literal[...]` (use `"integer"` when every value is an int, otherwise `"string"`);
+- `Optional[X]` and `X | None` (unwrap to `X`);
+- other unions (`{"anyOf": [...]}`);
+- `list[X]` (recursive `items`);
+- `dict[K, V]` (`{"type": "object"}`).
+
+Examples:
+- `schema_for(Optional[float])` → `{'type': 'number'}`
+- `schema_for(Literal[1, 2, 3])` → `{'type': 'integer', 'enum': [1, 2, 3]}`
+- `schema_for(int | str)` → `{'anyOf': [{'type': 'integer'}, {'type': 'string'}]}`
+
+**E2 (Easy–Medium).** Write `function_to_tool_v2(func)` built on `schema_for`. It should skip `self`/`cls`, `*args` and `**kwargs`, and use only the **first line** of the cleaned docstring (`inspect.getdoc`) as the description.
+
+```python
+def set_mode(pump_id: str, mode: Literal["start", "stop"] = "stop", *args,
+             rpm: Optional[int] = None, **kwargs) -> bool:
+    """Set the pump operating mode.
+
+    Longer notes for humans that the LLM does not need.
+    """
+```
+
+→ description `"Set the pump operating mode."`, properties `pump_id` (string), `mode` (string enum, default `"stop"`), `rpm` (integer, default `null`), required `["pump_id"]`
+
+**E3 (Medium).** Use Pydantic as the single source of truth. Write `tool_from_model(name, description, model_cls)`, which builds the tool from `model_cls.model_json_schema()` with the auto-generated `"title"` keys removed. Also write `call_with_model(func, model_cls, arguments_json) -> dict`, which validates the LLM's argument string and returns `{"result": ...}` or `{"error": ["<loc>: <msg>", ...]}`. Test with:
+
+```python
+class SetAlarmArgs(BaseModel):
+    sensor_id: str = Field(pattern=r"^[A-Z]-\d{2}$", description="Sensor id, e.g. T-01")
+    threshold: float = Field(ge=-50, le=200)
+    direction: Literal["above", "below"]
+```
+
+- `threshold` in the schema → `{"maximum": 200, "minimum": -50, "type": "number"}`
+- `call_with_model(set_alarm, SetAlarmArgs, '{"sensor_id": "T-01", "threshold": "85", "direction": "above"}')` → `{'result': True}`
+- `'{"sensor_id": "T-1", "threshold": 900, "direction": "up"}'` → three errors (`sensor_id`, `threshold`, `direction`)
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+```
+  joint: type=<class 'str'>, default=required
+  angle_deg: type=<class 'float'>, default=required
+  speed: type=<class 'float'>, default=0.5
+  dry_run: type=<class 'bool'>, default=False
+```
+
+`dry_run` has a default (`False`), so it prints `False`, not `required`. The check is `is not inspect.Parameter.empty`, not truthiness, so a falsy default still counts as a default.
+
+**Q2.**
+
+```json
+{"type": "object",
+ "properties": {"joint": {"type": "string"},
+                "angle_deg": {"type": "number"},
+                "speed": {"type": "number", "default": 0.5},
+                "dry_run": {"type": "boolean", "default": false}},
+ "required": ["joint", "angle_deg"]}
+```
+
+`description` is `"Move one robot joint to an absolute angle."`, **with** the trailing period, because `func.__doc__` is used verbatim. (The chapter's printed JSON drops the period, but the code keeps it.) Python `False` becomes JSON `false`.
+
+**Q3.**
+- `set_mode`: `properties = {"pump_id": {"type": "string"}, "mode": {"type": "array", "default": "stop"}}`, `required = ["pump_id"]`. `Literal[...]` has an `__origin__`, and the first branch maps *anything* with `__origin__` to `"array"`. The LLM is told `mode` is an array whose default is a string, which is self-contradictory.
+- `ping`: `properties = {"host": {"type": "string"}, "retries": {"type": "integer", "default": 3}}`, `required = ["host"]`, `description = "Execute ping"`. A missing annotation falls back to `hints.get(name, str)`, and a missing docstring falls back to `f"Execute {func.__name__}"`.
+
+**Q4.**
+
+| Call | Result | Why |
+|---|---|---|
+| (a) | `{'type': 'string'}` | `Optional[float]` is `Union[float, None]`. Its origin is `Union`, which is neither `Literal` nor `list`, and the union itself is not in the primitive tuple, so it hits the fallback. The chapter's printed `{'type': 'number'}` is **not** what this code produces. E1 fixes it. |
+| (b) | `{'type': 'array', 'items': {'type': 'string', 'enum': ['a', 'b']}}` | the list branch recurses into the Literal branch |
+| (c) | `{'type': 'string'}` | bare `list` has no `__origin__` and is not in `(str, int, float, bool)` |
+| (d) | `{'type': 'string', 'enum': [1, 2, 3]}` | the type is hard-coded `"string"` even though the enum values are ints, which is an inconsistent schema |
+
+**E1 — reference solution**
+
+```python
+import types
+from typing import Any, Literal, Union, get_args, get_origin
+
+PRIMITIVES = {str: "string", int: "integer", float: "number", bool: "boolean",
+              list: "array", dict: "object"}
+
+def schema_for(annotation: Any) -> dict:
+    origin, args = get_origin(annotation), get_args(annotation)
+    if origin is Literal:
+        values = list(args)
+        if all(isinstance(v, bool) for v in values):
+            json_type = "boolean"
+        elif all(isinstance(v, int) and not isinstance(v, bool) for v in values):
+            json_type = "integer"
+        else:
+            json_type = "string"
+        return {"type": json_type, "enum": values}
+    if origin in (Union, types.UnionType):            # Optional[X], X | None, X | Y
+        non_null = [a for a in args if a is not type(None)]
+        if len(non_null) == 1:
+            return schema_for(non_null[0])
+        return {"anyOf": [schema_for(a) for a in non_null]}
+    if origin is list:
+        return {"type": "array", "items": schema_for(args[0]) if args else {}}
+    if origin is dict:
+        return {"type": "object"}
+    if annotation in PRIMITIVES:
+        return {"type": PRIMITIVES[annotation]}
+    return {"type": "string"}
+```
+
+`get_origin(Optional[float])` is `typing.Union`, and `get_origin(float | None)` is `types.UnionType`, so both are checked. The `bool` test comes before the `int` test because `bool` is a subclass of `int`. Cost is linear in the size of the type expression.
+
+**E2 — reference solution**
+
+```python
+import inspect
+from typing import get_type_hints
+
+def function_to_tool_v2(func) -> dict:
+    sig = inspect.signature(func)
+    hints = get_type_hints(func)
+    properties: dict[str, dict] = {}
+    required: list[str] = []
+    for name, param in sig.parameters.items():
+        if name in ("self", "cls") or param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
+            continue                                     # *args / **kwargs cannot be described
+        prop = schema_for(hints.get(name, str))
+        if param.default is inspect.Parameter.empty:
+            required.append(name)
+        else:
+            prop["default"] = param.default
+        properties[name] = prop
+    doc = inspect.getdoc(func) or f"Execute {func.__name__}"   # getdoc strips indentation
+    return {"type": "function",
+            "function": {"name": func.__name__,
+                         "description": doc.splitlines()[0],
+                         "parameters": {"type": "object", "properties": properties,
+                                        "required": required}}}
+```
+
+`rpm` is keyword-only but still a normal named parameter, so it is kept (`Optional[int]` gives `"integer"`, default `None`, which is JSON `null`). $O(p)$ in the number of parameters.
+
+**E3 — reference solution**
+
+```python
+from pydantic import BaseModel, ValidationError
+
+def tool_from_model(name: str, description: str, model_cls: type[BaseModel]) -> dict:
+    schema = model_cls.model_json_schema()
+    schema.pop("title", None)                          # "SetAlarmArgs" is noise for the LLM
+    for prop in schema.get("properties", {}).values():
+        prop.pop("title", None)
+    return {"type": "function",
+            "function": {"name": name, "description": description, "parameters": schema}}
+
+def call_with_model(func, model_cls: type[BaseModel], arguments_json: str) -> dict:
+    try:
+        args = model_cls.model_validate_json(arguments_json)
+    except ValidationError as e:
+        return {"error": [f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in e.errors()]}
+    return {"result": func(**args.model_dump())}
+```
+
+Pydantic emits `ge`/`le` as `minimum`/`maximum`, `pattern` as `pattern`, and `Literal` as `enum`, so the schema the LLM sees and the validation that runs are generated from **one** class and cannot drift apart. The `"85"` string is coerced to `85.0`. The bad call returns `"sensor_id: String should match pattern ..."`, `"threshold: Input should be less than or equal to 200"` and `"direction: Input should be 'above' or 'below'"`. Those messages can be sent straight back to the model as the tool result.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

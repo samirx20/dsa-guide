@@ -487,6 +487,164 @@ Chunking strategy directly impacts retrieval quality. Fixed-size is simple but c
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Count the chunks.** `fixed_size_chunks("x" * 2500, chunk_size=1000, overlap=200)`: how many chunks are produced, and what is the length of each?
+
+**Q2. Fill in the true composition.** For the chapter's own example (`"A"*3000 + "B"*3000 + "C"*3000`, `chunk_size=2000`, `overlap=500`), fill in the table by counting characters. Compare your answer with the comments in the "What's happening" block for Section 2.
+
+| chunk | slice | #A | #B | #C | length |
+|-------|-------|----|----|----|--------|
+| 0 | `[0:2000]` | ? | ? | ? | ? |
+| 1 | `[1500:3500]` | ? | ? | ? | ? |
+| 2 | `[3000:5000]` | ? | ? | ? | ? |
+| 3 | `[4500:6500]` | ? | ? | ? | ? |
+| 4 | `[6000:8000]` | ? | ? | ? | ? |
+| 5 | `[7500:9000]` | ? | ? | ? | ? |
+
+**Q3. Finish the sentence-chunk trace.** The chapter traces `sentence_chunks(text, max_chunk_size=80)` only up to the first chunk. The six sentence lengths are `[30, 34, 50, 26, 31, 40]`. (`current_size` sums sentence lengths only and ignores the joining spaces.) How many chunks are produced, and which sentences go in each?
+
+**Q4. Overlap = chunk size.** What happens when you call `fixed_size_chunks(text, chunk_size=100, overlap=100)` on any non-empty `text`? Which line of the function causes it, and which function in the chapter defends against it?
+
+**Q5. Abbreviations again.** What does the chapter's `robust_sentence_split` return for this input?
+
+```python
+robust_sentence_split("See Fig. 3 for wiring. Mr. Lee approved it. Done.")
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Write `count_chunks(length: int, chunk_size: int, overlap: int) -> int` that returns how many chunks `fixed_size_chunks` would produce, without building them. Raise `ValueError` if `overlap >= chunk_size`.
+
+- `count_chunks(9000, 2000, 500)` → `6`
+- `count_chunks(2500, 1000, 200)` → `4`
+- `count_chunks(0, 10, 2)` → `0`
+
+**E2 (Easy–Medium).** Write `word_window_chunks(text: str, size: int, overlap: int) -> list[str]` that slides a window of `size` **words** with `overlap` shared words between consecutive chunks. Stop as soon as a window reaches the last word, so you never emit a chunk that is entirely overlap. Raise `ValueError` unless `0 <= overlap < size`.
+
+- `word_window_chunks("a b c d e f g", 3, 1)` → `["a b c", "c d e", "e f g"]`
+- `word_window_chunks("a b c d e f", 3, 1)` → `["a b c", "c d e", "e f"]`
+
+**E3 (Medium).** Combine sentence chunking with overlap. Write `sentence_chunks_overlap(text: str, max_chars: int, overlap_sentences: int = 1) -> list[str]`. Greedily add sentences (split with the chapter's regex) while the **joined** chunk length (including spaces) stays `<= max_chars`. When the next sentence would overflow, emit the current chunk and start the next one with its last `overlap_sentences` sentences.
+
+- `sentence_chunks_overlap("Open valve. Start pump. Check flow. Log result.", 30)` → `["Open valve. Start pump.", "Start pump. Check flow.", "Check flow. Log result."]`
+
+#### Dry-Run: Answers
+
+**Q1.** The step is $1000 - 200 = 800$, so the starts are `0, 800, 1600, 2400`. The next start, 3200, is not below 2500, so the loop stops. That gives **4 chunks** with lengths **`[1000, 1000, 900, 100]`**. The last chunk `[2400:2500]` is only 100 chars, and all of them also appear in chunk 2. A tiny trailing chunk like this is a common side effect of fixed-size splitting. In general the count is $\lceil L / (\text{size} - \text{overlap}) \rceil$.
+
+**Q2.**
+
+| chunk | slice | #A | #B | #C | length |
+|-------|-------|----|----|----|--------|
+| 0 | `[0:2000]` | 2000 | 0 | 0 | 2000 |
+| 1 | `[1500:3500]` | 1500 | 500 | 0 | 2000 |
+| 2 | `[3000:5000]` | 0 | 2000 | 0 | 2000 |
+| 3 | `[4500:6500]` | 0 | 1500 | 500 | 2000 |
+| 4 | `[6000:8000]` | 0 | 0 | 2000 | 2000 |
+| 5 | `[7500:9000]` | 0 | 0 | 1500 | 1500 |
+
+The A block covers indices 0–2999, so chunk 0 is **pure A**, not "mixed A and B". Chunk 1 is the one that mixes A and B, and chunk 2 is pure B. The only mixed chunks are 1 (A/B) and 3 (B/C): exactly the chunks that straddle a boundary.
+
+**Q3.** **3 chunks**:
+
+| sentence | len | `current_size` before | sum | action |
+|----------|-----|-----------------------|-----|--------|
+| 1 "The pump operates…" | 30 | 0 | 30 | add |
+| 2 "Temperature should…" | 34 | 30 | 64 | add |
+| 3 "If vibration exceeds…" | 50 | 64 | 114 > 80 | flush chunk 0, start with s3 (size 50) |
+| 4 "Check alignment…" | 26 | 50 | 76 | add |
+| 5 "Replace seals…" | 31 | 76 | 107 > 80 | flush chunk 1, start with s5 (size 31) |
+| 6 "Document all…" | 40 | 31 | 71 | add; flush at end as chunk 2 |
+
+- Chunk 0: sentences 1–2 (65 chars joined)
+- Chunk 1: sentences 3–4 (77 chars joined)
+- Chunk 2: sentences 5–6 (72 chars joined)
+
+**Q4.** It loops **forever**, appending `text[0:100]` again and again until memory runs out. The culprit is `start = end - overlap`, which works out to `start + 100 - 100 = start`, so `start` never advances. If `overlap > chunk_size`, `start` moves backwards, with the same result. `production_recursive_split` guards against this with `if overlap >= chunk_size: raise ValueError(...)`.
+
+**Q5.** `['See Fig. 3 for wiring.', 'Mr.', 'Lee approved it.', 'Done.']`
+
+The pattern splits after `.`, `!` or `?` when the next character is uppercase. Here is how it handles each candidate:
+
+- `Fig.` is followed by ` 3`, a digit, so there is no split, which is correct.
+- `wiring.` is followed by ` Mr`, so it splits, which is correct.
+- `Mr.` is followed by ` Lee`, so it splits. That is **wrong**, because the abbreviation is followed by a capitalized name.
+- `it.` is followed by ` Done`, so it splits, which is correct.
+
+The uppercase lookahead fixes dates such as "Jan. 15" but not titles. A production splitter needs an abbreviation list.
+
+**E1 — reference solution**
+
+```python
+import math
+
+def count_chunks(length: int, chunk_size: int, overlap: int) -> int:
+    if overlap >= chunk_size:
+        raise ValueError("overlap must be < chunk_size")
+    if length <= 0:
+        return 0
+    step = chunk_size - overlap
+    return math.ceil(length / step)   # number of starts 0, step, 2*step, ... < length
+
+print(count_chunks(9000, 2000, 500))  # 6
+print(count_chunks(2500, 1000, 200))  # 4
+print(count_chunks(0, 10, 2))         # 0
+```
+
+$O(1)$. The count is just the number of multiples of `step` below `length`. Note that `count_chunks(1000, 1000, 200)` is `2`, because `fixed_size_chunks` emits a redundant 200-char tail chunk.
+
+**E2 — reference solution**
+
+```python
+def word_window_chunks(text: str, size: int, overlap: int) -> list[str]:
+    if not 0 <= overlap < size:
+        raise ValueError("need 0 <= overlap < size")
+    words = text.split()
+    out, start = [], 0
+    while start < len(words):
+        out.append(" ".join(words[start:start + size]))
+        if start + size >= len(words):   # this window reached the end
+            break
+        start += size - overlap
+    return out
+
+print(word_window_chunks("a b c d e f g", 3, 1))  # ['a b c', 'c d e', 'e f g']
+print(word_window_chunks("a b c d e f", 3, 1))    # ['a b c', 'c d e', 'e f']
+```
+
+$O(n)$ in the number of words. The early `break` is what avoids the trailing overlap-only chunk from Q1.
+
+**E3 — reference solution**
+
+```python
+import re
+
+def sentence_chunks_overlap(text: str, max_chars: int, overlap_sentences: int = 1) -> list[str]:
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    chunks, current = [], []
+    for s in sentences:
+        candidate = " ".join(current + [s])
+        if current and len(candidate) > max_chars:
+            chunks.append(" ".join(current))
+            carry = current[-overlap_sentences:] if overlap_sentences else []
+            current = carry + [s]
+        else:
+            current.append(s)
+    if current:
+        chunks.append(" ".join(current))
+    return chunks
+
+print(sentence_chunks_overlap("Open valve. Start pump. Check flow. Log result.", 30))
+# ['Open valve. Start pump.', 'Start pump. Check flow.', 'Check flow. Log result.']
+```
+
+Trace: `"Open valve. Start pump."` has 23 chars. Adding `"Check flow."` would make 35 > 30, so the function emits the chunk and carries `"Start pump."` forward. The same thing happens before `"Log result."`. The cost is $O(n \cdot k)$, where $k$ is the number of sentences per chunk. One caveat: a carried sentence plus a long new sentence can exceed `max_chars`, so production code should drop the carry in that case.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

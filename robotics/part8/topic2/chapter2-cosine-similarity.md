@@ -500,6 +500,146 @@ Cosine similarity measures the angle between vectors, making it ideal for text c
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Score four documents by hand.** Query `q = [0.6, 0.8, 0.0]` (already unit length). Compute the cosine similarity against each document, then give the top-2 ranking.
+
+| doc | vector |
+|-----|--------|
+| A | `[0.8, 0.6, 0.0]` |
+| B | `[0.0, 0.0, 1.0]` |
+| C | `[-0.6, -0.8, 0.0]` |
+| D | `[3.0, 4.0, 0.0]` |
+
+**Q2. Euclidean vs cosine.** Repeat the chapter's Section 2 example with `a = [1.0, 2.0, 3.0]` and `b = [3.0, 6.0, 9.0]`. What are `np.linalg.norm(a - b)` and `cosine_similarity(a, b)`?
+
+**Q3. Trace `argsort`.** In the batch-similarity code, suppose `similarities = np.array([0.42, 0.91, 0.13, 0.77])`. What are `np.argsort(similarities)`, `np.argsort(similarities)[::-1]`, and `top_k_indices` (first 3)?
+
+**Q4. Threshold filtering.** Take the chapter's Section 3 `query` and four `documents` (assume each doc also carries a `"metadata": {}` key). (a) Fill in each score to 4 decimals. (b) What does `top_k_with_threshold(query, documents, top_k=5, min_score=0.7)` return (ids in order)? (c) What does it return with `min_score=0.9995`?
+
+**Q5. Zero vector without a guard.** What does this print, and what does `safe_cosine_similarity` return for the same input?
+
+```python
+import numpy as np
+z = np.array([0.0, 0.0, 0.0])
+x = np.array([1.0, 0.0, 0.0])
+print(np.dot(z, x) / (np.linalg.norm(z) * np.linalg.norm(x)))
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Write `normalize_rows(M) -> np.ndarray` that L2-normalizes every row of a 2-D array. All-zero rows should remain zero (no `nan`).
+
+- `normalize_rows([[3, 4], [0, 0], [0, 5]])` → `[[0.6, 0.8], [0.0, 0.0], [0.0, 1.0]]`
+
+**E2 (Easy–Medium).** Write `top_k(query, matrix, k) -> list[tuple[int, float]]` that returns `(row_index, score)` pairs sorted by descending cosine similarity, scores rounded to 4 decimals. Use one matrix–vector product (no Python loop over rows). Handle `k > len(matrix)` and a zero query (return `[]`).
+
+- `top_k([0.9, 0.1, 0, 0, 0], <chapter's 4 doc vectors>, 2)` → `[(2, 0.9994), (0, 0.999)]`
+- `top_k([1, 0], [[1, 0], [0, 1]], 5)` → `[(0, 1.0), (1, 0.0)]`
+
+**E3 (Medium).** Duplicate chunks waste retrieval slots. Write `near_duplicates(matrix, threshold) -> list[tuple[int, int, float]]` that returns every pair `i < j` whose cosine similarity is `>= threshold`, using a single similarity matrix $S = \hat{M}\hat{M}^\top$ (rows normalized).
+
+- `near_duplicates([[1, 0, 0], [2, 0, 0], [0, 1, 0], [0.9, 0.1, 0]], 0.99)` → `[(0, 1, 1.0), (0, 3, 0.9939), (1, 3, 0.9939)]`
+
+#### Dry-Run: Answers
+
+**Q1.** Since $\|q\| = 1$, each score is $\dfrac{q \cdot d}{\|d\|}$.
+
+| doc | $q \cdot d$ | $\|d\|$ | cosine |
+|-----|-------------|---------|--------|
+| A | $0.48 + 0.48 = 0.96$ | 1 | **0.96** |
+| B | $0$ | 1 | **0.0** (orthogonal) |
+| C | $-0.36 - 0.64 = -1.0$ | 1 | **-1.0** (opposite) |
+| D | $1.8 + 3.2 = 5.0$ | 5 | **1.0** (`D = 5·q`) |
+
+Top-2 is **D (1.0), A (0.96)**. D is five times longer than A but still wins because only direction matters.
+
+**Q2.** $a - b = [-2, -4, -6]$, so the Euclidean distance is $\sqrt{4 + 16 + 36} = \sqrt{56} \approx 7.4833$. Cosine is $\dfrac{3 + 12 + 27}{\sqrt{14}\cdot\sqrt{126}} = \dfrac{42}{42} = 1.0$, because `b = 3·a`. Euclidean calls them far apart, while cosine calls them identical in direction.
+
+**Q3.** `argsort` lists indices from the smallest value to the largest. The values sorted ascending are 0.13 (idx 2), 0.42 (idx 0), 0.77 (idx 3), 0.91 (idx 1).
+
+- `np.argsort(similarities)` → `[2, 0, 3, 1]`
+- `[::-1]` → `[1, 3, 0, 2]`
+- `top_k_indices` → `[1, 3, 0]`
+
+**Q4.** (a) Here $\|q\| = \sqrt{0.82} \approx 0.9055$.
+
+| doc | dot with query | cosine |
+|-----|----------------|--------|
+| doc1 | $0.765 + 0.012 = 0.777$ | **0.9990** |
+| doc2 | $0.09 + 0.09 = 0.18$ | **0.2195** |
+| doc3 | $0.792 + 0.008 = 0.800$ | **0.9994** |
+| doc4 | $0$ | **0.0000** |
+
+(b) Only scores `>= 0.7` survive, sorted descending: **`[doc3, doc1]`**. Only 2 results come back even though `top_k=5`, and that is the point of the threshold.
+
+(c) `0.9990` and `0.9994` are both below `0.9995`, so the result is **`[]`**. Note that the printed `top_k_with_threshold` reads `doc["metadata"]`. The chapter's `documents` list has no such key, so without the assumption in the question every passing doc would raise `KeyError: 'metadata'`.
+
+**Q5.** `norm(z) = 0`, so the expression is $0 / 0$. NumPy prints **`nan`**, along with a `RuntimeWarning: invalid value encountered`, and does not raise `ZeroDivisionError`. Any later comparison with `nan` is `False`, so the document silently drops out of rankings. `safe_cosine_similarity(z, x)` returns **`0.0`** because of its `norm_a == 0` guard.
+
+**E1 — reference solution**
+
+```python
+import numpy as np
+
+def normalize_rows(M) -> np.ndarray:
+    M = np.asarray(M, dtype=np.float64)
+    norms = np.linalg.norm(M, axis=1, keepdims=True)   # shape (n, 1)
+    out = np.zeros_like(M)
+    nonzero = norms[:, 0] > 0
+    out[nonzero] = M[nonzero] / norms[nonzero]
+    return out
+
+print(normalize_rows([[3, 4], [0, 0], [0, 5]]))
+# [[0.6 0.8]
+#  [0.  0. ]
+#  [0.  1. ]]
+```
+
+$O(nd)$. Masking the zero rows avoids $0/0$.
+
+**E2 — reference solution**
+
+```python
+def top_k(query, matrix, k) -> list[tuple[int, float]]:
+    Mn = normalize_rows(matrix)
+    q = np.asarray(query, dtype=np.float64)
+    qn = np.linalg.norm(q)
+    if qn == 0:
+        return []
+    scores = Mn @ (q / qn)                          # all cosines in one product
+    order = np.argsort(-scores, kind="stable")[:k]  # slicing handles k > n
+    return [(int(i), round(float(scores[i]), 4)) for i in order]
+
+docs = [[0.85, 0.12, 0.03, 0.0, 0.0], [0.1, 0.9, 0.0, 0.0, 0.0],
+        [0.88, 0.08, 0.02, 0.01, 0.01], [0.0, 0.0, 0.0, 0.95, 0.05]]
+print(top_k([0.9, 0.1, 0, 0, 0], docs, 2))    # [(2, 0.9994), (0, 0.999)]
+print(top_k([1, 0], [[1, 0], [0, 1]], 5))       # [(0, 1.0), (1, 0.0)]
+```
+
+$O(nd + n\log n)$. Sorting `-scores` gives descending order without the `[::-1]` step.
+
+**E3 — reference solution**
+
+```python
+def near_duplicates(matrix, threshold) -> list[tuple[int, int, float]]:
+    Mn = normalize_rows(matrix)
+    S = Mn @ Mn.T                                   # S[i, j] = cosine(i, j)
+    n = len(Mn)
+    return [(i, j, round(float(S[i, j]), 4))
+            for i in range(n) for j in range(i + 1, n)
+            if S[i, j] >= threshold]
+
+print(near_duplicates([[1, 0, 0], [2, 0, 0], [0, 1, 0], [0.9, 0.1, 0]], 0.99))
+# [(0, 1, 1.0), (0, 3, 0.9939), (1, 3, 0.9939)]
+```
+
+Building $S$ is $O(n^2 d)$, with $O(n^2)$ memory. Rows 0 and 1 are parallel. Row 3 has cosine $0.9/\sqrt{0.82} \approx 0.9939$ with both of them.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

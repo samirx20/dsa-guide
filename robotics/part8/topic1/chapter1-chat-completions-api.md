@@ -607,6 +607,156 @@ The Chat Completions API uses a messages list with `system`, `user`, and `assist
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Build the transcript.** What does this print?
+
+```python
+messages = [{"role": "system", "content": "You are a temperature monitoring assistant."}]
+for q, a in [("What is T-01?", "T-01 reads 72.5°C"), ("What about T-02?", "T-02 reads 68.3°C")]:
+    messages.append({"role": "user", "content": q})
+    messages.append({"role": "assistant", "content": a})
+messages.append({"role": "user", "content": "Which is hotter?"})
+
+print(len(messages), [m["role"][0] for m in messages])
+```
+
+**Q2. Reading the usage block.** A call made with `max_tokens=50` returns `usage.prompt_tokens == 118` and `usage.completion_tokens == 50`. What is `usage.total_tokens`? Which `finish_reason` should you expect, and what does it mean for `message.content`?
+
+**Q3. History cost.** Each call resends the *whole* history. Assume (ignoring per-message overhead) the system prompt is 20 tokens, every user message is 10 tokens, and every assistant reply is 30 tokens. For a 3-turn conversation (3 calls), fill in the table and give the totals.
+
+| Call | Messages sent | `prompt_tokens` | `completion_tokens` |
+|---|---|---|---|
+| 1 | system, user | ? | 30 |
+| 2 | ? | ? | 30 |
+| 3 | ? | ? | 30 |
+
+**Q4. Forgetting to check `success`.** Using the chapter's production `chat()` function with an invalid API key, what happens on the second line?
+
+```python
+result = chat([{"role": "user", "content": "What is the temperature of T-01?"}])
+print(result["usage"]["total"])
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Write `build_messages(system: str, history: list[tuple[str, str]], new_user: str) -> list[dict]`. `history` holds `(user_text, assistant_text)` pairs. Return a correctly ordered messages list ending with the new user message.
+
+- `build_messages("Be concise.", [("T-01?", "72.5°C")], "T-02?")` → `[{system}, {user: "T-01?"}, {assistant: "72.5°C"}, {user: "T-02?"}]` (4 messages)
+
+**E2 (Easy–Medium).** Write `parse_response(response) -> dict` that turns a completion object into `{"content": str, "finish_reason": str, "truncated": bool, "usage": {"prompt", "completion", "total"}}`. `content` must be `""` (not `None`) when the model returned no text, which happens on tool calls. `truncated` is `True` exactly when `finish_reason == "length"`. Test it offline with `types.SimpleNamespace` fakes.
+
+- Fake with content `"1. Thermocouple 2. Pressure"`, `finish_reason="length"`, usage 118/50 → `truncated=True`, `usage={'prompt': 118, 'completion': 50, 'total': 168}`
+- Fake with content `None`, `finish_reason="tool_calls"`, usage 90/12 → `content=''`, `truncated=False`, total `102`
+
+**E3 (Medium).** Write `ChatSession(system: str, complete_fn)`, where `complete_fn(messages) -> response` is injected so it can be faked. `ask(text) -> str` should:
+- append the user message, call `complete_fn`, append the assistant reply, and add `usage.total_tokens` to `self.total_tokens`;
+- if `complete_fn` raises, **remove** the user message it just appended and re-raise, so a failed call does not leave a dangling unanswered `user` turn.
+
+- With a fake that returns `prompt_tokens = 10 * len(messages)` and `completion_tokens = 5`: `ask("What is T-01?")`, then a failing `ask("boom")`, then `ask("What about T-02?")` → 5 messages with roles `system, user, assistant, user, assistant`, and `total_tokens == 70`
+
+#### Dry-Run: Answers
+
+**Q1.** `6 ['s', 'u', 'a', 'u', 'a', 'u']`
+
+| Step | Appended | `len` |
+|---|---|---|
+| init | system | 1 |
+| loop 1 | user, assistant | 3 |
+| loop 2 | user, assistant | 5 |
+| after loop | user | 6 |
+
+The list always ends on a `user` message: that is the turn the model is being asked to answer.
+
+**Q2.** `total_tokens = 118 + 50 = 168`. Because `completion_tokens` equals `max_tokens`, the model hit the cap, so expect `finish_reason == "length"`. `message.content` is **cut off mid-answer**. Either raise `max_tokens` or handle the partial text. Never parse it as complete JSON. (For completeness: when the model wants to call a tool, the OpenAI API reports `finish_reason == "tool_calls"`.)
+
+**Q3.**
+
+| Call | Messages sent | `prompt_tokens` | `completion_tokens` |
+|---|---|---|---|
+| 1 | system, user | $20 + 10 = 30$ | 30 |
+| 2 | system, user, assistant, user | $30 + 30 + 10 = 70$ | 30 |
+| 3 | system, u, a, u, a, user | $70 + 30 + 10 = 110$ | 30 |
+
+Totals: prompt $= 30 + 70 + 110 = 210$, completion $= 90$, overall $300$. Each call's prompt grows by $40$, so the cumulative prompt cost after $n$ turns is $\sum_{k=1}^{n} (30 + 40(k-1)) = 30n + 20n(n-1)$. That is **quadratic** in the number of turns. For $n=3$: $90 + 120 = 210$. This is why the next chapter manages the context window.
+
+**Q4.** `chat()` catches the `AuthenticationError` and returns `{"success": False, "error": "..."}`, which has **no `"usage"` key**. The second line therefore raises `KeyError: 'usage'`. The chapter's usage code avoids this by checking `if result["success"]:` first.
+
+**E1 — reference solution**
+
+```python
+def build_messages(system: str, history: list[tuple[str, str]], new_user: str) -> list[dict]:
+    msgs = [{"role": "system", "content": system}]          # system always first
+    for user_text, assistant_text in history:
+        msgs.append({"role": "user", "content": user_text})
+        msgs.append({"role": "assistant", "content": assistant_text})
+    msgs.append({"role": "user", "content": new_user})      # the turn to answer
+    return msgs
+```
+
+$O(h)$ for $h$ history pairs. Result length is $2h + 2$.
+
+**E2 — reference solution**
+
+```python
+from types import SimpleNamespace as NS
+from typing import Any
+
+def parse_response(response: Any) -> dict:
+    choice = response.choices[0]
+    usage = response.usage
+    return {
+        "content": choice.message.content or "",            # None -> "" (tool calls)
+        "finish_reason": choice.finish_reason,
+        "truncated": choice.finish_reason == "length",
+        "usage": {
+            "prompt": usage.prompt_tokens,
+            "completion": usage.completion_tokens,
+            "total": usage.total_tokens,
+        },
+    }
+
+def fake(content, reason, p, c):
+    return NS(choices=[NS(message=NS(role="assistant", content=content), finish_reason=reason)],
+              usage=NS(prompt_tokens=p, completion_tokens=c, total_tokens=p + c))
+
+print(parse_response(fake(None, "tool_calls", 90, 12)))
+# {'content': '', 'finish_reason': 'tool_calls', 'truncated': False,
+#  'usage': {'prompt': 90, 'completion': 12, 'total': 102}}
+```
+
+$O(1)$. Faking the response with `SimpleNamespace` mirrors the attribute access (`.choices[0].message.content`), so the parser can be unit-tested with no network calls and no API key.
+
+**E3 — reference solution**
+
+```python
+from typing import Any, Callable
+
+class ChatSession:
+    def __init__(self, system: str, complete_fn: Callable[[list[dict]], Any]):
+        self.messages: list[dict] = [{"role": "system", "content": system}]
+        self.complete_fn = complete_fn
+        self.total_tokens = 0
+
+    def ask(self, text: str) -> str:
+        self.messages.append({"role": "user", "content": text})
+        try:
+            response = self.complete_fn(list(self.messages))   # pass a copy
+        except Exception:
+            self.messages.pop()            # roll back the unanswered user turn
+            raise
+        reply = response.choices[0].message.content or ""
+        self.messages.append({"role": "assistant", "content": reply})
+        self.total_tokens += response.usage.total_tokens
+        return reply
+```
+
+Token trace with the fake: call 1 sends 2 messages, costing $20 + 5 = 25$. The `"boom"` call raises, and the user message is popped (back to 3 messages). Call 3 sends 4 messages (system, user, assistant, user), costing $40 + 5 = 45$. Total $25 + 45 = 70$, with 5 messages stored. Without the rollback, the history would contain two consecutive `user` messages, one of them never answered.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

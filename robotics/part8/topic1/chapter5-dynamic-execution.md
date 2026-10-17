@@ -494,6 +494,172 @@ Dynamic execution maps LLM string outputs to Python functions via a registry pat
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. `execute_from_llm` paths.** With the chapter's `registry` (only `read_sensor(sensor_id, metric="temperature")`, which returns `{"sensor_id": sensor_id, metric: 72.5}`), what does each call return?
+
+```python
+execute_from_llm(registry, "read_sensor", '{"sensor_id": "T-01"}')         # (a)
+execute_from_llm(registry, "read_sensor", '{"id": "T-01"}')                # (b)
+execute_from_llm(registry, "read_sensor", '["T-01"]')                      # (c)
+execute_from_llm(registry, "read_sensor", "{'sensor_id': 'T-01'}")         # (d)
+```
+
+Compare (a) with the first line of the chapter's printed output.
+
+**Q2. Lambdas take no arguments.** Using the chapter's `router`, what does `router.execute("list_processes", '{"limit": 5}')` return?
+
+**Q3. Allowlist vs. registry.** Predict each result and the final log:
+
+```python
+safe = SafeRouter({"read_cpu", "read_memory", "read_disk"})
+safe.register("read_cpu", lambda: {"cpu": 45})
+safe.register("read_memory", lambda: {"mem": 8})
+safe.register("delete_all", lambda: "deleted")
+
+print(safe.execute("delete_all", "{}"))   # (a)
+print(safe.execute("read_disk", "{}"))    # (b)
+print(safe.execute("read_cpu", "{}"))     # (c)
+print(len(safe.get_log()), [e["function"] for e in safe.get_log()])   # (d)
+```
+
+**Q4. How long does the "timeout" take?** With the chapter's `timeout_platform(2)` wrapping `slow_function` (which sleeps 5 s), the `except` branch does print `Timeout: Function timed out after 2s`. Roughly how many seconds after the call does that line appear: 2 or 5? Why?
+
+### Coding Exercises
+
+**E1 (Easy).** Write a `ToolRegistry` with a `tool` decorator method. It should register a function under its own `__name__`, return the function **unchanged** so it can still be called directly, and raise `ValueError("Duplicate tool name: <name>")` on a second registration with the same name. Also provide `get(name)` and `names()` (sorted).
+
+```python
+tools = ToolRegistry()
+
+@tools.tool
+def read_sensor(sensor_id: str, metric: str = "temperature") -> dict: ...
+
+@tools.tool
+def read_cpu() -> dict: ...
+```
+
+→ `tools.names() == ['read_cpu', 'read_sensor']`, and `read_sensor("T-01")` still works
+
+**E2 (Easy–Medium).** Write `safe_execute(registry, name, args_json) -> dict`. It checks the arguments **before** calling, using `inspect.signature(func).bind(**args)`, so that argument errors are distinguished from bugs inside the tool. Non-object JSON (a list, `null`, a number) must be rejected with `arguments must be a JSON object, got <type>`.
+
+- `'{"metric": "humidity"}'` → `{'status': 'error', 'error': "Bad arguments: missing a required argument: 'sensor_id'"}`
+- `'{"sensor_id": "T-01", "unit": "C"}'` → `{'status': 'error', 'error': "Bad arguments: got an unexpected keyword argument 'unit'"}`
+- `'["T-01"]'` → `{'status': 'error', 'error': 'Bad arguments: arguments must be a JSON object, got list'}`
+
+**E3 (Medium).** Write `run_with_timeout(func, kwargs, seconds) -> dict` that really **returns** after about `seconds`. Use a long-lived module-level `ThreadPoolExecutor` instead of a `with` block. Return `{"status": "ok", "result": ...}`, `{"status": "timeout", "error": "<name> exceeded <s>s"}` or `{"status": "error", "error": "<Exc>: <msg>"}`.
+
+- `run_with_timeout(slow, {"n": 3}, 1.0)` (where `slow` sleeps `n` seconds) → `{'status': 'timeout', 'error': 'slow exceeded 1.0s'}`, returned after about 1.0 s
+- `run_with_timeout(lambda: 1/0, {}, 1.0)` → `{'status': 'error', 'error': 'ZeroDivisionError: division by zero'}`
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| Call | Path | Returned |
+|---|---|---|
+| (a) | found, JSON ok, call ok | `{'status': 'ok', 'result': {'sensor_id': 'T-01', 'temperature': 72.5}}` |
+| (b) | `func(id="T-01")` raises `TypeError` | `{'error': "Argument mismatch: read_sensor() got an unexpected keyword argument 'id'"}` |
+| (c) | valid JSON, but it is a **list**, and `func(**[...])` raises `TypeError` | `{'error': 'Argument mismatch: ... argument after ** must be a mapping, not list'}` |
+| (d) | single quotes are not JSON | `{'error': 'Invalid JSON arguments: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)'}` |
+
+(a) The result key is the *value* of `metric`, which defaults to `"temperature"`, not the literal string `'metric'`. The chapter's printed `{'sensor_id': 'T-01', 'metric': 72.5}` does not match what the code does. Similarly, the humidity call returns `{'sensor_id': 'T-01', 'humidity': 72.5}`.
+(c) The exact prefix of the `TypeError` (for example `__main__.read_sensor()`) depends on the Python version. Note that (b) and (c) are both reported as "Argument mismatch", which is why E2 checks the argument shape explicitly.
+
+**Q2.** `{'function': 'list_processes', 'arguments': '{"limit": 5}', 'status': 'error', 'error': "<lambda>() got an unexpected keyword argument 'limit'"}`. The JSON parses fine, but the zero-argument lambda rejects `limit=5`. The `except Exception` branch records `str(e)`. The function name in the message is `<lambda>`, which is unhelpful in logs: prefer named `def` functions for tools.
+
+**Q3.**
+(a) `{'status': 'rejected', 'error': "Function 'delete_all' is not in the allowed set"}`. Registered, but not allowed.
+(b) `{'function': 'read_disk', 'arguments': '{}', 'status': 'error', 'error': 'Unknown function: read_disk'}`. Allowed, but never registered, so it falls through to the parent's unknown-function branch.
+(c) `{'function': 'read_cpu', 'arguments': '{}', 'status': 'ok', 'result': {'cpu': 45}}`
+(d) `2 ['read_disk', 'read_cpu']`. The allowlist rejection returns **before** `super().execute`, so it is never written to the audit log. Blocked attempts are often the most important ones to audit. A fix is to append a log entry in `SafeRouter.execute` before returning.
+
+**Q4.** About **5 s**. `future.result(timeout=2)` raises after 2 s, and the code converts it into `TimeoutError`. But that exception then propagates out of the `with ThreadPoolExecutor(...)` block, whose `__exit__` calls `executor.shutdown(wait=True)`. That waits for the worker thread, which is still sleeping, to finish its full 5 s. Python threads cannot be killed, so the function keeps running. The `with` block just made the caller wait for it too. (Verified: with a 1 s limit around a 3 s sleep, the exception surfaces after about 3.0 s.)
+
+**E1 — reference solution**
+
+```python
+from typing import Callable
+
+class ToolRegistry:
+    def __init__(self):
+        self._functions: dict[str, Callable] = {}
+
+    def tool(self, func: Callable) -> Callable:
+        if func.__name__ in self._functions:
+            raise ValueError(f"Duplicate tool name: {func.__name__}")
+        self._functions[func.__name__] = func
+        return func                      # unchanged: still directly callable and testable
+
+    def get(self, name: str) -> Callable | None:
+        return self._functions.get(name)
+
+    def names(self) -> list[str]:
+        return sorted(self._functions)
+```
+
+Registration is $O(1)$. Using `__name__` as the key means the tool name the LLM sees always matches the Python function name, which avoids the camelCase/snake_case mismatch from the previous chapter.
+
+**E2 — reference solution**
+
+```python
+import inspect
+import json
+from typing import Any, Callable
+
+def check_arguments(func: Callable, args: Any) -> str | None:
+    if not isinstance(args, dict):
+        return f"arguments must be a JSON object, got {type(args).__name__}"
+    try:
+        inspect.signature(func).bind(**args)     # same binding rules as a real call, without running it
+    except TypeError as e:
+        return str(e)
+    return None
+
+def safe_execute(registry, name: str, args_json: str) -> dict:
+    func = registry.get(name)
+    if func is None:
+        return {"status": "error", "error": f"Unknown function: {name}"}
+    try:
+        args = json.loads(args_json)
+    except json.JSONDecodeError as e:
+        return {"status": "error", "error": f"Invalid JSON: {e}"}
+    problem = check_arguments(func, args)
+    if problem:
+        return {"status": "error", "error": f"Bad arguments: {problem}"}
+    try:
+        return {"status": "ok", "result": func(**args)}
+    except Exception as e:                       # now this really means "the tool itself failed"
+        return {"status": "error", "error": f"{type(e).__name__}: {e}"}
+```
+
+`Signature.bind` raises `TypeError` with messages such as `missing a required argument: 'sensor_id'`, without executing anything. A `TypeError` raised *inside* the tool can therefore no longer be mistaken for a caller error. $O(p)$ in the number of parameters.
+
+**E3 — reference solution**
+
+```python
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from typing import Callable
+
+_POOL = ThreadPoolExecutor(max_workers=4)        # long-lived: no shutdown(wait=True) per call
+
+def run_with_timeout(func: Callable, kwargs: dict, seconds: float) -> dict:
+    future = _POOL.submit(func, **kwargs)
+    try:
+        return {"status": "ok", "result": future.result(timeout=seconds)}
+    except FuturesTimeout:
+        future.cancel()                          # only helps if it has not started yet
+        return {"status": "timeout", "error": f"{func.__name__} exceeded {seconds}s"}
+    except Exception as e:                       # exceptions raised inside func re-raise here
+        return {"status": "error", "error": f"{type(e).__name__}: {e}"}
+```
+
+This returns at about `seconds` because nothing blocks on the worker. The worker thread still runs to completion in the background, and it occupies one of the pool's 4 slots until it finishes. Truly *stopping* runaway work needs a separate **process** (`ProcessPoolExecutor` or `multiprocessing` with `terminate()`), or cooperative cancellation inside the tool.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

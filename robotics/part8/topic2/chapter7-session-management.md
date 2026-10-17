@@ -1241,6 +1241,210 @@ Stateless APIs need external session storage to maintain agent context across re
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Trace the summarizing `ConversationManager`.** For the chapter's usage block (`max_turns=5`, `summary_threshold=10`, 15 user/assistant pairs = 30 `add_message` calls), answer:
+
+(a) After which `add_message` call (1-based) does the first summarization happen, and what is `len(state["messages"])` right after it?
+(b) How many summarizations happen in total?
+(c) Final `len(state["messages"])`, `len(state["full_history"])`, and the printed `Context has N messages`.
+
+**Q2. Token-budget context.** Using `count_tokens` (`int(words * 1.3)`) and `get_context_with_token_limit(state, max_tokens=10)` on these messages, oldest first, which messages are selected and what is the final `total_tokens`?
+
+```python
+messages = [
+    {"role": "user", "content": "a b c d e"},
+    {"role": "assistant", "content": "x y z"},
+    {"role": "user", "content": "p q"},
+    {"role": "assistant", "content": "one two three four"},
+]
+```
+
+**Q3. JSON round trip.** What does this print?
+
+```python
+import json
+original = {"coords": (40.7, -74.0), 1: "one", "ok": True, "n": None}
+restored = json.loads(json.dumps(original))
+print(restored)
+print(restored == original)
+```
+
+**Q4. Which TTL?** `mgr = SessionManager(ttl=60)` (Section 5). Treat `time.time()` as a clock you control. Predict each result:
+
+| t (s) | call | result? |
+|-------|------|---------|
+| 0 | `sid = mgr.create({"n": 0})` | — |
+| 50 | `mgr.get(sid)` | ? |
+| 61 | `mgr.get(sid)` | ? |
+
+Now replay with an `update` at $t = 55$: `create` at 0, `get` at 50, `update(sid, {"n": 1})` at 55, `get` at 110, `get` at 116. What do the last two `get` calls return? How does this differ from the Section 1 `get_session`?
+
+**Q5. Production stats.** For the `ProductionSessionManager` usage block (ttl 300, one session, the 10-iteration loop run instantly), what does `get_stats()` return? What are the session's `access_count` and `len(state["messages"])`?
+
+### Coding Exercises
+
+**E1 (Easy).** Write `trim_history(messages, max_turns)` that keeps the first message **if** its role is `"system"`, plus the last `max_turns` non-system messages.
+
+- `[system "S", m0, m1, m2, m3, m4, m5]`, `max_turns=3` → `["S", "m3", "m4", "m5"]`
+- `[m0, …, m5]` (no system), `max_turns=2` → `["m4", "m5"]`
+
+**E2 (Easy–Medium).** Write `SlidingSessionStore(ttl, clock=time.time)` with `set(sid, state)`, `get(sid)` and `cleanup() -> int`. It stores JSON strings, `get` **refreshes** the timestamp on every successful read (a sliding window), and expiry happens when `now - last > ttl`. Inject `clock` so tests don't sleep.
+
+- ttl 60. Set `"a"` and `"b"` at $t=0$. `get("a")` at $t=50$ returns `{"n": 1}`. At $t=100$, `get("a")` returns `{"n": 1}` and `cleanup()` returns `1` (only `"b"` expired). At $t=161$, `get("a")` returns `None`.
+
+**E3 (Medium).** Improve `get_context_with_token_limit`: write `budgeted_context(messages, max_tokens) -> (selected, used)` that **always** keeps a leading system message, raises `ValueError` if that alone exceeds the budget, then fills the remaining budget newest-first. The result must stay in chronological order.
+
+- System `"You are a pump expert"` (6 tokens) + the four Q2 messages, `max_tokens=12` → `["You are a pump expert", "one two three four"]`, `used == 11`
+
+#### Dry-Run: Answers
+
+**Q1.** (a) Calls 1–10 grow the list to 10. Call 11 (user `"Message 5"`) makes it 11 > 10, so `_summarize_old_messages` runs with `cutoff = 11 // 2 = 5`. It moves 5 messages to `full_history` and keeps `1 summary + 6 recent = **7**` messages.
+
+(b) After that the list cycles `7 → 8 → 9 → 10 → 11 (summarize) → 7`, so a summarization fires on calls **11, 15, 19, 23 and 27**, for **5** in total.
+
+(c) Calls 28, 29 and 30 bring the list from 7 to **10** messages. `full_history` has $5 \times 5 =$ **25** entries. `get_context` returns the last `max_turns`, so it prints **`Context has 5 messages`**.
+
+| calls | len after |
+|-------|-----------|
+| 1–10 | 1 → 10 |
+| 11 | 7 (summarized) |
+| 12–14 | 8, 9, 10 |
+| 15 | 7 (summarized) |
+| … | … |
+| 27 | 7 (summarized) |
+| 28–30 | 8, 9, 10 |
+
+A subtle loss: `_create_summary` only includes `user`/`assistant` roles. Each earlier `"system"` summary is therefore **dropped** from the next summary, and only `full_history` still has it.
+
+**Q2.** Token counts are `[6, 3, 2, 5]` because `int(5*1.3)=6`, `int(3*1.3)=3`, `int(2*1.3)=2` and `int(4*1.3)=5`. Walking newest to oldest:
+
+| msg | tokens | total before | total + t | action |
+|-----|--------|--------------|-----------|--------|
+| "one two three four" | 5 | 0 | 5 | insert |
+| "p q" | 2 | 5 | 7 | insert |
+| "x y z" | 3 | 7 | 10 (not > 10) | insert |
+| "a b c d e" | 6 | 10 | 16 > 10 | break |
+
+The selection is **`["x y z", "p q", "one two three four"]`** in chronological order thanks to `insert(0, …)`, with **`total_tokens = 10`**.
+
+**Q3.**
+
+```
+{'coords': [40.7, -74.0], '1': 'one', 'ok': True, 'n': None}
+False
+```
+
+The round trip makes three changes. The tuple becomes a JSON array, which loads back as a `list`. The **integer key `1` becomes the string `"1"`**, because JSON object keys are always strings. `True` → `true` → `True` and `None` → `null` → `None` survive. Because of the list and the string key, `restored != original`.
+
+**Q4.** First run: at $t=50$, the elapsed time is $50 \le 60$, so `get` returns **`{"n": 0}`**. At $t=61$, the elapsed time is $61 > 60$, so the session is deleted and `get` returns **`None`**. `SessionManager.get` does **not** refresh the timer, so reading at $t=50$ does not keep the session alive.
+
+Replay: `update` at 55 resets `created = 55`. At $t=110$ the elapsed time is $55 \le 60$, so `get` returns **`{"n": 1}`**. At $t=116$ it is $61 > 60$, so `get` returns **`None`**.
+
+Section 1's `get_session` sets `last_accessed = time.time()` on every read, so a session read at $t=50$ there would live until $t=110$. Only `update()` slides the window in `SessionManager`.
+
+**Q5.**
+
+```python
+{'active_sessions': 1, 'total_created': 1, 'total_accessed': 10,
+ 'total_expired': 0, 'total_rejected': 0, 'access_rate_per_second': 0.17}
+```
+
+`access_count == 10` and `len(messages) == 10`. All 10 accesses are within the last 60 s, so the rate is $10 / 60 \approx 0.1667$, which rounds to `0.17`. Nothing expires because ttl is 300.
+
+**E1 — reference solution**
+
+```python
+def trim_history(messages, max_turns):
+    system = [m for m in messages[:1] if m["role"] == "system"]
+    rest = messages[len(system):]
+    return system + (rest[-max_turns:] if max_turns > 0 else [])
+
+h = [{"role": "system", "content": "S"}] + \
+    [{"role": "user" if i % 2 == 0 else "assistant", "content": f"m{i}"} for i in range(6)]
+print([m["content"] for m in trim_history(h, 3)])       # ['S', 'm3', 'm4', 'm5']
+print([m["content"] for m in trim_history(h[1:], 2)])   # ['m4', 'm5']
+```
+
+The `max_turns > 0` guard matters because `rest[-0:]` is the **whole** list. The function is $O(\text{max\_turns})$.
+
+**E2 — reference solution**
+
+```python
+import json, time
+
+class SlidingSessionStore:
+    def __init__(self, ttl, clock=time.time):
+        self.ttl, self.clock, self.store = ttl, clock, {}
+
+    def set(self, sid, state):
+        self.store[sid] = {"data": json.dumps(state), "last": self.clock()}
+
+    def get(self, sid):
+        entry = self.store.get(sid)
+        if entry is None:
+            return None
+        now = self.clock()
+        if now - entry["last"] > self.ttl:
+            del self.store[sid]
+            return None
+        entry["last"] = now                      # sliding window refresh
+        return json.loads(entry["data"])
+
+    def cleanup(self):
+        now = self.clock()
+        dead = [s for s, e in self.store.items() if now - e["last"] > self.ttl]
+        for s in dead:
+            del self.store[s]
+        return len(dead)
+
+T = [0.0]
+store = SlidingSessionStore(60, clock=lambda: T[0])
+store.set("a", {"n": 1}); store.set("b", {"n": 2})
+T[0] = 50;  print(store.get("a"))                     # {'n': 1}  ("a" refreshed to 50)
+T[0] = 100; print(store.get("a"), store.cleanup())    # {'n': 1} 1  ("b": 100 > 60)
+T[0] = 161; print(store.get("a"))                     # None  (161 - 100 = 61 > 60)
+```
+
+`get` and `set` are $O(1)$ and `cleanup` is $O(n)$. The dead ids are collected before deleting, so the dict is never modified while it is being iterated.
+
+**E3 — reference solution**
+
+```python
+def count_tokens(text):
+    return int(len(text.split()) * 1.3)
+
+def budgeted_context(messages, max_tokens, count=count_tokens):
+    system = messages[0] if messages and messages[0]["role"] == "system" else None
+    rest = messages[1:] if system else messages
+    used = count(system["content"]) if system else 0
+    if used > max_tokens:
+        raise ValueError("system prompt alone exceeds budget")
+    picked = []
+    for m in reversed(rest):                     # newest first
+        t = count(m["content"])
+        if used + t > max_tokens:
+            break
+        picked.append(m)
+        used += t
+    picked.reverse()                             # back to chronological order
+    return ([system] if system else []) + picked, used
+
+msgs = [{"role": "system", "content": "You are a pump expert"},
+        {"role": "user", "content": "a b c d e"},
+        {"role": "assistant", "content": "x y z"},
+        {"role": "user", "content": "p q"},
+        {"role": "assistant", "content": "one two three four"}]
+ctx, used = budgeted_context(msgs, 12)
+print([m["content"] for m in ctx], used)   # ['You are a pump expert', 'one two three four'] 11
+```
+
+Trace: the system prompt costs `int(5*1.3) = 6`. Adding "one two three four" (5) brings `used` to 11. Adding "p q" (2) would make 13 > 12, so the loop stops. `append` followed by one `reverse` is $O(n)$, unlike the $O(n^2)$ `insert(0, …)` pattern.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

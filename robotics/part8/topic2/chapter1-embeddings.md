@@ -518,6 +518,164 @@ Embeddings turn text into numerical vectors that capture meaning, enabling seman
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Batch bookkeeping.** You call the chapter's `batch_embed(texts, batch_size=200)` with `len(texts) == 1050`. (a) How many API calls are made, and what is the size of the last batch? (b) Suppose only the batch that starts at `i = 400` raises an exception. What are `len(embeddings)` and `len(failures)`, and which indices of `embeddings` hold `None`?
+
+**Q2. Which texts share a cache key?** Using `normalize_and_hash` from Section 4:
+
+```python
+keys = [
+    normalize_and_hash("Pump maintenance"),
+    normalize_and_hash(" pump maintenance "),
+    normalize_and_hash("PUMP  maintenance"),   # two spaces between the words
+]
+print(keys[0] == keys[1], keys[0] == keys[2])
+```
+
+What does this print, and why?
+
+**Q3. Spot the crash.** Run the first `get_embedding` function from Section 4 ("Caching Embeddings") exactly as printed. What happens on the very first call, which line is responsible, and what is the one-word fix?
+
+**Q4. Cosine by hand.** Using the chapter's `cosine_sim(a, b)` on tiny 3-D "embeddings":
+
+```python
+v1 = [1, 2, 2]
+v2 = [2, 1, 2]
+v3 = [2, 4, 4]
+v4 = [-2, 1, 0]
+print(cosine_sim(v1, v2), cosine_sim(v1, v3), cosine_sim(v1, v4))
+```
+
+Compute all three values by hand. If `embedding_diagnostics` saw the `v1`/`v2` score, which message would it print?
+
+**Q5. Storage arithmetic.** Embeddings are usually stored as 32-bit floats (4 bytes each). How many bytes does one 256-dimensional vector take? How many megabytes (1 MB $= 10^6$ bytes) do 100,000 chunks need at the default 1536 dimensions?
+
+### Coding Exercises
+
+**E1 (Easy).** Write `normalize(vec: list[float]) -> list[float]` that returns the unit-length version of `vec` (divide each element by the L2 norm). Raise `ValueError` for a zero vector.
+
+- `normalize([3, 4])` → `[0.6, 0.8]`
+- `normalize([0, 0, 2])` → `[0.0, 0.0, 1.0]`
+
+**E2 (Easy–Medium).** Before calling the embedding API, deduplicate texts so each distinct (normalized) text is embedded only once. Write `dedupe_for_embedding(texts: list[str]) -> tuple[list[str], list[int]]` returning `(unique, index)` where `unique` holds normalized texts (`strip().lower()`) in first-seen order, and `index[i]` is the position in `unique` that `texts[i]` maps to.
+
+- `dedupe_for_embedding(["Pump A", "pump a ", "Valve", "PUMP A"])` → `(["pump a", "valve"], [0, 0, 1, 0])`
+
+**E3 (Medium).** The chapter's dictionary cache grows forever. Write a class `LRUEmbeddingCache(max_size)` with a method `get_or_compute(text, embed_fn)` that keys on the normalized SHA-256 hash, returns the cached vector on a hit, otherwise calls `embed_fn(text)`, stores it, and evicts the least-recently-used entry when the cache exceeds `max_size`. Track `hits` and `misses`.
+
+- With `max_size=2` and the call sequence `"a", "b", "a", "c", "b"`: `hits == 1`, `misses == 4`, `embed_fn` is called for `["a", "b", "c", "b"]`, and the cache ends with 2 entries.
+
+#### Dry-Run: Answers
+
+**Q1.** (a) `range(0, 1050, 200)` yields starts `0, 200, 400, 600, 800, 1000` → **6 API calls**. The last batch is `texts[1000:1200]`, which has **50** items.
+
+(b) The failing batch still extends `[None] * 200`, so alignment is kept: `len(embeddings) == 1050`, `len(failures) == 1`, and indices **400 through 599** are `None`.
+
+| `i` | batch size | outcome | `len(embeddings)` after |
+|-----|-----------|---------|-------------------------|
+| 0 | 200 | ok | 200 |
+| 200 | 200 | ok | 400 |
+| 400 | 200 | fails → 200 × `None` | 600 |
+| 600 | 200 | ok | 800 |
+| 800 | 200 | ok | 1000 |
+| 1000 | 50 | ok | 1050 |
+
+**Q2.** Prints `True False`. `strip().lower()` turns both `"Pump maintenance"` and `" pump maintenance "` into `"pump maintenance"`, so the hashes match. `"PUMP  maintenance"` becomes `"pump  maintenance"` with **two** inner spaces. `strip()` only trims the ends, so that string, and therefore its hash, is different. To also merge it, normalize internal whitespace with `" ".join(text.split()).lower()`.
+
+**Q3.** It raises `NameError: name 'encoded_key' is not defined` on the line `cache_key = hashlib.sha256(encoded_key).hexdigest()`. The variable created on the line above is `encoded_text`, so the fix is to write `hashlib.sha256(encoded_text)`. The "What's happening" breakdown below the function already shows the correct spelling.
+
+**Q4.** Here $\|v_1\| = \sqrt{1+4+4} = 3$.
+
+| pair | dot product | norms | cosine |
+|------|-------------|-------|--------|
+| `v1`, `v2` | $2+2+4 = 8$ | $3 \cdot 3 = 9$ | $8/9 \approx 0.8889$ |
+| `v1`, `v3` | $2+8+8 = 18$ | $3 \cdot 6 = 18$ | $1.0$ (`v3 = 2·v1`) |
+| `v1`, `v4` | $-2+2+0 = 0$ | $3 \cdot \sqrt{5}$ | $0.0$ (orthogonal) |
+
+Since $0.8889 > 0.7$, `embedding_diagnostics` would print `GOOD: Texts are semantically similar (as expected)`.
+
+**Q5.** $256 \times 4 = 1024$ bytes, about 1 KB, which matches the Dimension Tradeoffs table. For the full collection, $1536 \times 4 \times 100{,}000 = 614{,}400{,}000$ bytes, or **614.4 MB**, before any index overhead. That is why reducing dimensions matters at scale.
+
+**E1 — reference solution**
+
+```python
+import numpy as np
+
+def normalize(vec: list[float]) -> list[float]:
+    v = np.asarray(vec, dtype=np.float64)
+    n = np.linalg.norm(v)
+    if n == 0:
+        raise ValueError("cannot normalize a zero vector")
+    return (v / n).tolist()
+
+print(normalize([3, 4]))     # [0.6, 0.8]
+print(normalize([0, 0, 2]))  # [0.0, 0.0, 1.0]
+```
+
+$O(d)$ for a $d$-dimensional vector. After normalizing, cosine similarity is just a dot product.
+
+**E2 — reference solution**
+
+```python
+def dedupe_for_embedding(texts: list[str]) -> tuple[list[str], list[int]]:
+    unique: list[str] = []
+    position: dict[str, int] = {}
+    index: list[int] = []
+    for t in texts:
+        key = t.strip().lower()
+        if key not in position:
+            position[key] = len(unique)
+            unique.append(key)
+        index.append(position[key])
+    return unique, index
+
+print(dedupe_for_embedding(["Pump A", "pump a ", "Valve", "PUMP A"]))
+# (['pump a', 'valve'], [0, 0, 1, 0])
+```
+
+$O(n)$ average time. Embed `unique` in one batch, then rebuild per-text vectors with `[vectors[j] for j in index]`.
+
+**E3 — reference solution**
+
+```python
+import hashlib
+from collections import OrderedDict
+
+class LRUEmbeddingCache:
+    def __init__(self, max_size: int):
+        self.max_size = max_size
+        self.data: OrderedDict[str, list[float]] = OrderedDict()
+        self.hits = 0
+        self.misses = 0
+
+    def get_or_compute(self, text, embed_fn):
+        key = hashlib.sha256(text.strip().lower().encode()).hexdigest()
+        if key in self.data:
+            self.hits += 1
+            self.data.move_to_end(key)          # mark as most recently used
+            return self.data[key]
+        self.misses += 1
+        vec = embed_fn(text)
+        self.data[key] = vec
+        if len(self.data) > self.max_size:
+            self.data.popitem(last=False)       # evict least recently used
+        return vec
+
+calls = []
+fake_embed = lambda t: (calls.append(t), [float(len(t))])[1]
+cache = LRUEmbeddingCache(max_size=2)
+for t in ["a", "b", "a", "c", "b"]:
+    cache.get_or_compute(t, fake_embed)
+print(cache.hits, cache.misses, calls, len(cache.data))   # 1 4 ['a', 'b', 'c', 'b'] 2
+```
+
+Trace: `a` miss, `b` miss, `a` hit (now most recent), `c` miss evicts `b`, `b` miss evicts `a`. Each operation is $O(1)$ plus the hash.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

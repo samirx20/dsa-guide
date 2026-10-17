@@ -509,6 +509,193 @@ The factory assembly line analogy holds throughout: each station (stage) has cle
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Run the whole assembly line.** `DiagnosticPipeline(documents).run("Check MCH-0042", "MCH-0042")` with the chapter's stage functions and these documents:
+
+```python
+documents = [
+    {"content": "D1", "serial_numbers": ["MCH-0042"]},
+    {"content": "D2", "serial_numbers": ["MCH-0007"]},
+    {"content": "D3", "serial_numbers": ["MCH-0042", "MCH-0007"]},
+    {"content": "D4"},                                   # no serial_numbers key
+    {"content": "D5", "serial_numbers": ["MCH-0042"]},
+    {"content": "D6", "serial_numbers": ["MCH-0042"]},
+]
+```
+
+What are `state.context`, `state.errors`, `len(state.validated_results)`, `state.metadata`, and the last line of `state.final_answer`?
+
+**Q2. Validator boundaries.** What does `validator_stage(results)` return for these results?
+
+```python
+results = [
+    {"tool": "get_machine_status",
+     "result": {"temp_c": 96.5, "pressure_psi": 205.0, "vibration_mm_s": 7.0}},
+    {"tool": "get_recent_alerts", "result": [{"temp_c": 120}]},
+]
+```
+
+**Q3. A hallucinated tool in production.** The planner returns `[ToolCall(tool_name="get_machine_temp", arguments={"serial": "MCH-0042"})]`, a tool that is not in `TOOL_REGISTRY`. Run `ProductionPipeline.run` with the Q1 documents. What are `state.errors`, `state.final_answer`, `state.context`, and `state.metadata`? Is anything about `metadata` suspicious even on a fully successful run?
+
+**Q4. Missing argument.** What exception and message does this raise?
+
+```python
+executor_stage([ToolCall(tool_name="get_recent_alerts", arguments={"serial": "X"})])
+```
+
+**Q5. Mutable defaults in Pydantic.** `PipelineState` declares `errors: list[str] = []`. What does this print?
+
+```python
+a = PipelineState(query="a")
+b = PipelineState(query="b")
+a.errors.append("x")
+print(b.errors, a.errors)
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Fix the Planner failure mode "Validate tool existence". Write `validate_tool_calls(calls, registry) -> (valid, errors)` that keeps known calls in order and produces `"Unknown tool: <name>"` for the rest.
+
+- The chapter's 2 planned calls plus `get_machine_temp` → valid `["get_machine_status", "get_recent_alerts"]`, errors `["Unknown tool: get_machine_temp"]`
+
+**E2 (Easy–Medium).** Write `executor_stage_safe(calls, registry=TOOL_REGISTRY)` that never crashes. Each call yields either `{"tool", "result"}` or `{"tool", "error"}`, with the error formatted as `"Unknown tool: <name>"` or `"<ExceptionType>: <message>"`. Later calls still run after a failure.
+
+- `[status call, get_machine_temp, get_recent_alerts without hours]` → 1 result, then `{"tool": "get_machine_temp", "error": "Unknown tool: get_machine_temp"}`, then `{"tool": "get_recent_alerts", "error": "TypeError: <lambda>() missing 1 required positional argument: 'hours'"}`
+
+**E3 (Medium).** Fix the `stages_completed` reporting. Write `run_with_status(stages, state)` where `stages` is a list of `(name, fn)` and each `fn(state)` mutates the state. Record `"ok"`, `"failed"` or `"skipped"` per stage: once a stage fails, the rest are skipped. Append `"<stage>: <ExceptionType>: <message>"` to `state.errors`, and set `state.metadata = {"stage_status": ..., "stages_completed": <count of ok>}`.
+
+- With the hallucinated-tool planner → `{"retriever": "ok", "planner": "ok", "executor": "failed", "validator": "skipped", "synthesizer": "skipped"}`, `stages_completed == 2`, errors `["executor: KeyError: 'get_machine_temp'"]`
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+- **Retriever.** D1 matches, D2 does not, and D3 matches because its list contains the serial. D4 has no key, so `.get` returns `[]` and it does not match. D5 matches, and D6 matches but is cut by `[:3]`. That gives `context == ["D1", "D3", "D5"]`.
+- **Planner and executor.** The planner returns the 2 hard-coded calls, and the executor runs both.
+- **Validator.** $87.3 \le 95$, $142.1 \le 200$ and $4.2 \le 7$, so `errors == []`. The alerts result is a list and is skipped by the `isinstance(data, dict)` check. Both items are kept, so `len(validated_results) == 2`.
+- **Metadata.** `metadata == {"stages_completed": 5, "total_tool_calls": 2}`.
+- **Synthesizer.** The last line of `final_answer` is **`No violations detected.`**
+
+**Q2.**
+
+```python
+([<both items unchanged>],
+ ["Temperature 96.5C exceeds 95.0C limit",
+  "Pressure 205.0PSI exceeds 200.0PSI limit"])
+```
+
+The vibration check is `7.0 > 7.0`, which is `False` because the limit is strict, so it reports no error. The second result is a **list**, so its `temp_c: 120` is never checked. A list-shaped tool result bypasses the physics rules entirely. Every item is still returned in `validated`, because the validator only reports violations and never drops data.
+
+**Q3.**
+
+- **Retriever.** It succeeds, so `context == ["D1", "D3", "D5"]`.
+- **Planner.** It returns the bad call, so `state.tool_calls` has 1 item.
+- **Executor.** `TOOL_REGISTRY["get_machine_temp"]` raises `KeyError('get_machine_temp')`. `_safe_stage` logs and re-raises it, and the outer `except` catches it. `str(KeyError('x'))` includes the quotes, so:
+  - `errors == ["Pipeline failed: 'get_machine_temp'"]`
+  - `final_answer == "Error: 'get_machine_temp'"`
+- **Metadata.** `{"stages_completed": 0, "stage_status": {}, "total_tool_calls": 1, "error_count": 1}`.
+
+The suspicious part: **`stage_status` is never written to**, so `stages_completed` is `0` even on a fully successful run. A successful run with the default planner reports `{"stages_completed": 0, "stage_status": {}, "total_tool_calls": 2, "error_count": 0}`. E3 fixes this.
+
+**Q4.** `TypeError: <lambda>() missing 1 required positional argument: 'hours'`. `func(**call.arguments)` becomes `lambda serial, hours: ...` called with only `serial=`. Like the `KeyError` in Q3, this crashes the whole stage in the unsafe executor.
+
+**Q5.** It prints `[] ['x']`. Unlike a plain Python default argument, Pydantic **copies** mutable field defaults for each instance, so `a` and `b` get separate lists. The `PipelineState` workpiece is safe to create once per run.
+
+**E1 — reference solution**
+
+```python
+def validate_tool_calls(calls, registry):
+    valid, errors = [], []
+    for call in calls:
+        if call.tool_name in registry:
+            valid.append(call)
+        else:
+            errors.append(f"Unknown tool: {call.tool_name}")
+    return valid, errors
+
+plan = planner_stage("Check MCH-0042", []) + \
+       [ToolCall(tool_name="get_machine_temp", arguments={"serial": "MCH-0042"})]
+valid, errors = validate_tool_calls(plan, TOOL_REGISTRY)
+print([c.tool_name for c in valid], errors)
+# ['get_machine_status', 'get_recent_alerts'] ['Unknown tool: get_machine_temp']
+```
+
+$O(n)$ dictionary lookups. Run this between Planner and Executor, and feed `errors` back to the planner for self-correction.
+
+**E2 — reference solution**
+
+```python
+def executor_stage_safe(calls, registry=TOOL_REGISTRY):
+    results = []
+    for call in calls:
+        func = registry.get(call.tool_name)
+        if func is None:
+            results.append({"tool": call.tool_name, "error": f"Unknown tool: {call.tool_name}"})
+            continue
+        try:
+            results.append({"tool": call.tool_name, "result": func(**call.arguments)})
+        except Exception as ex:
+            results.append({"tool": call.tool_name, "error": f"{type(ex).__name__}: {ex}"})
+    return results
+
+calls = [ToolCall(tool_name="get_machine_status", arguments={"serial": "MCH-0042"}),
+         ToolCall(tool_name="get_machine_temp", arguments={"serial": "MCH-0042"}),
+         ToolCall(tool_name="get_recent_alerts", arguments={"serial": "X"})]
+for r in executor_stage_safe(calls):
+    print(r)
+# {'tool': 'get_machine_status', 'result': {'temp_c': 87.3, 'pressure_psi': 142.1, 'vibration_mm_s': 4.2}}
+# {'tool': 'get_machine_temp', 'error': 'Unknown tool: get_machine_temp'}
+# {'tool': 'get_recent_alerts', 'error': "TypeError: <lambda>() missing 1 required positional argument: 'hours'"}
+```
+
+Failures become data, so the synthesizer can report partial results instead of `"Error: ..."`. Note that `validator_stage` reads `item["result"]`, so either filter out the error items first or switch it to `item.get("result")`.
+
+**E3 — reference solution**
+
+```python
+def run_with_status(stages, state):
+    status, failed = {}, False
+    for name, fn in stages:
+        if failed:
+            status[name] = "skipped"
+            continue
+        try:
+            fn(state)
+            status[name] = "ok"
+        except Exception as ex:
+            status[name] = "failed"
+            state.errors.append(f"{name}: {type(ex).__name__}: {ex}")
+            failed = True
+    state.metadata = {"stage_status": status,
+                      "stages_completed": sum(1 for v in status.values() if v == "ok")}
+    return state
+
+def make_stages(planner):
+    def s_retrieve(s): s.context = retriever_stage(s.query, "MCH-0042", documents)
+    def s_plan(s): s.tool_calls = planner(s.query, [])
+    def s_execute(s): s.tool_results = executor_stage(s.tool_calls)
+    def s_validate(s):
+        s.validated_results, errs = validator_stage(s.tool_results)
+        s.errors.extend(errs)
+    def s_synth(s): s.final_answer = synthesizer_stage(s.query, s.context, s.validated_results, s.errors)
+    return [("retriever", s_retrieve), ("planner", s_plan), ("executor", s_execute),
+            ("validator", s_validate), ("synthesizer", s_synth)]
+
+bad_planner = lambda q, t: [ToolCall(tool_name="get_machine_temp", arguments={"serial": "MCH-0042"})]
+out = run_with_status(make_stages(bad_planner), PipelineState(query="Check MCH-0042"))
+print(out.metadata, out.errors)
+# {'stage_status': {'retriever': 'ok', 'planner': 'ok', 'executor': 'failed',
+#   'validator': 'skipped', 'synthesizer': 'skipped'}, 'stages_completed': 2}
+# ["executor: KeyError: 'get_machine_temp'"]
+```
+
+With the normal `planner_stage`, all five stages are `"ok"` and `stages_completed == 5`. The status map pinpoints the failing station on the assembly line. The orchestrator itself is $O(\text{stages})$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

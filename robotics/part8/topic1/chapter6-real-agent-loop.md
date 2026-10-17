@@ -804,6 +804,176 @@ if not message.tool_calls:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Trace the minimal loop with a scripted model.** Replace the API call in section 1's loop with a fake that returns these three assistant messages in order:
+
+| API call | Assistant message |
+|---|---|
+| 1 | `tool_calls = [call_1: read_cpu("{}"), call_2: read_memory("{}")]` |
+| 2 | `tool_calls = [call_3: read_disk('{"path": "/data"}')]` |
+| 3 | `content = "All good."`, no tool calls |
+
+Using section 1's `execute_tool` (which only knows `read_cpu` and `read_memory`) and `MAX_ROUNDS = 10`: what lines are printed, how many API calls are made, and what is `len(messages)` at the end? `messages` starts with 2 entries.
+
+**Q2. Same script, `MAX_ROUNDS = 2`.** What is printed now, how many API calls are made, what is `len(messages)`, and what is the role of the last message?
+
+**Q3. Reassemble the stream.** Feed these `delta.tool_calls` fragments, in order, through section 3's accumulation code. What is `collected_tool_calls` at the end? What would `arguments` for index 0 be if the code used `=` instead of `+=`?
+
+| Chunk | `index` | `id` | `function.name` | `function.arguments` |
+|---|---|---|---|---|
+| 1 | 0 | `"call_a"` | `"read_disk"` | `""` |
+| 2 | 0 | `None` | `None` | `'{"pa'` |
+| 3 | 1 | `"call_b"` | `"read_cpu"` | `"{}"` |
+| 4 | 0 | `None` | `None` | `'th": "/"}'` |
+
+**Q4. `execute_tool` edge cases.** Using section 1's `execute_tool`, what does each call return?
+
+```python
+execute_tool("read_disk", '{"path": "/"}')    # (a)
+execute_tool("read_cpu", "")                  # (b)
+execute_tool("read_cpu", '{"core": 2}')       # (c)
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Write `accumulate_deltas(deltas: list[dict]) -> list[dict]`. It is a pure, testable version of the streaming accumulator. Each delta is a dict with `index` and optional `id`, `name`, `arguments`. Return the assembled calls **sorted by index**.
+
+- `[{"index": 1, "id": "call_b", "name": "read_cpu", "arguments": "{}"}, {"index": 0, "id": "call_a", "name": "read_disk"}, {"index": 0, "arguments": '{"path": '}, {"index": 0, "arguments": '"/data"}'}]`
+  → `[{'id': 'call_a', 'name': 'read_disk', 'arguments': '{"path": "/data"}'}, {'id': 'call_b', 'name': 'read_cpu', 'arguments': '{}'}]`
+
+**E2 (Easy–Medium).** Write `run_agent(create, messages, execute, max_rounds=10) -> tuple[str, int]`. Inject `create(messages=...)`, which returns an object shaped like an API response, so the loop can be tested with no network. Return `(final_answer, api_calls_made)`. Tool exceptions must become `{"error": "Tool execution failed: <msg>"}` results.
+
+- A scripted `create` that first requests `read_cpu` and `read_disk` (whose executor raises `RuntimeError("read_disk offline")`), then answers `"CPU 45.2%, disk unavailable."` → `('CPU 45.2%, disk unavailable.', 2)`. `create` saw message lists of length 2, then 5, and `len(messages) == 6` at the end.
+
+**E3 (Medium).** Implement the "Model keeps calling same failing tool" row of the error-recovery table. Write `run_agent_guarded(create, messages, execute, max_rounds=10, max_repeats=2)`. Count identical `(name, arguments)` calls. Once a call exceeds `max_repeats`, do **not** execute it. Return the tool result `{"error": "Repeated call <name>(<args>) blocked; answer with what you have."}` instead, and pass `tool_choice="none"` on the next `create` call. Return `(answer, rounds_used)`.
+
+- A stubborn fake that calls `read_cpu("{}")` every round until `tool_choice == "none"`, then answers `"CPU is 45.2%."` → `('CPU is 45.2%.', 4)`, with `len(messages) == 9`
+
+#### Dry-Run: Answers
+
+**Q1.** Printed:
+
+```
+  Round 1: read_cpu() -> {'cpu_percent': 45.2, 'cores': 8}
+  Round 1: read_memory() -> {'used_gb': 12.3, 'total_gb': 32.0}
+  Round 2: read_disk() -> {'error': 'Unknown function: read_disk'}
+Final answer: All good.
+```
+
+**3** API calls. Message growth:
+
+| After | Appended | `len(messages)` |
+|---|---|---|
+| start | system, user | 2 |
+| call 1 | assistant + 2 tool | 5 |
+| call 2 | assistant + 1 tool | 7 |
+| call 3 | assistant (final) | 8 |
+
+The unknown `read_disk` does not crash the loop. Its error dict is sent back as an ordinary tool result.
+
+**Q2.** The same three `Round` lines print, then `Hit max rounds without a final answer`. That line comes from the `for ... else` clause, because the loop never hit `break`. **2** API calls, `len(messages) == 7`, and the last message is a **`tool`** message (the `read_disk` error) that the model never got to see.
+
+**Q3.**
+
+```python
+{0: {'id': 'call_a', 'name': 'read_disk', 'arguments': '{"path": "/"}'},
+ 1: {'id': 'call_b', 'name': 'read_cpu', 'arguments': '{}'}}
+```
+
+Fragments for index 0 arrive in chunks 1, 2 and 4, with index 1 interleaved in chunk 3. Keying by `index` keeps them apart. Chunk 1's empty `""` arguments are skipped by `if tc.function.arguments`. `None` ids and names do not overwrite the earlier values. With `=` instead of `+=`, index 0 would end up with only the last fragment, `'th": "/"}'`, and `json.loads` would raise `JSONDecodeError`.
+
+**Q4.**
+(a) `{'error': 'Unknown function: read_disk'}`. Section 1's `funcs` dict only contains `read_cpu` and `read_memory`.
+(b) `{'cpu_percent': 45.2, 'cores': 8}`. `arguments` is the empty string, which is falsy, so `args = {}`. That guard matters because `json.loads("")` would raise.
+(c) `{'error': "read_cpu() got an unexpected keyword argument 'core'"}`. The `TypeError` is caught by the broad `except` and returned as data.
+
+**E1 — reference solution**
+
+```python
+def accumulate_deltas(deltas: list[dict]) -> list[dict]:
+    calls: dict[int, dict] = {}
+    for d in deltas:
+        slot = calls.setdefault(d["index"], {"id": "", "name": "", "arguments": ""})
+        if d.get("id"):
+            slot["id"] = d["id"]
+        if d.get("name"):
+            slot["name"] = d["name"]
+        if d.get("arguments"):
+            slot["arguments"] += d["arguments"]      # fragments: append, never overwrite
+    return [calls[i] for i in sorted(calls)]          # deterministic order by index
+```
+
+$O(n + k \log k)$ for $n$ fragments and $k$ calls. Keeping it a pure function over plain dicts means you can unit-test the hardest part of streaming without a live stream.
+
+**E2 — reference solution**
+
+```python
+import json
+from typing import Any, Callable
+
+def run_agent(create: Callable[..., Any], messages: list,
+              execute: Callable[[str, str], Any], max_rounds: int = 10) -> tuple[str, int]:
+    calls = 0
+    for _ in range(max_rounds):
+        response = create(messages=messages)
+        calls += 1
+        message = response.choices[0].message
+        messages.append(message)                       # assistant message first
+        if not message.tool_calls:
+            return message.content, calls
+        for tool_call in message.tool_calls:           # answer EVERY call
+            try:
+                result = execute(tool_call.function.name, tool_call.function.arguments)
+            except Exception as e:
+                result = {"error": f"Tool execution failed: {e}"}
+            messages.append({"role": "tool", "tool_call_id": tool_call.id,
+                             "content": json.dumps(result)})
+    return "Agent reached max rounds without a final answer.", calls
+```
+
+Trace: `create` sees 2 messages, then appends assistant, `tool(c1)` and `tool(c2)` with `{"error": "Tool execution failed: read_disk offline"}`, giving 5. It sees 5, the final assistant is appended, and the total is 6. In production, pass `create=lambda **kw: client.chat.completions.create(model="gpt-4o", tools=tools, **kw)`.
+
+**E3 — reference solution**
+
+```python
+import json
+
+def run_agent_guarded(create, messages, execute, max_rounds=10, max_repeats=2):
+    counts: dict[tuple[str, str], int] = {}
+    tool_choice = "auto"
+    for round_num in range(1, max_rounds + 1):
+        message = create(messages=messages, tool_choice=tool_choice).choices[0].message
+        messages.append(message)
+        if not message.tool_calls:
+            return message.content, round_num
+        for tool_call in message.tool_calls:
+            key = (tool_call.function.name, tool_call.function.arguments)
+            counts[key] = counts.get(key, 0) + 1
+            if counts[key] > max_repeats:
+                result = {"error": f"Repeated call {key[0]}({key[1]}) blocked; answer with what you have."}
+                tool_choice = "none"                    # next round: the model must answer in text
+            else:
+                result = execute(*key)
+            # every tool_call still gets a matching tool message, even when blocked
+            messages.append({"role": "tool", "tool_call_id": tool_call.id,
+                             "content": json.dumps(result)})
+    return "Agent reached max rounds without a final answer.", max_rounds
+```
+
+| Round | `read_cpu` count | Action | `len(messages)` after |
+|---|---|---|---|
+| 1 | 1 | execute | 4 |
+| 2 | 2 | execute | 6 |
+| 3 | 3 > 2 | blocked, `tool_choice = "none"` | 8 |
+| 4 | (none) | final answer | 9 |
+
+A blocked call still receives a `tool` reply, because skipping it would break the protocol rule that every `tool_call_id` must be answered. $O(1)$ per call for the dictionary bookkeeping.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

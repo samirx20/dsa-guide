@@ -469,6 +469,211 @@ Vector databases store embeddings and enable fast similarity search. An in-memor
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Search the in-memory store.** Using the chapter's `InMemoryVectorStore` with the same three inserts (P101 seal `[0.9, 0.1, 0.0]`, C201 compressor `[0.1, 0.9, 0.0]`, P101 alignment `[0.85, 0.15, 0.0]`), what does this print? Give scores to 4 decimals.
+
+```python
+results = store.search([0.1, 0.9, 0.0], top_k=2)
+for r in results:
+    print(f"{r['score']:.4f} | {r['text']}")
+```
+
+**Q2. pgvector distance → similarity.** Four rows have these cosine distances (`embedding <=> query`) for some query:
+
+| id | machine_id | distance |
+|----|-----------|----------|
+| 1 | P101 | 0.30 |
+| 2 | C201 | 0.05 |
+| 3 | P101 | 0.10 |
+| 4 | P101 | 0.45 |
+
+What rows, in what order, and with what `similarity` values does the chapter's query (`WHERE machine_id = 'P101' ... ORDER BY embedding <=> ... LIMIT 2`) return?
+
+**Q3. Pinecone filter.** Which of these vectors match the filter below?
+
+```python
+filter = {
+    "machine_id": {"$in": ["P101", "P102"]},
+    "page": {"$gte": 10, "$lte": 20},
+}
+# v1: {"machine_id": "P101", "page": 12}
+# v2: {"machine_id": "P102", "page": 25}
+# v3: {"machine_id": "C201", "page": 15}
+# v4: {"machine_id": "P102", "page": 10}
+# v5: {"machine_id": "P101", "page": 20}
+# v6: {"machine_id": "P103", "page": 11}
+```
+
+**Q4. What does `str()` really produce?** Predict the three printed lines:
+
+```python
+import numpy as np
+emb = np.array([0.5, 0.25])
+print(str(emb))
+print(repr(emb))
+print(str(emb.tolist()))
+```
+
+Which one can pgvector parse as a `vector` literal, and why does the first one fail?
+
+**Q5. Validation in the Section 6 store.** For each call on a fresh validated `InMemoryVectorStore` (Section 6 version), state whether it raises (and the message) or succeeds. If it succeeds, what is stored in `texts`?
+
+```python
+store.insert("   ", [1, 2])
+store.insert("ok", [[1, 2], [3, 4]])
+store.insert("ok", [1, float("nan")])
+store.insert(" Pump ", [1, 0])
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Pinecone's `upsert` replaces a record whose id already exists. Add that behaviour to the in-memory store: write `UpsertStore(InMemoryVectorStore)` with an `ids` list and a method `upsert(doc_id, text, vector, meta=None)` that overwrites in place if `doc_id` is known, otherwise appends. Keep all four parallel lists aligned.
+
+- `upsert("c1","old",[1,0])`, `upsert("c2","b",[0,1])`, `upsert("c1","new",[1,0])` → `texts == ["new", "b"]`, `ids == ["c1", "c2"]`
+
+**E2 (Easy–Medium).** The chapter's comparison table says in-memory filtering is "Manual". Write `search_with_filter(store, query_vector, top_k=5, filters=None)` that pre-filters by exact metadata match (AND across keys), then ranks only the survivors by cosine similarity (scores rounded to 4 decimals). Return `[]` if nothing matches.
+
+- On the chapter's store: `search_with_filter(store, [0.1, 0.9, 0.0], top_k=2, filters={"machine_id": "P101"})` → alignment (0.2815), then seal (0.2195)
+- `filters={"machine_id": "X"}` → `[]`
+
+**E3 (Medium).** The in-memory store loses everything on restart. Write `save(store, path)` and `load(path) -> InMemoryVectorStore` that round-trip texts, vectors and metadata through a JSON file. Searching the loaded store must return the same texts in the same order as the original.
+
+#### Dry-Run: Answers
+
+**Q1.** Here $\|q\| = \sqrt{0.01 + 0.81} = \sqrt{0.82} \approx 0.9055$.
+
+| doc | dot | $\|d\|$ | score |
+|-----|-----|---------|-------|
+| seal `[0.9, 0.1, 0]` | $0.09 + 0.09 = 0.18$ | 0.9055 | $0.18 / 0.82 = 0.2195$ |
+| compressor `[0.1, 0.9, 0]` | $0.01 + 0.81 = 0.82$ | 0.9055 | $0.82 / 0.82 \approx 1.0000$ |
+| alignment `[0.85, 0.15, 0]` | $0.085 + 0.135 = 0.22$ | 0.8631 | $0.22 / 0.7816 \approx 0.2815$ |
+
+Output:
+
+```
+1.0000 | Compressor vibration threshold is 5 mm/s
+0.2815 | Pump alignment tolerance is 0.05 mm
+```
+
+The `+ 1e-8` in the denominator makes the top score a hair under 1, but it still rounds to `1.0000`.
+
+**Q2.** The `WHERE` clause removes row 2 first, even though it has the smallest distance. The remaining rows sort ascending by distance: 3 (0.10), 1 (0.30), 4 (0.45). `LIMIT 2` keeps **row 3 with similarity $1 - 0.10 = 0.90$**, then **row 1 with similarity $1 - 0.30 = 0.70$**.
+
+**Q3.** **v1, v4, v5.**
+
+- v2 fails because page 25 > 20.
+- v3 fails because C201 is not in the list.
+- v6 fails because P103 is not in the list.
+
+Pinecone ANDs the top-level keys together, and `$gte`/`$lte` are inclusive, so pages 10 and 20 both pass.
+
+**Q4.**
+
+```
+[0.5  0.25]
+array([0.5 , 0.25])
+[0.5, 0.25]
+```
+
+`str()` on a NumPy array prints **space-separated values with no commas**, while `repr()` is the form with `array(...)`. pgvector's text format is `[x, y, ...]` with commas, so only the third line (`str(emb.tolist())`) parses. The first line fails because of the missing commas. Registering the adapter with `register_vector(conn)` avoids string conversion altogether.
+
+**Q5.**
+
+| call | result |
+|------|--------|
+| `insert("   ", [1, 2])` | `ValueError: Text cannot be empty` (`"   ".strip()` is `""`) |
+| `insert("ok", [[1, 2], [3, 4]])` | `ValueError: Vector must be 1D, got 2D` |
+| `insert("ok", [1, nan])` | `ValueError: Vector contains NaN values` |
+| `insert(" Pump ", [1, 0])` | succeeds; `texts == ["Pump"]` (text is stripped before storing) |
+
+Only the last call stores anything, because each check raises before the `append` lines run.
+
+**E1 — reference solution**
+
+```python
+import numpy as np
+
+class UpsertStore(InMemoryVectorStore):
+    def __init__(self):
+        super().__init__()
+        self.ids = []
+
+    def upsert(self, doc_id, text, vector, meta=None):
+        vec = np.array(vector, dtype=np.float32)
+        if doc_id in self.ids:                       # update in place
+            i = self.ids.index(doc_id)
+            self.texts[i], self.vectors[i], self.metadata[i] = text, vec, meta or {}
+        else:                                        # insert new
+            self.ids.append(doc_id)
+            self.texts.append(text)
+            self.vectors.append(vec)
+            self.metadata.append(meta or {})
+
+u = UpsertStore()
+u.upsert("c1", "old", [1, 0]); u.upsert("c2", "b", [0, 1]); u.upsert("c1", "new", [1, 0])
+print(u.texts, u.ids)   # ['new', 'b'] ['c1', 'c2']
+```
+
+`ids.index` is $O(n)$. A `dict` mapping id to position would make lookups $O(1)$.
+
+**E2 — reference solution**
+
+```python
+def search_with_filter(store, query_vector, top_k=5, filters=None):
+    filters = filters or {}
+    keep = [i for i, m in enumerate(store.metadata)
+            if all(m.get(k) == v for k, v in filters.items())]
+    if not keep:
+        return []
+    q = np.asarray(query_vector, dtype=np.float32)
+    M = np.vstack([store.vectors[i] for i in keep])
+    sims = M @ q / (np.linalg.norm(M, axis=1) * np.linalg.norm(q) + 1e-8)
+    order = np.argsort(-sims, kind="stable")[:top_k]
+    return [{"text": store.texts[keep[j]],
+             "score": round(float(sims[j]), 4),
+             "metadata": store.metadata[keep[j]]} for j in order]
+
+for r in search_with_filter(store, [0.1, 0.9, 0.0], top_k=2, filters={"machine_id": "P101"}):
+    print(r["score"], r["text"])
+# 0.2815 Pump alignment tolerance is 0.05 mm
+# 0.2195 Pump seal replacement requires 50 Nm torque
+```
+
+`keep[j]` maps a row of the filtered matrix back to the store's index. Only the $m$ survivors are scored: $O(n + md)$.
+
+**E3 — reference solution**
+
+```python
+import json
+
+def save(store, path):
+    with open(path, "w") as fh:
+        json.dump({"texts": store.texts,
+                   "vectors": [v.tolist() for v in store.vectors],   # ndarray -> list
+                   "metadata": store.metadata}, fh)
+
+def load(path):
+    with open(path) as fh:
+        data = json.load(fh)
+    new_store = InMemoryVectorStore()
+    for text, vec, meta in zip(data["texts"], data["vectors"], data["metadata"]):
+        new_store.insert(text, vec, meta)
+    return new_store
+
+save(store, "store.json")
+restored = load("store.json")
+same = [r["text"] for r in restored.search([0.88, 0.12, 0.0], 2)] == \
+       [r["text"] for r in store.search([0.88, 0.12, 0.0], 2)]
+print(same, len(restored.texts))   # True 3
+```
+
+`ndarray` is not JSON-serializable, so each vector goes through `.tolist()`. Inserting in the saved order keeps the three lists aligned. Both directions are $O(nd)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
