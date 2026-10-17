@@ -1,0 +1,192 @@
+// Chapter slug -> interactive labs rendered in place of the
+// "Interactive Visualization & shadcn/ui Specification" section.
+// Each lab lives in src/labs/<track>/<Name>.jsx and default-exports a component
+// that accepts `variant` (string) plus any extra props listed here.
+import { lazy } from "react";
+
+const modules = import.meta.glob("./{dsa,robotics}/*.jsx");
+
+const L = (lab, variant, props = {}) => ({ lab, variant, props });
+
+// prettier-ignore
+const MAP = {
+  // ---------------- DSA ----------------
+  "dsa/part0/topic1/chapter1-cpp-memory-and-variables": [L("dsa/MemoryLab", "memory")],
+  "dsa/part0/topic1/chapter2-pointers-and-references": [L("dsa/MemoryLab", "pointers")],
+  "dsa/part0/topic2/chapter1-structs-classes-and-raii": [L("dsa/MemoryLab", "raii"), L("dsa/VectorLab", "simple-vector")],
+  "dsa/part1/topic1/chapter1-vector": [L("dsa/VectorLab", "vector")],
+  "dsa/part1/topic1/chapter2-strings": [L("dsa/StringsLab", "string-ops")],
+  "dsa/part1/topic1/chapter3-pairs-and-tuples": [L("dsa/StlContainersLab", "pairs")],
+  "dsa/part1/topic1/chapter4-maps": [L("dsa/HashLab", "map")],
+  "dsa/part1/topic1/chapter5-sets": [L("dsa/HashLab", "set")],
+  "dsa/part1/topic1/chapter6-stacks-queues": [L("dsa/StlContainersLab", "stack-queue")],
+  "dsa/part1/topic1/chapter7-priority-queue": [L("dsa/HeapLab", "priority-queue")],
+  "dsa/part1/topic1/chapter8-algorithm-stl": [L("dsa/StlContainersLab", "algorithms")],
+  "dsa/part1/topic2/chapter1-big-o-notation": [L("dsa/BigOLab", "growth")],
+  "dsa/part1/topic2/chapter2-time-complexity": [L("dsa/BigOLab", "loops")],
+  "dsa/part1/topic2/chapter3-space-complexity": [L("dsa/BigOLab", "space")],
+  "dsa/part2/topic1/chapter1-array-traversal": [L("dsa/ArrayTraversalLab", "traversal")],
+  "dsa/part2/topic1/chapter2-in-place-modifications": [L("dsa/ArrayTraversalLab", "in-place")],
+  "dsa/part2/topic1/chapter3-kadanes-algorithm": [L("dsa/KadaneLab", "kadane")],
+  "dsa/part2/topic1/interview-problems-array-basics": [L("dsa/KadaneLab", "stock")],
+  "dsa/part2/topic2/chapter1-prefix-sum-array": [L("dsa/PrefixSumLab", "1d")],
+  "dsa/part2/topic2/chapter2-subarray-sums": [L("dsa/PrefixSumLab", "hashmap")],
+  "dsa/part2/topic2/chapter3-2d-prefix-sums": [L("dsa/PrefixSumLab", "2d")],
+  "dsa/part2/topic2/interview-problems-prefix-sum": [L("dsa/PrefixSumLab", "hashmap")],
+  "dsa/part2/topic3/chapter1-two-pointers": [L("dsa/TwoPointersLab", "pair-sum")],
+  "dsa/part2/topic3/interview-problems-two-pointers": [L("dsa/TwoPointersLab", "container")],
+  "dsa/part2/topic4/chapter1-sliding-window": [L("dsa/SlidingWindowLab", "fixed")],
+  "dsa/part2/topic4/interview-problems-sliding-window": [L("dsa/SlidingWindowLab", "variable")],
+  "dsa/part3/topic1/chapter1-O-n2-sorts": [L("dsa/SortingLab", "n2")],
+  "dsa/part3/topic1/chapter2-O-nlogn-sorts": [L("dsa/SortingLab", "nlogn")],
+  "dsa/part3/topic1/chapter3-non-comparison-sorts-and-stability": [L("dsa/SortingLab", "non-comparison")],
+  "dsa/part3/topic1/interview-problems-sorting": [L("dsa/SortingLab", "all")],
+  "dsa/part4/topic1/chapter1-classic-binary-search": [L("dsa/BinarySearchLab", "classic")],
+  "dsa/part4/topic1/chapter2-advanced-binary-search": [L("dsa/BinarySearchLab", "rotated")],
+  "dsa/part4/topic1/chapter3-search-on-answer-space": [L("dsa/BinarySearchLab", "answer-space")],
+  "dsa/part4/topic1/interview-problems-binary-search": [L("dsa/BinarySearchLab", "classic")],
+  "dsa/part5/topic1/chapter1-ascii-and-parsing": [L("dsa/StringsLab", "ascii")],
+  "dsa/part5/topic1/chapter2-palindromes-anagrams": [L("dsa/StringsLab", "palindrome")],
+  "dsa/part5/topic1/chapter3-kmp-overview": [L("dsa/KmpLab", "kmp")],
+  "dsa/part5/topic1/interview-problems-strings": [L("dsa/KmpLab", "kmp")],
+  "dsa/part6/topic1/chapter1-recursion-basics": [L("dsa/RecursionLab", "basics")],
+  "dsa/part6/topic1/chapter2-tail-vs-head-recursion": [L("dsa/RecursionLab", "head-tail")],
+  "dsa/part6/topic1/chapter3-divide-and-conquer": [L("dsa/RecursionLab", "divide-conquer")],
+  "dsa/part6/topic1/interview-problems-recursion": [L("dsa/RecursionLab", "basics")],
+  "dsa/part6/topic2/chapter1-backtracking-template": [L("dsa/BacktrackingLab", "subsets")],
+  "dsa/part6/topic2/chapter2-pruning": [L("dsa/BacktrackingLab", "nqueens")],
+  "dsa/part6/topic2/chapter3-combinations-permutations-subsets": [L("dsa/BacktrackingLab", "permutations")],
+  "dsa/part6/topic2/interview-problems-backtracking": [L("dsa/BacktrackingLab", "nqueens")],
+  "dsa/part7/topic1/chapter1-listnode-and-reversal": [L("dsa/LinkedListLab", "reverse")],
+  "dsa/part7/topic1/chapter2-dummy-heads": [L("dsa/LinkedListLab", "dummy")],
+  "dsa/part7/topic1/chapter3-fast-slow-pointers": [L("dsa/LinkedListLab", "floyd")],
+  "dsa/part7/topic1/interview-problems-linked-lists": [L("dsa/LinkedListLab", "reverse")],
+  "dsa/part8/topic1/chapter1-stack-fundamentals": [L("dsa/StackLab", "stack")],
+  "dsa/part8/topic1/chapter2-monotonic-stack": [L("dsa/StackLab", "monotonic")],
+  "dsa/part8/topic2/chapter1-queue-and-deque": [L("dsa/StackLab", "deque")],
+  "dsa/part8/interview-problems-stacks-queues": [L("dsa/StackLab", "monotonic")],
+  "dsa/part9/topic1/chapter1-hashing-internals": [L("dsa/HashLab", "internals")],
+  "dsa/part9/topic1/chapter2-hashing-patterns": [L("dsa/HashLab", "patterns")],
+  "dsa/part9/topic1/interview-problems-hashing": [L("dsa/HashLab", "patterns")],
+  "dsa/part10/topic1/chapter1-dfs-traversals": [L("dsa/TreeLab", "dfs")],
+  "dsa/part10/topic1/chapter2-bfs-level-order": [L("dsa/TreeLab", "bfs")],
+  "dsa/part10/topic1/interview-problems-binary-trees": [L("dsa/TreeLab", "dfs")],
+  "dsa/part10/topic2/chapter1-bst-fundamentals": [L("dsa/TreeLab", "bst")],
+  "dsa/part10/topic2/interview-problems-bst": [L("dsa/TreeLab", "bst")],
+  "dsa/part10/topic3/chapter1-heap-properties": [L("dsa/HeapLab", "heap")],
+  "dsa/part10/topic3/interview-problems-heaps": [L("dsa/HeapLab", "heap")],
+  "dsa/part10/topic4/chapter1-trie-architecture": [L("dsa/TrieLab", "trie")],
+  "dsa/part10/topic4/interview-problems-tries": [L("dsa/TrieLab", "trie")],
+  "dsa/part11/topic1/chapter1-graph-representations-and-traversals": [L("dsa/GraphLab", "traversal")],
+  "dsa/part11/topic1/interview-problems-graphs": [L("dsa/GraphLab", "traversal")],
+  "dsa/part11/topic2/chapter1-topological-sort": [L("dsa/GraphLab", "topo")],
+  "dsa/part11/topic2/interview-problems-topological-sort": [L("dsa/GraphLab", "topo")],
+  "dsa/part11/topic3/chapter1-dijkstras-algorithm": [L("dsa/GraphLab", "dijkstra")],
+  "dsa/part11/topic3/chapter2-bellman-floyd": [L("dsa/GraphLab", "bellman-ford")],
+  "dsa/part11/topic3/interview-problems-shortest-path": [L("dsa/GraphLab", "dijkstra")],
+  "dsa/part11/topic4/chapter1-dsu-structure": [L("dsa/DsuLab", "dsu")],
+  "dsa/part11/topic4/interview-problems-union-find": [L("dsa/DsuLab", "dsu")],
+  "dsa/part12/topic0/chapter1-dp-fundamentals": [L("dsa/DpLab", "1d")],
+  "dsa/part12/topic1/interview-problems-1d-dp": [L("dsa/DpLab", "1d")],
+  "dsa/part12/topic2/chapter1-2d-dp-concepts": [L("dsa/DpLab", "2d")],
+  "dsa/part12/topic2/interview-problems-2d-dp": [L("dsa/DpLab", "2d")],
+  "dsa/part13/topic1/chapter1-greedy-patterns": [L("dsa/GreedyLab", "intervals")],
+  "dsa/part13/topic1/interview-problems-greedy": [L("dsa/GreedyLab", "intervals")],
+  "dsa/part14/topic1/chapter1-bit-manipulation": [L("dsa/BitsLab", "bits")],
+  "dsa/part14/topic1/interview-problems-bit-manipulation": [L("dsa/BitsLab", "bits")],
+  "dsa/part14/topic2/chapter1-math-matrix-tricks": [L("dsa/MatrixLab", "matrix")],
+  "dsa/part14/topic2/interview-problems-math-matrix": [L("dsa/MatrixLab", "matrix")],
+
+  // ---------------- Robotics ----------------
+  "robotics/part0/topic1/chapter1-the-cli-and-linux": [L("robotics/PipeLab", "pipes")],
+  "robotics/part0/topic1/chapter2-git-and-github-workflows": [L("robotics/GitDagLab", "git")],
+  "robotics/part0/topic2/chapter1-intro-type-hinting": [L("robotics/PythonFoundationsLab", "types")],
+  "robotics/part0/topic2/chapter2-apis-and-json": [L("robotics/PythonFoundationsLab", "json")],
+  "robotics/part0/topic2/chapter3-class-refresher": [L("robotics/PythonFoundationsLab", "classes")],
+  "robotics/part0/topic2/chapter4-virtual-environments": [L("robotics/PythonFoundationsLab", "venv")],
+  "robotics/part0/topic2/chapter5-advanced-type-hinting": [L("robotics/PythonFoundationsLab", "types")],
+  "robotics/part0/topic2/chapter6-error-handling": [L("robotics/PythonFoundationsLab", "errors")],
+  "robotics/part0/topic2/project-strict-python-cli": [L("robotics/PythonFoundationsLab", "log-parser")],
+  "robotics/part1/topic1/chapter1-coordinates-radians-and-trig": [L("robotics/UnitCircleLab", "atan2")],
+  "robotics/part1/topic1/chapter2-vectors-dot-and-cross-products": [L("robotics/VectorLab", "dot-cross")],
+  "robotics/part1/topic2/chapter1-matrices-as-space-transformers": [L("robotics/MatrixTransformLab", "matrix")],
+  "robotics/part1/topic2/chapter2-rotation-matrices-euler-and-quaternions": [L("robotics/RotationLab", "gimbal")],
+  "robotics/part1/topic2/chapter3-homogeneous-transforms-se2-se3": [L("robotics/FramesLab", "se2")],
+  "robotics/part1/topic2/project-transform-tree-engine": [L("robotics/FramesLab", "tree")],
+  "robotics/part2/topic1/chapter1-derivatives-and-integrals-in-code": [L("robotics/IntegratorLab", "calculus")],
+  "robotics/part2/topic2/chapter1-forward-and-inverse-kinematics": [L("robotics/ArmIkLab", "ik")],
+  "robotics/part2/topic2/chapter2-differential-drive-and-odometry": [L("robotics/DiffDriveLab", "odometry")],
+  "robotics/part3/topic1/chapter1-pid-control-from-scratch": [L("robotics/PidLab", "pid")],
+  "robotics/part3/topic1/chapter2-cascaded-and-state-space-control": [L("robotics/CascadeLab", "cascade")],
+  "robotics/part3/topic2/chapter1-probability-gaussians-and-sensor-noise": [L("robotics/GaussianLab", "gaussian")],
+  "robotics/part3/topic2/chapter2-kalman-filter-and-sensor-fusion": [L("robotics/KalmanLab", "kalman")],
+  "robotics/part3/topic2/project-closed-loop-waypoint-follower": [L("robotics/DiffDriveLab", "waypoints")],
+  "robotics/part4/topic1/chapter1-modern-cpp-memory-raii-and-smart-pointers": [L("robotics/CacheLineLab", "cache")],
+  "robotics/part4/topic1/chapter2-ring-buffers-threads-and-deterministic-loops": [L("robotics/RingBufferLab", "ring")],
+  "robotics/part4/topic2/chapter1-occupancy-grids-astar-and-rrt": [L("robotics/PlannerLab", "planner")],
+  "robotics/part4/topic2/chapter2-ros2-architecture-and-mujoco-simulation": [L("robotics/RosGraphLab", "ros")],
+  "robotics/part4/topic2/project-cpp-autonomous-robot-daemon": [L("robotics/RingBufferLab", "daemon")],
+  "robotics/part5/topic1/chapter1-the-event-loop": [L("robotics/AsyncTimelineLab", "event-loop")],
+  "robotics/part5/topic1/chapter2-concurrent-execution": [L("robotics/AsyncTimelineLab", "gather")],
+  "robotics/part5/topic1/chapter3-async-http": [L("robotics/AsyncTimelineLab", "http")],
+  "robotics/part5/topic1/project-async-data-fetcher": [L("robotics/AsyncTimelineLab", "http")],
+  "robotics/part5/topic2/chapter1-fastapi-basics": [L("robotics/FastApiLab", "lifecycle")],
+  "robotics/part5/topic2/chapter2-dependency-injection": [L("robotics/FastApiLab", "depends")],
+  "robotics/part5/topic2/project-telemetry-api": [L("robotics/FastApiLab", "lifecycle")],
+  "robotics/part6/topic1/chapter1-tables-and-schema": [L("robotics/SqlLab", "schema")],
+  "robotics/part6/topic1/chapter2-sql-queries": [L("robotics/SqlLab", "queries")],
+  "robotics/part6/topic1/chapter3-foreign-keys-constraints": [L("robotics/SqlLab", "join")],
+  "robotics/part6/topic1/chapter4-advanced-sql": [L("robotics/SqlLab", "index")],
+  "robotics/part6/topic2/chapter1-docker-containers": [L("robotics/InfraLab", "docker")],
+  "robotics/part6/topic2/chapter2-background-queues": [L("robotics/InfraLab", "queue")],
+  "robotics/part6/topic2/chapter3-redis-caching": [L("robotics/InfraLab", "cache")],
+  "robotics/part6/topic2/chapter4-websockets": [L("robotics/InfraLab", "websocket")],
+  "robotics/part6/topic2/chapter5-cicd": [L("robotics/InfraLab", "cicd")],
+  "robotics/part7/topic1/chapter1-basemodels": [L("robotics/GuardrailLab", "validation")],
+  "robotics/part7/topic1/chapter2-field-constraints": [L("robotics/GuardrailLab", "validation")],
+  "robotics/part7/topic1/chapter3-custom-validators": [L("robotics/GuardrailLab", "validation")],
+  "robotics/part7/topic1/project-sensor-schema-validator": [L("robotics/GuardrailLab", "validation")],
+  "robotics/part7/topic2/chapter1-middleware-interceptors": [L("robotics/GuardrailLab", "interceptor")],
+  "robotics/part7/topic2/chapter2-deterministic-fallbacks": [L("robotics/GuardrailLab", "fallback")],
+  "robotics/part7/topic2/project-thermal-guardrail": [L("robotics/GuardrailLab", "interceptor")],
+  "robotics/part8/topic1/chapter1-chat-completions-api": [L("robotics/AgentLoopLab", "messages")],
+  "robotics/part8/topic1/chapter2-context-windows": [L("robotics/AgentLoopLab", "context")],
+  "robotics/part8/topic1/chapter3-tool-message-role": [L("robotics/AgentLoopLab", "tools")],
+  "robotics/part8/topic1/chapter4-json-schema-generation": [L("robotics/AgentLoopLab", "schema")],
+  "robotics/part8/topic1/chapter5-dynamic-execution": [L("robotics/AgentLoopLab", "tools")],
+  "robotics/part8/topic1/chapter6-real-agent-loop": [L("robotics/AgentLoopLab", "loop")],
+  "robotics/part8/topic1/project-tool-calling-bot": [L("robotics/AgentLoopLab", "loop")],
+  "robotics/part8/topic2/chapter1-embeddings": [L("robotics/RagLab", "embeddings")],
+  "robotics/part8/topic2/chapter2-cosine-similarity": [L("robotics/RagLab", "cosine")],
+  "robotics/part8/topic2/chapter3-chunking-strategies": [L("robotics/RagLab", "chunking")],
+  "robotics/part8/topic2/chapter4-vector-databases": [L("robotics/RagLab", "retrieval")],
+  "robotics/part8/topic2/chapter5-metadata-filtering": [L("robotics/RagLab", "filtering")],
+  "robotics/part8/topic2/chapter6-state-dictionary": [L("robotics/RagLab", "pipeline")],
+  "robotics/part8/topic2/chapter7-session-management": [L("robotics/AgentLoopLab", "context")],
+  "robotics/part8/topic2/chapter8-self-correction-loops": [L("robotics/AgentLoopLab", "self-correct")],
+  "robotics/part8/topic2/chapter9-architecture-review": [L("robotics/RagLab", "pipeline")],
+  "robotics/part8/topic2/chapter10-observability": [L("robotics/RagLab", "pipeline")],
+  "robotics/part8/topic2/project-factory-agent-os": [L("robotics/RagLab", "pipeline")],
+  "robotics/part8/topic2/project-industrial-rag-pipeline": [L("robotics/RagLab", "retrieval")],
+};
+
+const cache = new Map();
+function component(lab) {
+  const loader = modules[`./${lab}.jsx`];
+  if (!loader) return null;
+  if (!cache.has(lab)) cache.set(lab, lazy(loader));
+  return cache.get(lab);
+}
+
+/** Labs available for a chapter slug (missing lab files are skipped). */
+export function labsFor(slug) {
+  return (MAP[slug] ?? [])
+    .map((e, k) => ({ key: `${e.lab}-${k}`, Component: component(e.lab), variant: e.variant, props: e.props }))
+    .filter((e) => e.Component);
+}
+
+export function hasLab(slug) {
+  return labsFor(slug).length > 0;
+}
+
+export const LAB_MAP = MAP;
