@@ -372,6 +372,156 @@ if (nums.empty()) return -1;
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Target at the far end.** Trace the Golden Template `binarySearch` on the chapter's array `[1, 3, 5, 7, 9, 11, 13]` with `target = 13`. Fill in the iteration table (`left`, `right`, `mid`, `nums[mid]`, action). How many iterations run?
+
+**Q2. Where do the pointers stop?** Trace `binarySearch` on `[2, 4, 6, 8, 10, 12]` with `target = 9`. It returns `-1`, but what are the final values of `left` and `right`? What does the final `left` mean?
+
+**Q3. Bounds and counts.** For `nums = {5, 7, 7, 8, 8, 8, 10}`, give the index returned (via `distance`) by `lower_bound` and `upper_bound` for the values 8, 6 and 11. How many copies of each value are there according to `upper_bound - lower_bound`?
+
+**Q4. The boundary template.** Trace the chapter's "first occurrence" loop (`while (left < right)`, `right = mid` / `left = mid + 1`), starting from `left = 0`, `right = nums.size() - 1`, on `[1, 2, 2, 2, 3]` with `target = 2`. What does it return? Then: what does the same code return for `target = 4`, and why must the caller still check `nums[left] == target`?
+
+**Q5. Mistake 2 in action.** Someone writes `left = mid;` instead of `left = mid + 1;` in the Golden Template. What happens on `nums = [1, 3]`, `target = 3`? Show the first two iterations.
+
+### Coding Exercises
+
+**E1 (Easy).** *Search Insert Position.* Return the index of `target` if found; otherwise the index where it would be inserted to keep the array sorted. Use the Golden Template (do not call `lower_bound`).
+
+```cpp
+int searchInsert(vector<int>& nums, int target);
+```
+
+- `nums = [1, 3, 5, 6], target = 5` → `2`
+- `nums = [1, 3, 5, 6], target = 2` → `1`;  `target = 7` → `4`
+
+**E2 (Easy–Medium).** *Last occurrence.* Using a `left < right` boundary loop, return the index of the **last** occurrence of `target`, or `-1` if absent. (Careful: the "last" variant needs a mid that rounds **up**, or it loops forever.)
+
+```cpp
+int lastOccurrence(vector<int>& nums, int target);
+```
+
+- `nums = [5, 7, 7, 8, 8, 10], target = 8` → `4`
+- `nums = [5, 7, 7, 8, 8, 10], target = 6` → `-1`
+
+**E3 (Medium).** *Count in range.* Write your own `lowerBound(nums, x)` (first index with `nums[i] >= x`, or `n` if none) and use it to count how many elements lie in the closed range `[lo, hi]`, in $O(\log N)$.
+
+```cpp
+int countInRange(const vector<int>& nums, int lo, int hi);
+```
+
+- `nums = [1, 3, 3, 5, 7, 9], lo = 3, hi = 7` → `4`  (3, 3, 5, 7)
+- `nums = [1, 3, 3, 5, 7, 9], lo = 10, hi = 20` → `0`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **6** after **3** iterations.
+
+| Iteration | left | right | mid | nums[mid] | Action |
+|-----------|------|-------|-----|-----------|--------|
+| 1 | 0 | 6 | 3 | 7 | 7 < 13 → `left = 4` |
+| 2 | 4 | 6 | 5 | 11 | 11 < 13 → `left = 6` |
+| 3 | 6 | 6 | 6 | 13 | equal → **return 6** |
+
+Iteration 3 has `left == right`; with `left < right` it would never run — the chapter's Mistake 3.
+
+**Q2.** Final `left = 4`, `right = 3`. `left` is the **insertion position**: the index of the first element `>= 9` (here `10`), i.e. exactly what `lower_bound` would return.
+
+| Iteration | left | right | mid | nums[mid] | Action |
+|-----------|------|-------|-----|-----------|--------|
+| 1 | 0 | 5 | 2 | 6 | 6 < 9 → `left = 3` |
+| 2 | 3 | 5 | 4 | 10 | 10 > 9 → `right = 3` |
+| 3 | 3 | 3 | 3 | 8 | 8 < 9 → `left = 4` |
+| — | 4 | 3 | — | — | `left > right` → return -1 |
+
+**Q3.** Indices: `5 7 7 8 8 8 10` are at 0..6.
+
+| Value | lower_bound (first >= v) | upper_bound (first > v) | Count |
+|-------|--------------------------|--------------------------|-------|
+| 8 | 3 | 6 | 3 |
+| 6 | 1 | 1 | 0 |
+| 11 | 7 (= end) | 7 (= end) | 0 |
+
+When the value is absent, both bounds point to the same insertion position. Index 7 is `end()` and must never be dereferenced.
+
+**Q4.** Returns **1** for `target = 2`.
+
+| left | right | mid | nums[mid] | nums[mid] >= 2? | Update |
+|------|-------|-----|-----------|-----------------|--------|
+| 0 | 4 | 2 | 2 | yes | `right = 2` |
+| 0 | 2 | 1 | 2 | yes | `right = 1` |
+| 0 | 1 | 0 | 1 | no | `left = 1` |
+| 1 | 1 | — | — | loop ends | return 1 |
+
+For `target = 4`: every `nums[mid] < 4`, so `left` climbs until `left = right = 4` and the code returns **4** — a valid index holding `3`, not `4`. Because `right` started at `n - 1`, the loop can only ever answer "some index in `[0, n-1]`", so the caller must verify `nums[left] == target` (or start with `right = n` to allow the "not present, insert at end" answer).
+
+**Q5.** Infinite loop.
+- Iteration 1: `left = 0, right = 1, mid = 0`, `nums[0] = 1 < 3` → `left = mid = 0` (no progress).
+- Iteration 2: identical state `left = 0, right = 1, mid = 0` → `left = 0` again, forever.
+Because `mid` rounds down, `mid == left` whenever the window has 2 elements, so `left = mid` never shrinks it.
+
+**E1 — reference solution**
+
+```cpp
+int searchInsert(vector<int>& nums, int target) {
+    int left = 0, right = (int)nums.size() - 1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] == target) return mid;
+        if (nums[mid] < target) left = mid + 1;
+        else right = mid - 1;
+    }
+    return left;   // first index whose value is > target (see Q2)
+}
+```
+
+Time $O(\log N)$, space $O(1)$. Works for the empty array too (`right = -1`, returns 0).
+
+**E2 — reference solution**
+
+```cpp
+int lastOccurrence(vector<int>& nums, int target) {
+    if (nums.empty()) return -1;
+    int left = 0, right = (int)nums.size() - 1;
+    while (left < right) {
+        int mid = left + (right - left + 1) / 2;   // round UP
+        if (nums[mid] <= target) left = mid;       // mid could be the answer
+        else right = mid - 1;
+    }
+    return nums[left] == target ? left : -1;
+}
+```
+
+Time $O(\log N)$, space $O(1)$. With `left = mid`, rounding up guarantees `mid > left`, so every iteration shrinks the window. Trace for `target = 8`: `(0,5) mid=3 (8<=8) left=3` → `(3,5) mid=4 (8<=8) left=4` → `(4,5) mid=5 (10>8) right=4` → return 4.
+
+**E3 — reference solution**
+
+```cpp
+int lowerBound(const vector<int>& nums, int x) {
+    int left = 0, right = (int)nums.size();   // right = n: "insert at end" allowed
+    while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] >= x) right = mid;
+        else left = mid + 1;
+    }
+    return left;
+}
+
+int countInRange(const vector<int>& nums, int lo, int hi) {
+    if (lo > hi) return 0;
+    // elements >= lo  minus  elements >= hi + 1   (use long long-safe hi + 1)
+    int start = lowerBound(nums, lo);
+    int end = (hi == INT_MAX) ? (int)nums.size() : lowerBound(nums, hi + 1);
+    return end - start;
+}
+```
+
+Time $O(\log N)$, space $O(1)$. For the first example: `lowerBound(3) = 1`, `lowerBound(8) = 5` → `5 - 1 = 4`. Using `hi + 1` turns "first element > hi" into a `lower_bound` call, so one helper covers both ends.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

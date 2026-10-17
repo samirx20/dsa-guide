@@ -427,6 +427,176 @@ Example: Koko Eating Bananas with `piles` of size 10,000 and answer space up to 
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Koko, new input.** Trace the chapter's `minEatingSpeed` (the `left <= right` version) on `piles = [30, 11, 23, 4, 20]`, `h = 6`. For each iteration give `left`, `right`, `mid`, the hours computed by `canFinish`, and the action. What is returned?
+
+**Q2. Ship packages.** Trace `shipWithinDays` on the chapter's `weights = [1, 2, ..., 10]`, `D = 5`. For each iteration give `mid` and the number of days `canShip` needs. What is returned, and what are the five day-loads at that capacity?
+
+**Q3. Split Array Largest Sum.** Trace `splitArray` on the chapter's `nums = [7, 2, 5, 10, 8]`, `m = 2`. For each iteration give `mid` and the number of subarrays `canSplit` creates. What is returned?
+
+**Q4. Magnetic force (maximize).** Trace `maxDistance` on the chapter's `position = [1, 2, 4, 8, 16]`, `m = 3`. For each iteration give `mid`, the balls `canPlace` places greedily, and the action. What is returned?
+
+**Q5. Why the upper mid?** In Q4's trace there is a moment where `left = 6`, `right = 7`. If `maxDistance` used the ordinary lower mid `left + (right - left) / 2` instead, what would happen from that state?
+
+### Coding Exercises
+
+**E1 (Easy).** *Integer square root.* Return $\lfloor \sqrt{x} \rfloor$ for `0 <= x <= INT_MAX` by searching the answer space (no `sqrt`). Avoid overflow when squaring `mid`.
+
+```cpp
+int mySqrt(int x);
+```
+
+- `x = 8` → `2`;  `x = 16` → `4`
+- `x = 2147395599` → `46339`
+
+**E2 (Easy–Medium).** *Minimum days to make bouquets.* `bloomDay[i]` is the day flower `i` blooms. A bouquet needs `k` **adjacent** bloomed flowers. Return the minimum day on which you can make `m` bouquets, or `-1` if impossible. (Minimize pattern; the feasibility check is a linear scan.)
+
+```cpp
+int minDays(vector<int>& bloomDay, int m, int k);
+```
+
+- `bloomDay = [1, 10, 3, 10, 2], m = 3, k = 1` → `3`;  with `k = 2` → `-1`
+- `bloomDay = [7, 7, 7, 7, 12, 7, 7], m = 2, k = 3` → `12`
+
+**E3 (Medium).** *Cutting ribbons (Woodcutting).* Cut ribbons into pieces of one common integer length `L` (leftovers are discarded). Return the **maximum** `L` that yields at least `k` pieces, or `0` if even `L = 1` is not enough. (Maximize pattern — think about which mid you need.)
+
+```cpp
+int maxLength(vector<int>& ribbons, int k);
+```
+
+- `ribbons = [9, 7, 5], k = 3` → `5`
+- `ribbons = [7, 5, 9], k = 4` → `4`;  `ribbons = [5, 7, 9], k = 22` → `0`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **23**. Answer space `[1, 30]`.
+
+| Iter | left | right | mid | hours = sum of ceil(pile / mid) | <= 6? | Action |
+|------|------|-------|-----|----------------------------------|-------|--------|
+| 1 | 1 | 30 | 15 | 2+1+2+1+2 = 8 | no | `left = 16` |
+| 2 | 16 | 30 | 23 | 2+1+1+1+1 = 6 | yes | `best = 23, right = 22` |
+| 3 | 16 | 22 | 19 | 2+1+2+1+2 = 8 | no | `left = 20` |
+| 4 | 20 | 22 | 21 | 2+1+2+1+1 = 7 | no | `left = 22` |
+| 5 | 22 | 22 | 22 | 2+1+2+1+1 = 7 | no | `left = 23` |
+| — | 23 | 22 | — | — | — | loop ends, return `best = 23` |
+
+With 5 piles and only 6 hours, at most one pile may take 2 hours, and it has to be the 30-pile; every other pile — including 23 — must fit in one hour, so the speed must be at least 23.
+
+**Q2.** Returns **15**. Answer space `[10, 55]`.
+
+| Iter | left | right | mid | days needed | <= 5? | Action |
+|------|------|-------|-----|-------------|-------|--------|
+| 1 | 10 | 55 | 32 | 2 | yes | `right = 32` |
+| 2 | 10 | 32 | 21 | 3 | yes | `right = 21` |
+| 3 | 10 | 21 | 15 | 5 | yes | `right = 15` |
+| 4 | 10 | 15 | 12 | 6 | no | `left = 13` |
+| 5 | 13 | 15 | 14 | 6 | no | `left = 15` |
+| — | 15 | 15 | — | — | — | return 15 |
+
+At capacity 15 the greedy loads are `[1,2,3,4,5] = 15`, `[6,7] = 13`, `[8] = 8`, `[9] = 9`, `[10] = 10` → exactly 5 days. At 14, `[1..4] = 10`, `[5,6] = 11`, `[7]`, `[8]`, `[9]`, `[10]` → 6 days.
+
+**Q3.** Returns **18**. Answer space `[10, 32]`.
+
+| Iter | left | right | mid | greedy subarrays | count <= 2? | Action |
+|------|------|-------|-----|------------------|-------------|--------|
+| 1 | 10 | 32 | 21 | `[7,2,5]` `[10,8]` | 2 yes | `right = 21` |
+| 2 | 10 | 21 | 15 | `[7,2,5]` `[10]` `[8]` | 3 no | `left = 16` |
+| 3 | 16 | 21 | 18 | `[7,2,5]` `[10,8]` | 2 yes | `right = 18` |
+| 4 | 16 | 18 | 17 | `[7,2,5]` `[10]` `[8]` | 3 no | `left = 18` |
+| — | 18 | 18 | — | — | — | return 18 |
+
+**Q4.** Returns **7**. Answer space `[1, 15]`, upper mid.
+
+| Iter | left | right | mid | balls placed (greedy) | count >= 3? | Action |
+|------|------|-------|-----|-----------------------|-------------|--------|
+| 1 | 1 | 15 | 8 | 1, 16 | 2 no | `right = 7` |
+| 2 | 1 | 7 | 4 | 1, 8, 16 | 3 yes | `left = 4` |
+| 3 | 4 | 7 | 6 | 1, 8, 16 | 3 yes | `left = 6` |
+| 4 | 6 | 7 | 7 | 1, 8, 16 | 3 yes | `left = 7` |
+| — | 7 | 7 | — | — | — | return 7 |
+
+Placement 1, 8, 16 has gaps 7 and 8, so the minimum force is 7.
+
+**Q5.** An **infinite loop**. Lower mid gives `mid = 6 + (7 - 6) / 2 = 6`; `canPlace(6)` is true, so `left = mid = 6` — the state `left = 6, right = 7` never changes. Upper mid gives `mid = 7`, which always moves `left` or `right`.
+
+**E1 — reference solution**
+
+```cpp
+int mySqrt(int x) {
+    long long left = 0, right = x, ans = 0;
+    while (left <= right) {
+        long long mid = left + (right - left) / 2;
+        if (mid * mid <= x) {        // feasible: mid is not too big
+            ans = mid;
+            left = mid + 1;          // try a larger root
+        } else {
+            right = mid - 1;
+        }
+    }
+    return (int)ans;
+}
+```
+
+Time $O(\log x)$, space $O(1)$. "Largest `mid` with $mid^2 \le x$" is a maximize problem; tracking `ans` with `left <= right` avoids the upper-mid subtlety. `long long` matters: for `x = INT_MAX` the first `mid` is about $1.07 \times 10^9$ and its square overflows `int`.
+
+**E2 — reference solution**
+
+```cpp
+bool canMake(const vector<int>& bloomDay, int day, int m, int k) {
+    int bouquets = 0, run = 0;
+    for (int d : bloomDay) {
+        if (d <= day) {
+            if (++run == k) { bouquets++; run = 0; }
+        } else {
+            run = 0;                 // adjacency broken
+        }
+    }
+    return bouquets >= m;
+}
+
+int minDays(vector<int>& bloomDay, int m, int k) {
+    if ((long long)m * k > (long long)bloomDay.size()) return -1;
+    int left = *min_element(bloomDay.begin(), bloomDay.end());
+    int right = *max_element(bloomDay.begin(), bloomDay.end());
+    while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (canMake(bloomDay, mid, m, k)) right = mid;
+        else left = mid + 1;
+    }
+    return left;
+}
+```
+
+Time $O(N \log(\max - \min))$, space $O(1)$. Monotonic because waiting longer never un-blooms a flower. Second example: on day 7 the bloomed runs are length 4 and 2 → only 1 bouquet of 3; on day 12 the whole run of 7 gives 2.
+
+**E3 — reference solution**
+
+```cpp
+bool canCut(const vector<int>& ribbons, int len, int k) {
+    long long pieces = 0;
+    for (int r : ribbons) pieces += r / len;
+    return pieces >= k;
+}
+
+int maxLength(vector<int>& ribbons, int k) {
+    int left = 0;                                    // 0 = "impossible"
+    int right = *max_element(ribbons.begin(), ribbons.end());
+    while (left < right) {
+        int mid = left + (right - left + 1) / 2;     // upper mid, mid >= 1
+        if (canCut(ribbons, mid, k)) left = mid;     // feasible -> try longer
+        else right = mid - 1;
+    }
+    return left;
+}
+```
+
+Time $O(N \log(\max))$, space $O(1)$. Starting `left` at 0 encodes "no valid length", and the upper mid keeps `mid >= 1`, so `r / mid` never divides by zero. Example 2: `L = 4` gives `1 + 1 + 2 = 4` pieces; `L = 5` gives `1 + 1 + 1 = 3`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

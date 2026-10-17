@@ -565,6 +565,170 @@ When you see a binary search problem, ask yourself:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. First and last position.** Run `searchRange` on `[5, 7, 7, 8, 8, 10]` with `target = 8`, tracing both calls to `binarySearchEdges`. Then: what does `searchRange` return for `target = 6`?
+
+**Q2. Which peak?** Run `findPeakElement` on `[1, 2, 1, 3, 5, 6, 4]`. Fill in the iteration table. Index 1 (value 2) is also a peak — why doesn't the code return it?
+
+**Q3. Koko, `left < right` version.** Trace Problem 5's `minEatingSpeed` on `piles = [3, 6, 7, 11]` with the tighter limit `h = 5`. Give `left`, `right`, `mid` and hours for each iteration, and the return value.
+
+**Q4. Aggressive Cows.** Run Problem 8's `maxDistance` on `position = [1, 2, 8, 4, 9]`, `m = 3`. After sorting, trace every iteration (upper mid!) and list the positions `canPlace` picks. What is returned?
+
+**Q5. Name the pattern.** Using the Step-by-Step Problem Selection Guide, say which template (classic, boundary / first-true, rotated, answer-space minimize, answer-space maximize, peak) fits each statement, and give the search range:
+- (a) Versions `1..n`; `isBad(v)` is false up to some version and true from then on. Find the first bad version.
+- (b) Place `k` routers in houses at given coordinates to maximize the smallest distance between two routers.
+- (c) Find the smallest positive divisor `d` such that $\sum_i \lceil nums_i / d \rceil \le threshold$.
+- (d) `arr` strictly increases then strictly decreases. Return the index of its maximum.
+
+### Coding Exercises
+
+**E1 (Easy).** *First Bad Version.* `isBad` is monotonic (false...false, true...true) and at least one version is bad. Minimize calls to `isBad`; beware overflow for `n` near `INT_MAX`.
+
+```cpp
+int firstBadVersion(int n, function<bool(int)> isBad);
+```
+
+- `n = 5`, first bad is 4 → `4`
+- `n = 1`, first bad is 1 → `1`
+
+**E2 (Easy–Medium).** *Smallest Divisor Given a Threshold.* Return the smallest positive integer `d` such that $\sum_i \lceil nums_i / d \rceil \le threshold$. Guaranteed `threshold >= nums.size()`.
+
+```cpp
+int smallestDivisor(vector<int>& nums, int threshold);
+```
+
+- `nums = [1, 2, 5, 9], threshold = 6` → `5`
+- `nums = [44, 22, 33, 11, 1], threshold = 5` → `44`
+
+**E3 (Medium).** *Kth Smallest Element in a Sorted Matrix.* Every row and every column of the `n x n` matrix is sorted ascending. Binary-search on the **value** range `[matrix[0][0], matrix[n-1][n-1]]`; the feasibility check "how many elements are `<= mid`?" can be done in $O(n)$ with the staircase walk.
+
+```cpp
+int kthSmallest(vector<vector<int>>& matrix, int k);
+```
+
+- `matrix = [[1,5,9],[10,11,13],[12,13,15]], k = 8` → `13`
+- `matrix = [[-5]], k = 1` → `-5`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **`[3, 4]`** for 8 and **`[-1, -1]`** for 6.
+
+| Search | left | right | mid | nums[mid] | Action |
+|--------|------|-------|-----|-----------|--------|
+| first (8) | 0 | 5 | 2 | 7 | 7 < 8 → `left = 3` |
+| first (8) | 3 | 5 | 4 | 8 | `bound = 4`, `right = 3` |
+| first (8) | 3 | 3 | 3 | 8 | `bound = 3`, `right = 2` → return 3 |
+| last (8) | 0 | 5 | 2 | 7 | `left = 3` |
+| last (8) | 3 | 5 | 4 | 8 | `bound = 4`, `left = 5` |
+| last (8) | 5 | 5 | 5 | 10 | 10 > 8 → `right = 4` → return 4 |
+
+For 6, the first search visits `mid = 2` (7 > 6 → `right = 1`), `mid = 0` (5 < 6 → `left = 1`), `mid = 1` (7 > 6 → `right = 0`) and never records a `bound`, so it returns -1; the last search likewise returns -1.
+
+**Q2.** Returns **5** (value 6).
+
+| Iter | left | right | mid | nums[mid] vs nums[mid+1] | Action |
+|------|------|-------|-----|--------------------------|--------|
+| 1 | 0 | 6 | 3 | 3 < 5 (up) | `left = 4` |
+| 2 | 4 | 6 | 5 | 6 > 4 (down) | `right = 5` |
+| 3 | 4 | 5 | 4 | 5 < 6 (up) | `left = 5` |
+| — | 5 | 5 | — | — | return 5 |
+
+The very first comparison sees an upward slope at index 3 and throws away `[0..3]`, including the peak at index 1. The algorithm only promises *a* peak, not a specific one.
+
+**Q3.** Returns **7**.
+
+| Iter | left | right | mid | hours | <= 5? | Action |
+|------|------|-------|-----|-------|-------|--------|
+| 1 | 1 | 11 | 6 | 1+1+2+2 = 6 | no | `left = 7` |
+| 2 | 7 | 11 | 9 | 1+1+1+2 = 5 | yes | `right = 9` |
+| 3 | 7 | 9 | 8 | 1+1+1+2 = 5 | yes | `right = 8` |
+| 4 | 7 | 8 | 7 | 1+1+1+2 = 5 | yes | `right = 7` |
+| — | 7 | 7 | — | — | — | return 7 |
+
+**Q4.** Sorted: `[1, 2, 4, 8, 9]`, range `[1, 8]`. Returns **3**.
+
+| Iter | left | right | mid (upper) | cows placed | count >= 3? | Action |
+|------|------|-------|-------------|-------------|-------------|--------|
+| 1 | 1 | 8 | 5 | 1, 8 | 2 no | `right = 4` |
+| 2 | 1 | 4 | 3 | 1, 4, 8 | 3 yes | `left = 3` |
+| 3 | 3 | 4 | 4 | 1, 8 | 2 no | `right = 3` |
+| — | 3 | 3 | — | — | — | return 3 |
+
+**Q5.**
+- (a) Boundary / first-true on `[1, n]`: `while (left < right)`, `right = mid` when bad, else `left = mid + 1`.
+- (b) Answer-space **maximize** on `[1, maxPos - minPos]` (after sorting): `left = mid` when feasible, upper mid. Same as Aggressive Cows.
+- (c) Answer-space **minimize** on `[1, max(nums)]`: a larger divisor never increases the sum, so feasibility is monotonic. Same shape as Koko.
+- (d) Peak: compare `arr[mid]` with `arr[mid + 1]` on `[0, n - 1]`.
+
+**E1 — reference solution**
+
+```cpp
+int firstBadVersion(int n, function<bool(int)> isBad) {
+    int left = 1, right = n;
+    while (left < right) {
+        int mid = left + (right - left) / 2;   // (left + right) could overflow
+        if (isBad(mid)) right = mid;            // mid might be the first bad one
+        else left = mid + 1;
+    }
+    return left;
+}
+```
+
+Time $O(\log n)$ calls, space $O(1)$. Example 1: `mid = 3` good → `left = 4`; `mid = 4` bad → `right = 4`; return 4.
+
+**E2 — reference solution**
+
+```cpp
+int smallestDivisor(vector<int>& nums, int threshold) {
+    int left = 1, right = *max_element(nums.begin(), nums.end());
+    while (left < right) {
+        int mid = left + (right - left) / 2;
+        long long sum = 0;
+        for (int x : nums) sum += (x + mid - 1) / mid;   // ceiling division
+        if (sum <= threshold) right = mid;
+        else left = mid + 1;
+    }
+    return left;
+}
+```
+
+Time $O(N \log(\max))$, space $O(1)$. Example 1: `d = 5` gives `1+1+1+2 = 5 <= 6`, while `d = 4` gives `1+1+2+3 = 7 > 6`. Example 2: `threshold = 5 = nums.size()`, so every term must be 1, forcing `d >= 44`.
+
+**E3 — reference solution**
+
+```cpp
+int countLessEqual(const vector<vector<int>>& m, int val) {
+    int n = m.size(), row = n - 1, col = 0, cnt = 0;
+    while (row >= 0 && col < n) {          // staircase from bottom-left
+        if (m[row][col] <= val) {
+            cnt += row + 1;                // whole column segment [0..row] is <= val
+            col++;
+        } else {
+            row--;
+        }
+    }
+    return cnt;
+}
+
+int kthSmallest(vector<vector<int>>& matrix, int k) {
+    int n = matrix.size();
+    int left = matrix[0][0], right = matrix[n - 1][n - 1];
+    while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (countLessEqual(matrix, mid) >= k) right = mid;   // mid is big enough
+        else left = mid + 1;
+    }
+    return left;
+}
+```
+
+Time $O(n \log(\max - \min))$, space $O(1)$. The first value `v` with `count(<= v) >= k` is always an actual matrix element. Example 1: `count(<= 12) = 6 < 8` but `count(<= 13) = 8`, so the answer is 13. (`left + (right - left) / 2` still works with negative values because C++ division truncates toward zero and `right - left >= 0`.)
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

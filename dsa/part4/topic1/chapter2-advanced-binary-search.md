@@ -388,6 +388,169 @@ Start: row=0, col=3 → matrix[0][3]=7 < 16 → go DOWN
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Both branches of the rotated search.** Trace `searchRotated` on `[6, 7, 1, 2, 3, 4, 5]` with `target = 3`. For each iteration record `left`, `right`, `mid`, `nums[mid]`, which half is sorted, and the action.
+
+**Q2. `findMin` on two inputs.** Trace `findMin` on `[3, 4, 5, 1, 2]` and on the un-rotated `[1, 2, 3, 4, 5]`. How many loop iterations does each take, and what does each return?
+
+**Q3. A miss in the flattened matrix.** Run `searchMatrix` on the chapter's 3×4 matrix with `target = 13`. For each iteration give `mid`, the `(row, col)` it maps to, and the value. What is returned?
+
+**Q4. Staircase path.** The matrix below has sorted rows and sorted columns, but row 1 starts with `2 < 11`, so it cannot be flattened. List every cell `searchMatrixStaircase` visits for `target = 9` and for `target = 15`, and what each search returns.
+
+```cpp
+vector<vector<int>> m = {
+    { 1,  4,  7, 11},
+    { 2,  5,  8, 12},
+    { 3,  6,  9, 16},
+    {10, 13, 14, 17}
+};
+```
+
+**Q5. Why `<=`?** In `searchRotated`, suppose the check were written `if (nums[left] < nums[mid])` (strict). Trace both versions on `nums = [3, 1]`, `target = 1`. What does each return?
+
+### Coding Exercises
+
+**E1 (Easy).** *Rotation count.* A sorted array of **distinct** values was rotated right `k` times. Return `k` (which is the index of the minimum) in $O(\log N)$, reusing `findMin`'s logic.
+
+```cpp
+int rotationCount(vector<int>& nums);
+```
+
+- `[4, 5, 6, 7, 0, 1, 2]` → `4`
+- `[1, 2, 3]` → `0`
+
+**E2 (Easy–Medium).** *Two-pass rotated search.* Find the pivot (index of the minimum) first, then run a plain Golden-Template binary search on whichever sorted piece — `[0, pivot-1]` or `[pivot, n-1]` — can contain the target. Distinct values.
+
+```cpp
+int searchRotatedTwoPass(vector<int>& nums, int target);
+```
+
+- `nums = [4, 5, 6, 7, 0, 1, 2], target = 0` → `4`
+- `nums = [4, 5, 6, 7, 0, 1, 2], target = 3` → `-1`
+
+**E3 (Medium).** *Rotated array with duplicates.* Values may repeat, so `nums[left] == nums[mid] == nums[right]` can make it impossible to tell which half is sorted. Return whether `target` exists. (Worst case is allowed to degrade to $O(N)$.)
+
+```cpp
+bool searchRotatedDup(vector<int>& nums, int target);
+```
+
+- `nums = [2, 5, 6, 0, 0, 1, 2], target = 0` → `true`;  `target = 3` → `false`
+- `nums = [1, 0, 1, 1, 1], target = 0` → `true`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **4** after 3 iterations.
+
+| Iter | left | right | mid | nums[mid] | Sorted half | Target in it? | Action |
+|------|------|-------|-----|-----------|-------------|---------------|--------|
+| 1 | 0 | 6 | 3 | 2 | right (6 > 2) | 3 > 2 and 3 <= 5 → yes | `left = 4` |
+| 2 | 4 | 6 | 5 | 4 | left (3 <= 4) | 3 >= 3 and 3 < 4 → yes | `right = 4` |
+| 3 | 4 | 4 | 4 | 3 | — | — | **return 4** |
+
+**Q2.**
+- `[3, 4, 5, 1, 2]`: 2 iterations, returns **1**.
+
+| left | right | mid | nums[mid] | nums[right] | Action |
+|------|-------|-----|-----------|-------------|--------|
+| 0 | 4 | 2 | 5 | 2 | 5 > 2 → `left = 3` |
+| 3 | 4 | 3 | 1 | 2 | 1 <= 2 → `right = 3` |
+| 3 | 3 | — | — | — | return `nums[3] = 1` |
+
+- `[1, 2, 3, 4, 5]`: 3 iterations, returns **1**. Every comparison is `nums[mid] <= nums[right]`, so `right` shrinks `4 → 2 → 1 → 0` (mids 2, 1, 0) and `left` never moves. No special case is needed for an un-rotated array.
+
+**Q3.** Returns **false**.
+
+| Iter | left | right | mid | (row, col) | value | Action |
+|------|------|-------|-----|------------|-------|--------|
+| 1 | 0 | 11 | 5 | (1, 1) | 11 | 11 < 13 → `left = 6` |
+| 2 | 6 | 11 | 8 | (2, 0) | 23 | 23 > 13 → `right = 7` |
+| 3 | 6 | 7 | 6 | (1, 2) | 16 | 16 > 13 → `right = 5` |
+| — | 6 | 5 | — | — | — | `left > right` → false |
+
+**Q4.**
+- `target = 9`: (0,3)=11 → left; (0,2)=7 → down; (1,2)=8 → down; (2,2)=9 → **true**. 4 cells.
+- `target = 15`: (0,3)=11 → down; (1,3)=12 → down; (2,3)=16 → left; (2,2)=9 → down; (3,2)=14 → down; `row = 4` leaves the matrix → **false**. 5 cells.
+
+Each step discards a whole row (moving down) or a whole column (moving left), so at most $M + N - 1$ cells are visited.
+
+**Q5.** With `<=`: returns **1**. With `<`: returns **-1** (bug).
+- Both: `left = 0, right = 1, mid = 0`, `nums[0] = 3 != 1`.
+- `<=` version: `3 <= 3` → left half `[3]` is "sorted"; is `1` in `[3, 3)`? no → `left = 1`. Next iteration `mid = 1`, `nums[1] = 1` → return 1.
+- `<` version: `3 < 3` is false → assumes the right half `[mid..right] = [3, 1]` is sorted (it is not); is `1 > 3`? no → `right = -1`, loop ends, returns -1.
+When `left == mid` (a 1-element left half), that half is trivially sorted; `<=` is what recognises it.
+
+**E1 — reference solution**
+
+```cpp
+int rotationCount(vector<int>& nums) {
+    int left = 0, right = (int)nums.size() - 1;
+    while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] > nums[right]) left = mid + 1;
+        else right = mid;
+    }
+    return left;   // index of the minimum = number of rotations
+}
+```
+
+Time $O(\log N)$, space $O(1)$. Same loop as `findMin`, but return the index instead of the value.
+
+**E2 — reference solution**
+
+```cpp
+int binarySearchRange(vector<int>& nums, int left, int right, int target) {
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] == target) return mid;
+        if (nums[mid] < target) left = mid + 1;
+        else right = mid - 1;
+    }
+    return -1;
+}
+
+int searchRotatedTwoPass(vector<int>& nums, int target) {
+    if (nums.empty()) return -1;
+    int n = nums.size();
+    int pivot = rotationCount(nums);             // E1
+    // [pivot, n-1] holds the smallest values; [0, pivot-1] the largest
+    if (target >= nums[pivot] && target <= nums[n - 1])
+        return binarySearchRange(nums, pivot, n - 1, target);
+    return binarySearchRange(nums, 0, pivot - 1, target);
+}
+```
+
+Time $O(\log N)$ (two binary searches), space $O(1)$. Example 1: pivot = 4, `0` lies in `[nums[4], nums[6]] = [0, 2]` → search `[4, 6]` → index 4. Example 2: `3` is not in `[0, 2]` → search `[0, 3]` = `[4, 5, 6, 7]` → -1. When the array is not rotated, `pivot = 0` and the second range is empty.
+
+**E3 — reference solution**
+
+```cpp
+bool searchRotatedDup(vector<int>& nums, int target) {
+    int left = 0, right = (int)nums.size() - 1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (nums[mid] == target) return true;
+
+        if (nums[left] == nums[mid] && nums[mid] == nums[right]) {
+            left++; right--;                     // can't tell which side is sorted
+        } else if (nums[left] <= nums[mid]) {    // left half sorted
+            if (target >= nums[left] && target < nums[mid]) right = mid - 1;
+            else left = mid + 1;
+        } else {                                 // right half sorted
+            if (target > nums[mid] && target <= nums[right]) left = mid + 1;
+            else right = mid - 1;
+        }
+    }
+    return false;
+}
+```
+
+Average $O(\log N)$, worst $O(N)$ (e.g. `[1, 1, 1, 1, 0, 1, 1]`), space $O(1)$. Trace `[1, 0, 1, 1, 1]`, target 0: `mid = 2`, ends and middle are all 1 → shrink to `left = 1, right = 3`; `mid = 2`, `nums[1] = 0 <= 1` → left half `[0, 1]` sorted, `0 >= 0 && 0 < 1` → `right = 1`; `mid = 1` → found. Dropping `nums[left]` and `nums[right]` is safe because both equal `nums[mid]`, which is already known not to be the target.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
