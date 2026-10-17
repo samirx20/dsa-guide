@@ -588,6 +588,145 @@ Need to avoid recomputation?    → Memoization
 
 ---
 
+## Practice & Self-Check
+
+Each question reuses one of the pattern implementations above on a new input. Keep a column for the map's contents before and after each step.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Complement pattern: check before you store.** Run `twoSum` (Section 1) on `nums = [3, 2, 4]`, `target = 6`. Give the dry-run table and the returned indices. Then: what would be returned if the two statements in the loop body were swapped (store `seen[nums[i]] = i` **before** checking the complement)?
+
+**Q2. Prefix Sum + Hash Map with a zero-sum stretch.** Run `subarraySum` (Section 5) on `nums = [1, -1, 1, 1]`, `k = 1`. Fill in the dry-run table (`currentSum`, `currentSum - k`, matches, `count`, map after). What is the final count? List the subarrays it counted.
+
+**Q3. Frequency intersection and a hidden insert.** Run `intersection` (Section 2) with `nums1 = [4, 9, 5]`, `nums2 = [9, 4, 9, 8, 4]`. What is `result`? How many keys does `counts` hold when the function returns, and why is that number not 3?
+
+**Q4. Group Shifted Strings keys.** Using `groupStrings` (Section 3), compute the key for `"az"` and for `"ba"`. Are they grouped together?
+
+**Q5. Early exit in `isAnagram`.** For `isAnagram("rat", "car")` (Section 4), at which character of `t` does the function return, and with what value?
+
+### Coding Exercises
+
+**E1 (Easy). Contains Nearby Duplicate.** Return `true` if there are indices `i != j` with `nums[i] == nums[j]` and `|i - j| <= k`.
+
+```cpp
+bool containsNearbyDuplicate(const vector<int>& nums, int k);
+// [1, 2, 3, 1], k = 3       -> true   (indices 0 and 3)
+// [1, 2, 3, 1, 2, 3], k = 2 -> false  (every repeat is 3 apart)
+```
+
+**E2 (Easy–Medium). Count All Pairs with a Given Sum.** Count index pairs `i < j` with `nums[i] + nums[j] == target`. Duplicates count as different pairs. Aim for $O(N)$.
+
+```cpp
+long long countPairs(const vector<int>& nums, int target);
+// [1, 5, 7, -1, 5], target = 6 -> 3   ((1,5), (1,5), (7,-1))
+// [3, 3, 3], target = 6        -> 3
+```
+
+**E3 (Medium). Longest Subarray with Sum K.** Return the **length** of the longest contiguous subarray summing to `k` (values may be negative), or `0` if none exists.
+
+```cpp
+int maxLenSubarraySum(const vector<int>& nums, int k);
+// [1, -1, 5, -2, 3], k = 3 -> 4   ([1, -1, 5, -2])
+// [-2, -1, 2, 1],    k = 1 -> 2   ([-1, 2])
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns `{1, 2}` (2 + 4 = 6).
+
+| i | nums[i] | complement | seen (before) | Found? | seen (after) |
+|---|---------|------------|---------------|--------|--------------|
+| 0 | 3 | 3 | {} | No | {3:0} |
+| 1 | 2 | 4 | {3:0} | No | {3:0, 2:1} |
+| 2 | 4 | 2 | {3:0, 2:1} | Yes → return {1, 2} | - |
+
+With the statements swapped, at i = 0 the map becomes `{3:0}` and then the complement 3 is found immediately, returning **`{0, 0}`** — the same element used twice. Checking first guarantees the partner comes from an **earlier** index.
+
+**Q2.** Final count **5**.
+
+| i | num | currentSum | currentSum - k | prefixSums[...] | count | prefixSums (after) |
+|---|-----|------------|----------------|-----------------|-------|--------------------|
+| 0 | 1 | 1 | 0 | 1 | 1 | {0:1, 1:1} |
+| 1 | -1 | 0 | -1 | 0 | 1 | {0:2, 1:1} |
+| 2 | 1 | 1 | 0 | 2 | 3 | {0:2, 1:2} |
+| 3 | 1 | 2 | 1 | 2 | 5 | {0:2, 1:2, 2:1} |
+
+The five subarrays (by index range): `[0..0]`, `[2..2]`, `[0..2]` = `[1, -1, 1]`, `[3..3]`, `[1..3]` = `[-1, 1, 1]`. Prefix sum 0 occurring **twice** is what lets one step add 2 at once; that is why the map stores frequencies, not booleans.
+
+**Q3.** `result = [9, 4]`; `counts` ends with **4** keys: `{4:0, 9:0, 5:1, 8:0}`.
+
+| nums2[i] | counts[num] before | Push? | counts after |
+|----------|-------------------|-------|--------------|
+| 9 | 1 | yes | 9 → 0 |
+| 4 | 1 | yes | 4 → 0 |
+| 9 | 0 | no | unchanged |
+| 8 | (missing) → `[]` inserts 0 | no | 8 → 0 **inserted** |
+| 4 | 0 | no | unchanged |
+
+`counts[num] > 0` uses `operator[]`, which inserts missing keys (Mistake 1 in Section 9). The answer is still right, but the map grows; `counts.find(num)` avoids it.
+
+**Q4.** Both keys are `"a,z,"`, so they **are** grouped together.
+- `"az"`: shift = 0; `'a'` → `'a'`, `'z'` → `'z'` → key `"a,z,"`.
+- `"ba"`: shift = 1; `'b'` → $(1 - 1 + 26) \bmod 26 = 0$ → `'a'`; `'a'` → $(0 - 1 + 26) \bmod 26 = 25$ → `'z'` → key `"a,z,"`.
+
+The `+ 26` is what makes the wrap-around from `'a'` back to `'z'` work.
+
+**Q5.** Lengths match (3 = 3), so counting runs: `counts = {r:1, a:1, t:1}`. The first char of `t` is `'c'`: `counts['c']` becomes $-1 < 0$, so it returns **false at `'c'` (index 0 of `t`)** without looking at `'a'` or `'r'`.
+
+**E1 — reference solution.** Complement-style lookback, but the map stores the **latest** index of each value.
+
+```cpp
+bool containsNearbyDuplicate(const vector<int>& nums, int k) {
+    unordered_map<int, int> lastIndex;            // value -> most recent index
+    for (int i = 0; i < (int)nums.size(); i++) {
+        auto it = lastIndex.find(nums[i]);
+        if (it != lastIndex.end() && i - it->second <= k) return true;
+        lastIndex[nums[i]] = i;                   // overwrite: nearer is better
+    }
+    return false;
+}
+```
+Time $O(N)$, space $O(N)$. Overwriting is safe because a later duplicate can only be closer to the most recent occurrence.
+
+**E2 — reference solution.** Like `twoSumAll`, but store only a **count** per value, since we need the number of pairs rather than the pairs themselves.
+
+```cpp
+long long countPairs(const vector<int>& nums, int target) {
+    unordered_map<int, int> freq;                 // value -> times seen so far
+    long long pairs = 0;
+    for (int x : nums) {
+        auto it = freq.find(target - x);
+        if (it != freq.end()) pairs += it->second;   // pair x with every earlier match
+        freq[x]++;
+    }
+    return pairs;
+}
+// [1, 5, 7, -1, 5]: 1(+0) 5(+1) 7(+0) -1(+1) 5(+1) -> 3
+```
+Time $O(N)$, space $O(N)$. Using `long long` matters: $N$ equal values give $\frac{N(N-1)}{2}$ pairs.
+
+**E3 — reference solution.** Same identity as `subarraySum` (`prefix[j] - prefix[i] = k`), but to **maximize** `j - i` we keep only the **first** index where each prefix sum appears.
+
+```cpp
+int maxLenSubarraySum(const vector<int>& nums, int k) {
+    unordered_map<long long, int> firstIndex;
+    firstIndex[0] = -1;                          // empty prefix ends "before" index 0
+    long long sum = 0;
+    int best = 0;
+    for (int i = 0; i < (int)nums.size(); i++) {
+        sum += nums[i];
+        auto it = firstIndex.find(sum - k);
+        if (it != firstIndex.end()) best = max(best, i - it->second);
+        if (!firstIndex.count(sum)) firstIndex[sum] = i;   // never overwrite
+    }
+    return best;
+}
+// [1, -1, 5, -2, 3], k=3: sums 1,0,5,3,6. At i=3 sum=3, 3-3=0 first at -1 -> length 4.
+```
+Time $O(N)$, space $O(N)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

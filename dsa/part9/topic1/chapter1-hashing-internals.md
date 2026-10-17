@@ -457,6 +457,214 @@ ages["Alice"];             // Returns 25 (or inserts 0 if missing!)
 
 ---
 
+## Practice & Self-Check
+
+For every question, assume the "hash" of an integer key is the key itself (as `hash<int>` is on most systems, Section 2), so the bucket index is simply `key % numBuckets`.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Separate chaining.** A chained table with **5** buckets inserts `12, 7, 22, 3, 17` (in that order, new nodes appended to the end of the chain, as in Section 7).
+(a) Draw every bucket's chain.
+(b) How many key comparisons does `LOOKUP 17` make? How many does `LOOKUP 2` (absent) make before giving up?
+
+**Q2. Linear probing with wrap-around.** A linear-probing table of size **7** inserts `10, 3, 17, 24, 5`.
+(a) Which slot does each key end up in?
+(b) Using the lookup loop from Section 4, how many slots are examined when looking up the absent key `31`?
+
+**Q3. Rehashing the Section 7 table.** The Section 7 dry run put `"cat"` (hash 5), `"dog"` (hash 9), and `"fox"` (hash 7) in a 4-bucket table, where cat and dog collided in bucket 1. If the table is resized to **8** buckets, which bucket does each key land in? Is there still a collision?
+
+**Q4. When does it resize?** A chained map starts with 4 buckets, doubles when **after an insert** the load factor $\alpha = \frac{\text{elements}}{\text{buckets}}$ is **strictly greater** than $0.75$, and inserts 13 distinct keys. After which inserts does a resize happen, how many buckets are there at the end, and how many elements are moved in total across all resizes?
+
+**Q5. Pitfall 2.** What does this print?
+
+```cpp
+unordered_map<string, int> m;
+m["a"] = 1;
+if (m["b"] == 0) cout << "zero ";
+cout << m.size() << endl;
+```
+
+### Coding Exercises
+
+**E1 (Easy). A tiny chained hash set.** Implement separate chaining for `int` keys with a fixed number of buckets. Negative keys must work.
+
+```cpp
+class ChainedHashSet {
+public:
+    explicit ChainedHashSet(int numBuckets);
+    void add(int key);          // no duplicates
+    bool contains(int key) const;
+    void remove(int key);
+};
+// ChainedHashSet s(5); add 12, 7, 22, 3, 17
+// contains(17) -> true, contains(2) -> false
+// remove(7); contains(7) -> false; add(-3); contains(-3) -> true
+```
+
+**E2 (Easy–Medium). A linear-probing map.** Fixed capacity, `int -> int`, no deletion. `get` returns `-1` if the key is missing.
+
+```cpp
+class LinearProbingMap {
+public:
+    explicit LinearProbingMap(int capacity);
+    void put(int key, int val);   // insert or update
+    int get(int key) const;
+};
+// capacity 7; put(10,100), put(3,101), put(17,102), put(24,103), put(5,104)
+// get(5) -> 104 (stored in slot 0 after wrapping), get(31) -> -1
+```
+
+**E3 (Medium). A self-resizing hash map.** Chained `int -> int` map that starts with 4 buckets and doubles + rehashes when, after inserting a **new** key, $\alpha > 0.75$.
+
+```cpp
+class ResizingHashMap {
+public:
+    void put(int key, int value);   // insert or update
+    int get(int key) const;         // -1 if missing
+    int bucketCount() const;
+};
+// put keys 1..13 (value = key * 10): bucketCount() goes 4,4,4,8,8,8,16,...,16,32
+// get(7) -> 70, get(99) -> -1
+```
+
+#### Dry-Run: Answers
+
+**Q1.** All of 12, 7, 22, 17 map to bucket 2 ($12 \bmod 5 = 7 \bmod 5 = 22 \bmod 5 = 17 \bmod 5 = 2$); 3 maps to bucket 3.
+
+| Bucket | Chain |
+|--------|-------|
+| 0 | (empty) |
+| 1 | (empty) |
+| 2 | 12 → 7 → 22 → 17 |
+| 3 | 3 |
+| 4 | (empty) |
+
+`LOOKUP 17`: 4 comparisons (12, 7, 22, 17 ✓). `LOOKUP 2`: $2 \bmod 5 = 2$, so it walks the whole chain — 4 comparisons, then reports "not found". This is the $O(N)$ worst case in miniature: 4 of 5 keys in one chain.
+
+**Q2.** (a) Every key except 5 has home slot $k \bmod 7 = 3$:
+
+| Key | Home | Slots probed | Final slot |
+|-----|------|--------------|-----------|
+| 10 | 3 | 3 | 3 |
+| 3 | 3 | 3, 4 | 4 |
+| 17 | 3 | 3, 4, 5 | 5 |
+| 24 | 3 | 3, 4, 5, 6 | 6 |
+| 5 | 5 | 5, 6, 0 (wraps) | 0 |
+
+Final table: `[5, _, _, 10, 3, 17, 24]`.
+(b) $31 \bmod 7 = 3$; it examines slots 3, 4, 5, 6, 0 (all occupied, none equal 31), then slot 1, which is empty → **6 slots examined**. Key 5 was never hashed to 3, yet it extends the cluster: this is the Cluster Problem.
+
+**Q3.** cat → $5 \bmod 8 = 5$, dog → $9 \bmod 8 = 1$, fox → $7 \bmod 8 = 7$. **No collision**: cat and dog differed by exactly 4, so they shared a bucket modulo 4 but separate modulo 8. This is why indices change after a resize (`hash % 8 ≠ hash % 4`) and every key must be rehashed.
+
+**Q4.** Resizes after inserts **#4, #7, and #13**; final size **32 buckets**; **24** elements moved.
+
+| Insert # | Buckets before | $\alpha$ after insert | Resize? | Elements moved |
+|----------|---------------|-----------------------|---------|----------------|
+| 3 | 4 | 3/4 = 0.75 | no (not > 0.75) | - |
+| 4 | 4 | 4/4 = 1.0 | yes → 8 | 4 |
+| 6 | 8 | 6/8 = 0.75 | no | - |
+| 7 | 8 | 7/8 = 0.875 | yes → 16 | 7 |
+| 12 | 16 | 12/16 = 0.75 | no | - |
+| 13 | 16 | 13/16 = 0.8125 | yes → 32 | 13 |
+
+Total moves $4 + 7 + 13 = 24 < 2 \times 13$, which is the amortized $O(1)$ argument from Section 5.
+
+**Q5.** Prints `zero 2`. `m["b"]` does not just read: it **inserts** `"b"` with a value-initialized `0`, the comparison is true, and the map now has 2 keys. Using `m.count("b")` or `m.find("b")` would leave the size at 1.
+
+**E1 — reference solution.**
+
+```cpp
+class ChainedHashSet {
+    vector<list<int>> buckets;
+    int index(int key) const {
+        int b = buckets.size();
+        return ((key % b) + b) % b;          // safe for negative keys
+    }
+public:
+    explicit ChainedHashSet(int numBuckets) : buckets(numBuckets) {}
+    void add(int key) {
+        list<int>& chain = buckets[index(key)];
+        for (int k : chain) if (k == key) return;   // no duplicates
+        chain.push_back(key);
+    }
+    bool contains(int key) const {
+        for (int k : buckets[index(key)]) if (k == key) return true;
+        return false;
+    }
+    void remove(int key) { buckets[index(key)].remove(key); }
+};
+```
+Each operation costs $O(1 + \text{chain length})$, i.e. $O(1 + \alpha)$ average. In C++, `-3 % 5 == -3`, so the `((key % b) + b) % b` fix is needed to get bucket 2.
+
+**E2 — reference solution.**
+
+```cpp
+class LinearProbingMap {
+    vector<int> keys, vals;
+    vector<bool> used;
+    int cap;
+public:
+    explicit LinearProbingMap(int capacity)
+        : keys(capacity), vals(capacity), used(capacity, false), cap(capacity) {}
+    void put(int key, int val) {
+        int i = ((key % cap) + cap) % cap;
+        for (int step = 0; step < cap; step++) {
+            if (!used[i] || keys[i] == key) {      // empty slot or update
+                used[i] = true; keys[i] = key; vals[i] = val;
+                return;
+            }
+            i = (i + 1) % cap;                     // probe next slot
+        }
+        throw runtime_error("table full");
+    }
+    int get(int key) const {
+        int i = ((key % cap) + cap) % cap;
+        for (int step = 0; step < cap && used[i]; step++) {
+            if (keys[i] == key) return vals[i];
+            i = (i + 1) % cap;
+        }
+        return -1;                                 // hit an empty slot
+    }
+};
+```
+$O(1)$ average when $\alpha$ is low; $O(\text{cap})$ worst case. The `step < cap` bound prevents an infinite loop on a full table. (Deletion is omitted on purpose: removing a key would break probe chains unless you use "tombstone" markers, which is why the comparison table lists delete as "Complex".)
+
+**E3 — reference solution.**
+
+```cpp
+class ResizingHashMap {
+    vector<list<pair<int, int>>> buckets;
+    int count = 0;
+    int index(int key, int b) const { return ((key % b) + b) % b; }
+    void rehash() {
+        vector<list<pair<int, int>>> bigger(buckets.size() * 2);
+        for (auto& chain : buckets)
+            for (auto& kv : chain)
+                bigger[index(kv.first, bigger.size())].push_back(kv);  // NEW index
+        buckets.swap(bigger);
+    }
+public:
+    ResizingHashMap() : buckets(4) {}
+    void put(int key, int value) {
+        auto& chain = buckets[index(key, buckets.size())];
+        for (auto& kv : chain)
+            if (kv.first == key) { kv.second = value; return; }  // update, no growth
+        chain.push_back({key, value});
+        count++;
+        if ((double)count / buckets.size() > 0.75) rehash();
+    }
+    int get(int key) const {
+        for (auto& kv : buckets[index(key, buckets.size())])
+            if (kv.first == key) return kv.second;
+        return -1;
+    }
+    int bucketCount() const { return buckets.size(); }
+};
+```
+`put` is $O(1)$ amortized: a rehash costs $O(N)$ but doubling means it happens only $O(\log N)$ times, with total work under $2N$ (see Q4). Updates to existing keys never trigger a resize.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

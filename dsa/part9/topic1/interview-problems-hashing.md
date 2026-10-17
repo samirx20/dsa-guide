@@ -476,6 +476,148 @@ int lengthOfLongestSubstring(string s) {
 
 ---
 
+## Practice & Self-Check
+
+These questions trace the solutions above on new inputs. Write out the map/set state at each step before checking the answers.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Why `lastSeen[c] >= left`?** Run Problem 8's `lengthOfLongestSubstring` on `s = "abba"`. Give `left`, `lastSeen`, and `maxLen` after each `right`. Then: what would it return if the condition were only `lastSeen.count(c)` (without `&& lastSeen[c] >= left`)?
+
+**Q2. Longest Consecutive: counting the work.** Run Problem 5's `longestConsecutive` on `[0, 3, 7, 2, 5, 8, 4, 6, 0, 1]`.
+(a) What is returned?
+(b) How many numbers in the set pass the "start of sequence" test?
+(c) How many `st.count(num + length)` calls does the `while` loop make in total?
+
+**Q3. Ransom Note.** Trace Problem 2's `canConstruct("abc", "aabbd")` with a dry-run table. At which step does it stop, and what does it return?
+
+**Q4. Sudoku box index.** Using `boxIdx = (r / 3) * 3 + (c / 3)` from Problem 7, which box do cells `(4, 7)`, `(8, 3)` and `(2, 5)` belong to?
+
+**Q5. Top K Frequent.** Run Problem 4's `topKFrequent` on `[4, 4, 1, 1, 1, 2, 3, 3, 3, 3]` with `k = 2`. What does the frequency map look like, which pairs remain in the heap, and in what order does `result` come out?
+
+### Coding Exercises
+
+**E1 (Easy). Isomorphic Strings.** Two strings are isomorphic if the characters of `s` can be replaced one-to-one to get `t` (no two characters map to the same character).
+
+```cpp
+bool isIsomorphic(const string& s, const string& t);
+// "egg",  "add"  -> true
+// "foo",  "bar"  -> false   ('o' would map to both 'a' and 'r')
+// "badc", "baba" -> false   ('b' and 'd' would both map to 'b')
+```
+
+**E2 (Easy–Medium). Find All Anagram Start Indices.** Return every start index `i` such that `s.substr(i, p.size())` is an anagram of `p` (lowercase letters only). Combine Ransom Note's frequency array with a fixed-size sliding window.
+
+```cpp
+vector<int> findAnagrams(const string& s, const string& p);
+// s = "cbaebabacd", p = "abc" -> [0, 6]
+// s = "abab",       p = "ab"  -> [0, 1, 2]
+```
+
+**E3 (Medium). Longest Substring with At Most K Distinct Characters.** Like Problem 8, but the window may contain up to `k` distinct characters (repeats allowed).
+
+```cpp
+int longestKDistinct(const string& s, int k);
+// "eceba",   k = 2 -> 3   ("ece")
+// "ccaabbb", k = 2 -> 5   ("aabbb")
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **2**. Without the `>= left` guard it returns **3**, which is wrong.
+
+| right | c | Seen in window? | left | lastSeen (after) | maxLen |
+|-------|---|-----------------|------|------------------|--------|
+| 0 | a | no | 0 | {a:0} | 1 |
+| 1 | b | no | 0 | {a:0, b:1} | 2 |
+| 2 | b | yes, 1 >= 0 | 2 | {a:0, b:2} | 2 |
+| 3 | a | stored at 0, but 0 < left = 2 | 2 | {a:3, b:2} | 2 |
+
+Without the guard, at right = 3 the stale entry `a:0` moves `left` **back** to 1, making the window `"bba"` (length 3) even though it contains two `b`s. The guard ignores positions that already slid out of the window.
+
+**Q2.** (a) **9** (the run 0, 1, ..., 8; the duplicate 0 collapses in the set). (b) **1**: only 0 has no predecessor ($-1$ is absent); every other number $x$ in 1..8 has $x-1$ in the set. (c) **9** calls: 8 succeed (finding 1 through 8) and 1 fails (9 is absent). This is the "every number visited at most twice" argument: each element is counted once by the set iteration and once by a `while` check.
+
+**Q3.** Returns **false** at step 3.
+
+| Step | Char | count before | Available? | Action |
+|------|------|--------------|------------|--------|
+| init | - | a=2, b=2, d=1 | - | count magazine |
+| 1 | 'a' | a=2 | yes | a → 1 |
+| 2 | 'b' | b=2 | yes | b → 1 |
+| 3 | 'c' | c=0 | no | return false |
+
+**Q4.**
+- `(4, 7)`: $(4/3) \cdot 3 + 7/3 = 1 \cdot 3 + 2 =$ **5**
+- `(8, 3)`: $(8/3) \cdot 3 + 3/3 = 2 \cdot 3 + 1 =$ **7**
+- `(2, 5)`: $(2/3) \cdot 3 + 5/3 = 0 + 1 =$ **1**
+
+(Integer division: $4/3 = 1$, $7/3 = 2$, $8/3 = 2$, $5/3 = 1$, $2/3 = 0$.)
+
+**Q5.** Frequency map `{4:2, 1:3, 2:1, 3:4}`. Whatever order the map is iterated in, every pair with frequency 1 or 2 is eventually popped, because the heap is capped at 2 and always ejects its smallest frequency. The heap ends with `(3, 1)` and `(4, 3)`. The min-heap pops the smaller frequency first, so `result = [1, 3]`.
+
+**E1 — reference solution.** Two maps enforce a one-to-one mapping in both directions.
+
+```cpp
+bool isIsomorphic(const string& s, const string& t) {
+    if (s.size() != t.size()) return false;
+    unordered_map<char, char> sToT, tToS;
+    for (size_t i = 0; i < s.size(); i++) {
+        char a = s[i], b = t[i];
+        auto it1 = sToT.find(a);
+        auto it2 = tToS.find(b);
+        if (it1 != sToT.end() && it1->second != b) return false;  // a already mapped elsewhere
+        if (it2 != tToS.end() && it2->second != a) return false;  // b already claimed
+        sToT[a] = b;
+        tToS[b] = a;
+    }
+    return true;
+}
+```
+Time $O(n)$, space $O(1)$ (at most 256 keys per map). With only `sToT`, `"badc"`/`"baba"` would wrongly pass.
+
+**E2 — reference solution.** Keep a 26-slot count of the current window; slide by adding the new char and removing the one that falls out.
+
+```cpp
+vector<int> findAnagrams(const string& s, const string& p) {
+    vector<int> result;
+    int n = s.size(), m = p.size();
+    if (m > n) return result;
+    int need[26] = {0}, have[26] = {0};
+    for (char c : p) need[c - 'a']++;
+    for (int i = 0; i < n; i++) {
+        have[s[i] - 'a']++;                        // char entering the window
+        if (i >= m) have[s[i - m] - 'a']--;        // char leaving the window
+        if (i >= m - 1 && equal(begin(need), end(need), begin(have)))
+            result.push_back(i - m + 1);
+    }
+    return result;
+}
+// "cbaebabacd", "abc": window "cba" at 0 matches; "bac" at 6 matches.
+```
+Time $O(26 \cdot n) = O(n)$, space $O(1)$. An array beats a map here because the key range is 26 letters.
+
+**E3 — reference solution.** Sliding window + frequency map; `freq.size()` is the number of distinct chars, so erase keys whose count hits 0.
+
+```cpp
+int longestKDistinct(const string& s, int k) {
+    unordered_map<char, int> freq;
+    int left = 0, best = 0;
+    for (int right = 0; right < (int)s.size(); right++) {
+        freq[s[right]]++;
+        while ((int)freq.size() > k) {             // too many distinct: shrink
+            char out = s[left++];
+            if (--freq[out] == 0) freq.erase(out);
+        }
+        best = max(best, right - left + 1);
+    }
+    return best;
+}
+// "eceba", k=2: e,ec,ece (3) -> add b: shrink to "eb" -> add a: shrink to "ba" -> best 3
+```
+Time $O(n)$ (each index enters and leaves the window once), space $O(k)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
