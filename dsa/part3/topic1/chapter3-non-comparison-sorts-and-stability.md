@@ -497,6 +497,163 @@ Counting Sort O(N+K): If K = 10^9, that's O(10^9) not O(N)! Always check if K is
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Prefix sums in stable Counting Sort.** Run `countingSortStable` on `[2, 5, 3, 0, 2, 3, 0, 3]`. Give the `counts` array (indices 0–5) after counting and after the prefix-sum loop. Into which `output` index does the 3 that started at index 2 land?
+
+**Q2. Radix Sort passes.** Run the chapter's `radixSort` on `[329, 457, 657, 839, 436, 720, 355]`. How many passes does the `exp` loop make? Write the array after each pass.
+
+**Q3. Offset arithmetic.** Run `countingSortWithNegatives` on `[-2, 5, -2, 1]`. What are `offset` and `range`, which `counts` indices end up non-zero (and with what values), and what is the final array?
+
+**Q4. Which bucket?** Run the chapter's `bucketSort` on the 10 values `[0.78, 0.17, 0.39, 0.26, 0.72, 0.94, 0.21, 0.12, 0.23, 0.68]`. List each non-empty bucket's contents *before* the per-bucket sort. Which bucket is largest?
+
+**Q5. Mistake 2, made concrete.** Suppose someone "simplifies" `countingSortByDigit` by changing the output loop to run forward: `for (int i = 0; i < n; i++)` (everything else unchanged). What does `radixSort` now return for `[21, 12, 22, 11]`? What does the correct (reverse-loop) version return?
+
+### Coding Exercises
+
+**E1 (Easy).** The array contains only `0`, `1` and `2`. Sort it with Counting Sort in two passes (count, then overwrite).
+
+```cpp
+void sortColors(vector<int>& nums);
+```
+
+- `[2, 0, 2, 1, 1, 0]` → `[0, 0, 1, 1, 2, 2]`
+- `[1]` → `[1]`
+
+**E2 (Easy–Medium).** Stable Counting Sort on *records*: sort people by age (`0 <= age <= maxAge`) so that people with equal ages keep their input order. Use the prefix-sum + reverse-placement pattern from `countingSortStable`.
+
+```cpp
+vector<pair<string, int>> sortByAge(const vector<pair<string, int>>& people, int maxAge);
+```
+
+- `[("Alice",25), ("Bob",30), ("Charlie",25)], maxAge = 120` → `[("Alice",25), ("Charlie",25), ("Bob",30)]`
+- `[("Zed",3), ("Amy",1), ("Kim",3), ("Lee",1)], maxAge = 5` → `[("Amy",1), ("Lee",1), ("Zed",3), ("Kim",3)]`
+
+**E3 (Medium).** Extend Radix Sort to handle negative numbers, following the chapter's hint: separate the negatives, radix-sort their absolute values, then reverse and negate them and put them in front of the sorted non-negatives. Assume no element equals `INT_MIN`.
+
+```cpp
+void radixSortWithNegatives(vector<int>& arr);
+```
+
+- `[170, -45, 75, -90, 802, 24, -2, 66]` → `[-90, -45, -2, 24, 66, 75, 170, 802]`
+- `[-5, -50, -1]` → `[-50, -5, -1]`
+
+#### Dry-Run: Answers
+
+**Q1.** After counting: `[2, 0, 2, 3, 0, 1]`. After prefix sums: `[2, 2, 4, 7, 7, 8]`. The 3 from index 2 lands at **output[4]**. Final output `[0, 0, 2, 2, 3, 3, 3, 5]`.
+
+| i (right → left) | arr[i] | slot = counts[v] - 1 | counts[v] after |
+|------------------|--------|----------------------|-----------------|
+| 7 | 3 | 6 | 6 |
+| 6 | 0 | 1 | 1 |
+| 5 | 3 | 5 | 5 |
+| 4 | 2 | 3 | 3 |
+| 3 | 0 | 0 | 0 |
+| 2 | 3 | **4** | 4 |
+| 1 | 5 | 7 | 7 |
+| 0 | 2 | 2 | 2 |
+
+The three 3s (from indices 2, 5, 7) land at slots 4, 5, 6 — the same left-to-right order they had in the input. That is stability.
+
+**Q2.** `maxVal = 839`, so `exp` takes the values 1, 10, 100 → **3 passes** (`839 / 1000 = 0` stops the loop).
+
+| Pass | Digit | Buckets (in stable order) | Array after pass |
+|------|-------|---------------------------|------------------|
+| 1 | 1s | 0:[720] 5:[355] 6:[436] 7:[457, 657] 9:[329, 839] | `[720, 355, 436, 457, 657, 329, 839]` |
+| 2 | 10s | 2:[720, 329] 3:[436, 839] 5:[355, 457, 657] | `[720, 329, 436, 839, 355, 457, 657]` |
+| 3 | 100s | 3:[329, 355] 4:[436, 457] 6:[657] 7:[720] 8:[839] | `[329, 355, 436, 457, 657, 720, 839]` |
+
+Note pass 3: 329 and 355 share the 100s digit 3; they end up correctly ordered only because pass 2 already put 329 before 355 and the sub-sort is stable.
+
+**Q3.** `minVal = -2`, `maxVal = 5`, so `offset = 2` and `range = 5 - (-2) + 1 = 8` (indices 0–7).
+- `-2 + 2 = 0` → `counts[0] = 2`
+- `1 + 2 = 3` → `counts[3] = 1`
+- `5 + 2 = 7` → `counts[7] = 1`
+
+Reconstruction writes `i - offset`: `0 - 2 = -2` (twice), `3 - 2 = 1`, `7 - 2 = 5` → `[-2, -2, 1, 5]`.
+
+**Q4.** `bucketIdx = (int)(10 * num)` (truncation):
+
+| Bucket | Contents before sort | After sort |
+|--------|----------------------|------------|
+| 1 | `[0.17, 0.12]` | `[0.12, 0.17]` |
+| 2 | `[0.26, 0.21, 0.23]` | `[0.21, 0.23, 0.26]` |
+| 3 | `[0.39]` | `[0.39]` |
+| 6 | `[0.68]` | `[0.68]` |
+| 7 | `[0.78, 0.72]` | `[0.72, 0.78]` |
+| 9 | `[0.94]` | `[0.94]` |
+
+Bucket **2** is largest (3 items). Concatenating: `[0.12, 0.17, 0.21, 0.23, 0.26, 0.39, 0.68, 0.72, 0.78, 0.94]`.
+
+**Q5.** Broken (forward loop) version returns **`[12, 11, 22, 21]`** — not sorted. The correct version returns `[11, 12, 21, 22]`.
+
+Why: with prefix sums, `counts[d]` points one past the *last* slot for digit `d`. Filling from the right end of each group while scanning the input forward places equal-digit items in **reversed** order.
+
+| Pass | Input | Prefix `counts[1], counts[2]` | Forward placement | Output |
+|------|-------|-------------------------------|-------------------|--------|
+| 1s | `[21, 12, 22, 11]` | 2, 4 | 21→[1], 12→[3], 22→[2], 11→[0] | `[11, 21, 22, 12]` |
+| 10s | `[11, 21, 22, 12]` | 2, 4 | 11→[1], 21→[3], 22→[2], 12→[0] | `[12, 11, 22, 21]` |
+
+**E1 — reference solution**
+
+```cpp
+void sortColors(vector<int>& nums) {
+    int counts[3] = {0, 0, 0};
+    for (int x : nums) counts[x]++;
+    int w = 0;
+    for (int v = 0; v < 3; v++)
+        while (counts[v]-- > 0) nums[w++] = v;
+}
+```
+
+Time $O(N)$, space $O(1)$ ($K = 3$ is a constant).
+
+**E2 — reference solution**
+
+```cpp
+vector<pair<string, int>> sortByAge(const vector<pair<string, int>>& people, int maxAge) {
+    vector<int> counts(maxAge + 1, 0);
+    for (const auto& p : people) counts[p.second]++;
+    for (int a = 1; a <= maxAge; a++) counts[a] += counts[a - 1];
+
+    vector<pair<string, int>> output(people.size());
+    for (int i = (int)people.size() - 1; i >= 0; i--) {   // reverse => stable
+        int age = people[i].second;
+        output[--counts[age]] = people[i];
+    }
+    return output;
+}
+```
+
+Time $O(N + K)$, space $O(N + K)$ with $K$ = `maxAge`. This is exactly why the "production" version exists: the simple overwrite version only works for bare integers, because it rebuilds values instead of moving the original records.
+
+**E3 — reference solution**
+
+```cpp
+void radixSort(vector<int>& arr);   // the chapter's version (non-negative input)
+
+void radixSortWithNegatives(vector<int>& arr) {
+    vector<int> neg, pos;
+    for (int x : arr) {
+        if (x < 0) neg.push_back(-x);   // store absolute value
+        else       pos.push_back(x);
+    }
+    radixSort(neg);                     // e.g. [45, 90, 2] -> [2, 45, 90]
+    radixSort(pos);
+
+    arr.clear();
+    for (int i = (int)neg.size() - 1; i >= 0; i--)   // largest |x| first
+        arr.push_back(-neg[i]);                      // -> -90, -45, -2
+    for (int x : pos) arr.push_back(x);
+}
+```
+
+Time $O(d \cdot (N + b))$, space $O(N + b)$. Reversing is required because among negatives a *larger* absolute value means a *smaller* number. `INT_MIN` is excluded because `-INT_MIN` overflows an `int`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

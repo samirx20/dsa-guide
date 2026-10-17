@@ -613,6 +613,179 @@ int medianOfThree(vector<int>& arr, int left, int right) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Lomuto partition.** Run the chapter's `partition(arr, 0, 6)` on `[7, 2, 9, 4, 3, 8, 5]` (pivot = last element = 5). Give the array after the loop and the final swap, and the returned `pivotIndex`.
+
+**Q2. Merge stability.** Call `merge` on a segment whose left half is `[2, 5a, 8]` and right half is `[3, 5b, 9]` (both 5s equal; the tags just track identity). Write `temp` after each comparison of the main `while` loop. How many comparisons happen, and which 5 lands first?
+
+**Q3. Order of merges.** Run `mergeSort(arr, 0, 4)` on `[5, 1, 4, 2, 3]`. List every call to `merge(arr, left, mid, right)` in the order it executes, with the array after each.
+
+**Q4. Quick Sort worst case, counted.** Run the chapter's `quickSort` (last-element pivot) on the already sorted `[1, 2, 3, 4, 5]`. How many `arr[j] < pivot` comparisons happen in total, and what is the maximum number of `quickSort` frames on the call stack at once (count frames that actually enter `partition` or hit the base case)?
+
+**Q5. Finish the chapter's "?" table.** After the first partition, the chapter's full Quick Sort trace has the array `[10, 30, 40, 50, 70, 90, 80]` and leaves two `?` marks. What do `partition(arr, 0, 3)` and `partition(arr, 5, 6)` return, and what does the array look like after each?
+
+### Coding Exercises
+
+**E1 (Easy).** Write the merge step as a standalone function that merges two already sorted vectors into a new sorted vector (stable: on ties take from `a` first).
+
+```cpp
+vector<int> mergeSorted(const vector<int>& a, const vector<int>& b);
+```
+
+- `a = [1, 4, 9], b = [2, 3, 10, 11]` → `[1, 2, 3, 4, 9, 10, 11]`
+- `a = [], b = [5]` → `[5]`
+
+**E2 (Easy–Medium).** *Quickselect.* Reuse the chapter's `partition` to find the `k`-th smallest element (1-indexed) without fully sorting. Recurse/loop only into the side that contains index `k - 1`.
+
+```cpp
+int kthSmallest(vector<int>& arr, int k);
+```
+
+- `arr = [7, 2, 9, 4, 3, 8, 5], k = 3` → `4`
+- `arr = [10, 80, 30, 90, 40, 50, 70], k = 7` → `90`
+
+**E3 (Medium).** *Count inversions.* Count pairs `(i, j)` with `i < j` and `arr[i] > arr[j]` in $O(N \log N)$ by piggy-backing on Merge Sort: whenever the merge takes `arr[j]` from the right half, every element still remaining in the left half forms an inversion with it.
+
+```cpp
+long long countInversions(vector<int>& arr);
+```
+
+- `[2, 4, 1, 3, 5]` → `3`  (pairs (2,1), (4,1), (4,3))
+- `[5, 3, 8, 1, 2]` → `7`
+
+#### Dry-Run: Answers
+
+**Q1.** Result `[2, 4, 3, 5, 9, 8, 7]`, returns **3**.
+
+| j | arr[j] | < 5? | i after | Array after step |
+|---|--------|------|---------|------------------|
+| 0 | 7 | no | -1 | `[7, 2, 9, 4, 3, 8, 5]` |
+| 1 | 2 | yes | 0 | swap(0,1) → `[2, 7, 9, 4, 3, 8, 5]` |
+| 2 | 9 | no | 0 | unchanged |
+| 3 | 4 | yes | 1 | swap(1,3) → `[2, 4, 9, 7, 3, 8, 5]` |
+| 4 | 3 | yes | 2 | swap(2,4) → `[2, 4, 3, 7, 9, 8, 5]` |
+| 5 | 8 | no | 2 | unchanged |
+| final | — | — | — | swap(3,6) → `[2, 4, 3, 5, 9, 8, 7]` |
+
+Everything left of index 3 is `< 5`, everything right is `>= 5`, but neither side is sorted yet.
+
+**Q2.** 5 comparisons; `5a` (from the left half) lands first, because `arr[i] <= arr[j]` prefers the left on ties — that is what makes Merge Sort stable.
+
+| Step | Compare | Take | temp |
+|------|---------|------|------|
+| 1 | 2 <= 3 | 2 (L) | `[2]` |
+| 2 | 5a <= 3 | 3 (R) | `[2, 3]` |
+| 3 | 5a <= 5b | 5a (L) | `[2, 3, 5a]` |
+| 4 | 8 <= 5b | 5b (R) | `[2, 3, 5a, 5b]` |
+| 5 | 8 <= 9 | 8 (L) | `[2, 3, 5a, 5b, 8]` |
+| copy | left exhausted | 9 (R) | `[2, 3, 5a, 5b, 8, 9]` |
+
+**Q3.** Four merges (always $N - 1$ for $N$ elements):
+
+| # | Call | Halves merged | Array after |
+|---|------|---------------|-------------|
+| 1 | `merge(0, 0, 1)` | `[5]` + `[1]` | `[1, 5, 4, 2, 3]` |
+| 2 | `merge(0, 1, 2)` | `[1, 5]` + `[4]` | `[1, 4, 5, 2, 3]` |
+| 3 | `merge(3, 3, 4)` | `[2]` + `[3]` | `[1, 4, 5, 2, 3]` |
+| 4 | `merge(0, 2, 4)` | `[1, 4, 5]` + `[2, 3]` | `[1, 2, 3, 4, 5]` |
+
+`mid = 0 + (4 - 0) / 2 = 2`, so the left half is `[0..2]` (3 elements) and is fully merged before the right half `[3..4]` is even touched.
+
+**Q4.** $4 + 3 + 2 + 1 = 10 = \frac{N(N-1)}{2}$ comparisons; max depth **5** frames.
+
+| Frame | Call | Comparisons | Pivot lands at | Left call | Right call |
+|-------|------|-------------|----------------|-----------|------------|
+| 1 | `quickSort(0, 4)` | 4 | 4 | `(0, 3)` | `(5, 4)` base |
+| 2 | `quickSort(0, 3)` | 3 | 3 | `(0, 2)` | `(4, 3)` base |
+| 3 | `quickSort(0, 2)` | 2 | 2 | `(0, 1)` | `(3, 2)` base |
+| 4 | `quickSort(0, 1)` | 1 | 1 | `(0, 0)` | `(2, 1)` base |
+| 5 | `quickSort(0, 0)` | 0 | — | base case | — |
+
+Each partition peels off only one element, so the depth is $N$, not $\log N$ — the chapter's worst case.
+
+**Q5.**
+- `partition(arr, 0, 3)`: pivot 50; 10, 30, 40 are all `< 50`, so `i` walks to 2 and every swap is a self-swap; final `swap(arr[3], arr[3])`. Returns **3**, array unchanged `[10, 30, 40, 50, 70, 90, 80]`. (Then `quickSort(0, 2)` repeats the same pattern: sorted input is the worst case again.)
+- `partition(arr, 5, 6)`: pivot 80; `j = 5`: `90 < 80`? no. Final `swap(arr[5], arr[6])` → `[10, 30, 40, 50, 70, 80, 90]`. Returns **5**.
+
+**E1 — reference solution**
+
+```cpp
+vector<int> mergeSorted(const vector<int>& a, const vector<int>& b) {
+    vector<int> out;
+    out.reserve(a.size() + b.size());
+    size_t i = 0, j = 0;
+    while (i < a.size() && j < b.size()) {
+        if (a[i] <= b[j]) out.push_back(a[i++]);   // <= keeps it stable
+        else              out.push_back(b[j++]);
+    }
+    while (i < a.size()) out.push_back(a[i++]);
+    while (j < b.size()) out.push_back(b[j++]);
+    return out;
+}
+```
+
+Time $O(|a| + |b|)$, space $O(|a| + |b|)$ for the output.
+
+**E2 — reference solution**
+
+```cpp
+int partition(vector<int>& arr, int left, int right) {   // chapter's Lomuto
+    int pivot = arr[right], i = left - 1;
+    for (int j = left; j < right; j++)
+        if (arr[j] < pivot) swap(arr[++i], arr[j]);
+    swap(arr[i + 1], arr[right]);
+    return i + 1;
+}
+
+int kthSmallest(vector<int>& arr, int k) {
+    int left = 0, right = (int)arr.size() - 1, target = k - 1;
+    while (left <= right) {
+        int p = partition(arr, left, right);
+        if (p == target) return arr[p];
+        if (p < target) left = p + 1;   // answer is right of the pivot
+        else            right = p - 1;  // answer is left of the pivot
+    }
+    return -1; // only reached if k is out of range
+}
+```
+
+Average $O(N)$ ($N + N/2 + N/4 + \dots$), worst $O(N^2)$ on sorted input — add the chapter's `randomPartition` to make that unlikely. For the first example, Q1's partition already returns index 3 > 2, so the next call is `partition(0, 2)` on `[2, 4, 3]` → pivot 3 lands at index 1, then `partition(2, 2)` returns 2 → `arr[2] = 4`.
+
+**E3 — reference solution**
+
+```cpp
+long long mergeCount(vector<int>& arr, int left, int right) {
+    if (left >= right) return 0;
+    int mid = left + (right - left) / 2;
+    long long cnt = mergeCount(arr, left, mid) + mergeCount(arr, mid + 1, right);
+
+    vector<int> temp;
+    int i = left, j = mid + 1;
+    while (i <= mid && j <= right) {
+        if (arr[i] <= arr[j]) temp.push_back(arr[i++]);
+        else {
+            cnt += mid - i + 1;          // arr[i..mid] are all > arr[j]
+            temp.push_back(arr[j++]);
+        }
+    }
+    while (i <= mid)   temp.push_back(arr[i++]);
+    while (j <= right) temp.push_back(arr[j++]);
+    for (int k = left; k <= right; k++) arr[k] = temp[k - left];
+    return cnt;
+}
+
+long long countInversions(vector<int>& arr) {
+    return mergeCount(arr, 0, (int)arr.size() - 1);
+}
+```
+
+Time $O(N \log N)$, space $O(N)$. The `<=` matters: equal elements are not inversions, so they must be taken from the left without counting. Use `long long` — an array of $10^5$ descending values has $\approx 5 \times 10^9$ inversions.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

@@ -660,6 +660,152 @@ void insertionSortAdaptive(vector<int>& arr) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Bubble Sort passes.** Run the chapter's `bubbleSort` on `[6, 2, 9, 1, 5]`. What is the array after Pass 2 (`i = 1`)? How many passes run in total before the loop ends, and how many swaps happen overall?
+
+**Q2. Selection Sort swaps.** Run the chapter's `selectionSort` on `[29, 10, 14, 37, 13]`. Write the array after every pass. How many actual calls to `swap` happen (remember the `if (min_idx != i)` guard)? How many comparisons `arr[j] < arr[min_idx]` are made?
+
+**Q3. Insertion Sort shifts.** Run the chapter's `insertionSort` on `[3, 7, 4, 9, 5, 2]`. For each `i`, how many shifts (`arr[j + 1] = arr[j]`) happen? What is the total, and what property of the array does that total equal?
+
+**Q4. Stability check.** Two equal keys are tagged `3a` and `3b` (same value 3). Run `selectionSort` on `[3a, 3b, 1]`. What is the final order of `3a` and `3b`? What does this prove about Selection Sort?
+
+**Q5. Read the counters carefully.** What exactly does the chapter's `insertionSortAdaptive` print for the nearly sorted array `[1, 2, 3, 5, 4, 6, 7, 8]`? Look closely at *where* `comparisons++` sits.
+
+### Coding Exercises
+
+**E1 (Easy).** Modify Bubble Sort so it also reports how many swaps it performed.
+
+```cpp
+int bubbleSortCountSwaps(vector<int>& arr); // sorts arr ascending, returns #swaps
+```
+
+- `[5, 3, 8, 1, 2]` → arr becomes `[1, 2, 3, 5, 8]`, returns `7`
+- `[1, 2, 3]` → returns `0`
+
+**E2 (Easy–Medium).** *Binary Insertion Sort.* Keep Insertion Sort's shifting, but find the insert position with binary search over the sorted prefix `arr[0..i-1]`. Equal keys must stay in their original order (stable).
+
+```cpp
+void binaryInsertionSort(vector<int>& arr);
+```
+
+- `[5, 2, 4, 6, 1, 3]` → `[1, 2, 3, 4, 5, 6]`
+- `[2, 1, 2, 1]` → `[1, 1, 2, 2]`
+
+**E3 (Medium).** *Partial Selection Sort.* Return the `k` smallest values in ascending order by running only the first `k` passes of Selection Sort (do not sort the whole array). Assume `0 <= k <= arr.size()`.
+
+```cpp
+vector<int> kSmallestSorted(vector<int> arr, int k);
+```
+
+- `arr = [64, 25, 12, 22, 11], k = 2` → `[11, 12]`
+- `arr = [7, 7, 3], k = 3` → `[3, 7, 7]`
+
+#### Dry-Run: Answers
+
+**Q1.** After Pass 2 the array is `[2, 1, 5, 6, 9]`. 4 passes run (`i = 0..3`; the early exit fires at the end of Pass 4, which happens to be the last pass anyway). Total swaps = 3 + 2 + 1 + 0 = **6**.
+
+| Pass | Comparisons (j) | Swaps | Array after pass |
+|------|-----------------|-------|------------------|
+| 1 (i=0) | 6>2 Y, 6>9 N, 9>1 Y, 9>5 Y | 3 | `[2, 6, 1, 5, 9]` |
+| 2 (i=1) | 2>6 N, 6>1 Y, 6>5 Y | 2 | `[2, 1, 5, 6, 9]` |
+| 3 (i=2) | 2>1 Y, 2>5 N | 1 | `[1, 2, 5, 6, 9]` |
+| 4 (i=3) | 1>2 N | 0 | `[1, 2, 5, 6, 9]` → `swapped = false`, break |
+
+**Q2.** 3 swaps and $4 + 3 + 2 + 1 = 10$ comparisons (Selection Sort always makes $\frac{N(N-1)}{2}$ comparisons).
+
+| Pass | Scan range | Minimum found | Swap? | Array after pass |
+|------|-----------|---------------|-------|------------------|
+| i=0 | `[29,10,14,37,13]` | 10 at idx 1 | yes | `[10, 29, 14, 37, 13]` |
+| i=1 | `[29,14,37,13]` | 13 at idx 4 | yes | `[10, 13, 14, 37, 29]` |
+| i=2 | `[14,37,29]` | 14 at idx 2 | no (`min_idx == i`) | `[10, 13, 14, 37, 29]` |
+| i=3 | `[37,29]` | 29 at idx 4 | yes | `[10, 13, 14, 29, 37]` |
+
+**Q3.** Shifts per `i`: 0, 1, 0, 2, 5 → total **8**. The total number of shifts always equals the number of **inversions** (pairs $i < j$ with $a_i > a_j$). Here they are (3,2), (7,4), (7,5), (7,2), (4,2), (9,5), (9,2), (5,2) = 8.
+
+| i | key | Elements shifted | Array after insert |
+|---|-----|------------------|--------------------|
+| 1 | 7 | none | `[3, 7, 4, 9, 5, 2]` |
+| 2 | 4 | 7 | `[3, 4, 7, 9, 5, 2]` |
+| 3 | 9 | none | `[3, 4, 7, 9, 5, 2]` |
+| 4 | 5 | 9, 7 | `[3, 4, 5, 7, 9, 2]` |
+| 5 | 2 | 9, 7, 5, 4, 3 | `[2, 3, 4, 5, 7, 9]` |
+
+**Q4.** Final order: `[1, 3b, 3a]` — the equal keys got **reversed**, so Selection Sort is **unstable**.
+- `i = 0`: minimum is `1` at index 2 → `swap(arr[0], arr[2])` → `[1, 3b, 3a]`. The long-distance swap jumped `3a` over `3b`.
+- `i = 1`: `min_idx = 1` (`3b`); `3a < 3b`? No (strict `<`) → no swap.
+Using strict `<` does not save stability; the swap itself is the culprit (exactly what the chapter's "Duplicate Elements" note warns).
+
+**Q5.** It prints:
+
+```bash
+Comparisons: 7
+Shifts: 1
+```
+
+`comparisons++` sits *after* the `while` loop, so it counts outer-loop iterations ($N - 1 = 7$), not the real number of `arr[j] > key` checks. The real count is 8: every `i` does 1 check, except `key = 4` which does 2 (`5 > 4` yes, `3 > 4` no). Shifts is 1 (only `5` moves).
+
+**E1 — reference solution**
+
+```cpp
+int bubbleSortCountSwaps(vector<int>& arr) {
+    int n = arr.size(), swaps = 0;
+    for (int i = 0; i < n - 1; i++) {
+        bool swapped = false;
+        for (int j = 0; j < n - i - 1; j++) {
+            if (arr[j] > arr[j + 1]) {
+                swap(arr[j], arr[j + 1]);
+                swaps++;
+                swapped = true;
+            }
+        }
+        if (!swapped) break;
+    }
+    return swaps;
+}
+```
+
+Time $O(N^2)$, space $O(1)$. Each adjacent swap fixes exactly one inversion, so the returned value is the inversion count (7 for the chapter's `[5, 3, 8, 1, 2]`: 3 + 2 + 2 swaps in its dry-run table).
+
+**E2 — reference solution**
+
+```cpp
+void binaryInsertionSort(vector<int>& arr) {
+    int n = arr.size();
+    for (int i = 1; i < n; i++) {
+        int key = arr[i];
+        // upper_bound: first position whose value is > key,
+        // so key lands AFTER any equal keys -> stable.
+        int pos = upper_bound(arr.begin(), arr.begin() + i, key) - arr.begin();
+        for (int j = i - 1; j >= pos; j--) arr[j + 1] = arr[j];
+        arr[pos] = key;
+    }
+}
+```
+
+Comparisons drop to $O(N \log N)$ total, but shifts are still $O(N^2)$ worst case, so time stays $O(N^2)$; space $O(1)$. Using `lower_bound` would break stability.
+
+**E3 — reference solution**
+
+```cpp
+vector<int> kSmallestSorted(vector<int> arr, int k) {
+    int n = arr.size();
+    for (int i = 0; i < k && i < n; i++) {   // only k passes
+        int min_idx = i;
+        for (int j = i + 1; j < n; j++)
+            if (arr[j] < arr[min_idx]) min_idx = j;
+        if (min_idx != i) swap(arr[i], arr[min_idx]);
+    }
+    return vector<int>(arr.begin(), arr.begin() + k);
+}
+```
+
+Time $O(N \cdot k)$, space $O(N)$ for the copy. After pass `i`, the prefix `arr[0..i]` holds the `i + 1` smallest values in final sorted order — the Selection Sort invariant — so stopping after `k` passes is enough.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

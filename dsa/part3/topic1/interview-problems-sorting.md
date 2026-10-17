@@ -382,6 +382,161 @@ We sort meetings by start time and use a min-heap to track end times. For each n
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Dutch National Flag trace.** Run the chapter's `sortColors` on `[1, 2, 0, 2, 0, 1]`. Fill in `low`, `mid`, `high` and the array after every loop iteration. How many iterations and how many swaps happen?
+
+**Q2. The "don't increment mid" rule.** A buggy version adds `mid++` inside the `else` branch (after swapping with `high`). What does the buggy version produce on `[1, 2, 0]`? What does the correct version produce?
+
+**Q3. Merge Intervals with touching ends.** Run the chapter's `merge` on `[[1,4], [0,2], [3,5], [7,9], [9,10]]`. What is the sorted order, and what is the final merged list? Do `[7,9]` and `[9,10]` merge?
+
+**Q4. Custom comparator.** What does `largestNumber` return for `[10, 2, 9, 39, 17]`? Give the sorted string order and justify each tricky pair with its `A+B` vs `B+A` comparison. What does it return for `[0, 0, 0]`?
+
+**Q5. Heap trace.** Run `minMeetingRooms` on `[[0,30], [5,10], [15,20], [10,15]]`. Show the heap contents after each meeting is processed. What is returned?
+
+### Coding Exercises
+
+**E1 (Easy).** *Meeting Rooms.* Return `true` if one person can attend every meeting (no two meetings overlap). A meeting ending at `t` and another starting at `t` do **not** overlap.
+
+```cpp
+bool canAttendMeetings(vector<vector<int>>& intervals);
+```
+
+- `[[0,30], [5,10], [15,20]]` → `false`
+- `[[7,10], [2,4]]` → `true`
+
+**E2 (Easy–Medium).** *Insert Interval.* `intervals` is already sorted by start and non-overlapping. Insert `newInterval` and merge where necessary, in $O(N)$ (no re-sort).
+
+```cpp
+vector<vector<int>> insertInterval(const vector<vector<int>>& intervals, vector<int> newInterval);
+```
+
+- `intervals = [[1,3], [6,9]], newInterval = [2,5]` → `[[1,5], [6,9]]`
+- `intervals = [[1,2], [3,5], [6,7], [8,10], [12,16]], newInterval = [4,8]` → `[[1,2], [3,10], [12,16]]`
+
+**E3 (Medium).** *Non-overlapping Intervals.* Return the minimum number of intervals to remove so the rest do not overlap (touching at an endpoint is fine). Hint: sort by **end** time and greedily keep the interval that finishes earliest.
+
+```cpp
+int eraseOverlapIntervals(vector<vector<int>>& intervals);
+```
+
+- `[[1,2], [2,3], [3,4], [1,3]]` → `1`
+- `[[1,2], [1,2], [1,2]]` → `2`
+
+#### Dry-Run: Answers
+
+**Q1.** 6 iterations, 4 swaps, final `[0, 0, 1, 1, 2, 2]`.
+
+| Iter | nums[mid] | Action | Array after | low | mid | high |
+|------|-----------|--------|-------------|-----|-----|------|
+| start | — | — | `[1,2,0,2,0,1]` | 0 | 0 | 5 |
+| 1 | 1 | mid++ | `[1,2,0,2,0,1]` | 0 | 1 | 5 |
+| 2 | 2 | swap(1,5), high-- | `[1,1,0,2,0,2]` | 0 | 1 | 4 |
+| 3 | 1 | mid++ | `[1,1,0,2,0,2]` | 0 | 2 | 4 |
+| 4 | 0 | swap(0,2), low++, mid++ | `[0,1,1,2,0,2]` | 1 | 3 | 4 |
+| 5 | 2 | swap(3,4), high-- | `[0,1,1,0,2,2]` | 1 | 3 | 3 |
+| 6 | 0 | swap(1,3), low++, mid++ | `[0,0,1,1,2,2]` | 2 | 4 | 3 |
+
+Loop ends because `mid = 4 > high = 3`. Notice iteration 5: the value swapped in from `high` was a `0`, and it was only handled correctly because `mid` stayed put.
+
+**Q2.** Buggy: **`[1, 0, 2]`** (wrong). Correct: `[0, 1, 2]`.
+- Both: `nums[0] = 1` → `mid = 1`.
+- `nums[1] = 2` → `swap(nums[1], nums[2])` → `[1, 0, 2]`, `high = 1`.
+- Buggy: `mid++` → `mid = 2 > high = 1`, loop exits; the `0` that was swapped in is never examined.
+- Correct: `mid` stays 1; `nums[1] = 0` → `swap(nums[0], nums[1])` → `[0, 1, 2]`, `low = 1`, `mid = 2`; loop exits.
+
+**Q3.** Sorted: `[[0,2], [1,4], [3,5], [7,9], [9,10]]`. Result: **`[[0,5], [7,10]]`** — yes, `[7,9]` and `[9,10]` merge because the test is `9 <= 9`.
+
+| Current | Test vs last end | Merged list |
+|---------|------------------|-------------|
+| `[0,2]` | first | `[[0,2]]` |
+| `[1,4]` | 1 <= 2 → merge, end = max(2,4) | `[[0,4]]` |
+| `[3,5]` | 3 <= 4 → merge, end = max(4,5) | `[[0,5]]` |
+| `[7,9]` | 7 > 5 → push | `[[0,5], [7,9]]` |
+| `[9,10]` | 9 <= 9 → merge, end = 10 | `[[0,5], [7,10]]` |
+
+**Q4.** Order `["9", "39", "2", "17", "10"]` → **`"93921710"`**. For `[0, 0, 0]` → **`"0"`** (the `strNums[0] == "0"` guard).
+
+| Pair | A+B | B+A | Who goes first |
+|------|-----|-----|----------------|
+| 9 vs 39 | 939 | 399 | 9 |
+| 39 vs 2 | 392 | 239 | 39 |
+| 2 vs 17 | 217 | 172 | 2 |
+| 17 vs 10 | 1710 | 1017 | 17 |
+
+Plain numeric sorting would wrongly put 39 first; plain lexicographic sorting happens to work here but fails on cases like `[3, 30]` (`"330" > "303"`, so 3 must precede 30 even though `"3" < "30"`).
+
+**Q5.** Returns **2**. After `sort`: `[[0,30], [5,10], [10,15], [15,20]]`.
+
+| Meeting | start >= heap top? | Heap after (min first) |
+|---------|--------------------|------------------------|
+| `[0,30]` | initial push | `{30}` |
+| `[5,10]` | 5 >= 30? no | `{10, 30}` |
+| `[10,15]` | 10 >= 10? yes → pop 10 | `{15, 30}` |
+| `[15,20]` | 15 >= 15? yes → pop 15 | `{20, 30}` |
+
+The `>=` matters: a meeting that starts exactly when another ends can reuse its room.
+
+**E1 — reference solution**
+
+```cpp
+bool canAttendMeetings(vector<vector<int>>& intervals) {
+    sort(intervals.begin(), intervals.end());          // by start time
+    for (size_t i = 1; i < intervals.size(); i++)
+        if (intervals[i][0] < intervals[i - 1][1])      // strict: touching is OK
+            return false;
+    return true;
+}
+```
+
+Time $O(N \log N)$, space $O(1)$ extra. After sorting, only neighbors can be the first overlap.
+
+**E2 — reference solution**
+
+```cpp
+vector<vector<int>> insertInterval(const vector<vector<int>>& intervals, vector<int> newInterval) {
+    vector<vector<int>> res;
+    size_t i = 0, n = intervals.size();
+    // 1. Intervals that end before newInterval starts
+    while (i < n && intervals[i][1] < newInterval[0]) res.push_back(intervals[i++]);
+    // 2. Overlapping intervals: absorb into newInterval
+    while (i < n && intervals[i][0] <= newInterval[1]) {
+        newInterval[0] = min(newInterval[0], intervals[i][0]);
+        newInterval[1] = max(newInterval[1], intervals[i][1]);
+        i++;
+    }
+    res.push_back(newInterval);
+    // 3. Intervals that start after newInterval ends
+    while (i < n) res.push_back(intervals[i++]);
+    return res;
+}
+```
+
+Time $O(N)$, space $O(N)$ for the output. Second example: `[1,2]` is copied; `[3,5]`, `[6,7]`, `[8,10]` all start at or before the growing end and are absorbed into `[3,10]`; `[12,16]` is copied.
+
+**E3 — reference solution**
+
+```cpp
+int eraseOverlapIntervals(vector<vector<int>>& intervals) {
+    if (intervals.empty()) return 0;
+    sort(intervals.begin(), intervals.end(),
+         [](const vector<int>& a, const vector<int>& b) { return a[1] < b[1]; });
+    int removed = 0;
+    int lastEnd = intervals[0][1];
+    for (size_t i = 1; i < intervals.size(); i++) {
+        if (intervals[i][0] < lastEnd) removed++;   // overlaps the kept one: drop it
+        else lastEnd = intervals[i][1];             // keep it
+    }
+    return removed;
+}
+```
+
+Time $O(N \log N)$, space $O(1)$ extra. Keeping the interval that ends earliest leaves the most room for the rest (exchange argument). First example sorted by end: `[1,2]`, then `[2,3]` and `[1,3]` (tied at end 3, either order), then `[3,4]`. Keep `[1,2]` (lastEnd = 2); whichever of the tied pair comes first, `[2,3]` is kept (2 >= its predecessor's end) and `[1,3]` is dropped (1 < 2 or 1 < 3); `[3,4]` is kept → 1 removal.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
