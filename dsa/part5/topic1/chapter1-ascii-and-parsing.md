@@ -513,6 +513,166 @@ Two pointers          O(N)        O(1)      In-place reversal, palindrome checks
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Char arithmetic and type promotion.** What does this print? (Hint: what is the type of `'7' + 1`?)
+
+```cpp
+char c = 'q';
+cout << (c - 'a') << " " << char(c - 32) << " "
+     << ('7' - '0') * 2 << " " << ('7' + 1) << endl;
+```
+
+**Q2. getline edge cases.** Using the chapter's `splitString`, how many tokens are returned for `splitString("a,,b,", ',')`, and what are they? What does `manualSplit("a,,b,")` return instead?
+
+**Q3. stringToInt, good and bad input.** Trace `stringToInt("-205")` with a table of `i`, `s[i]`, `digit`, `result`. Then: what does `stringToInt("12a")` return, and why?
+
+**Q4. The bit-5 trick.** The chapter notes that `'A'` and `'a'` differ only in bit 5 (value 32). What characters do `char('M' | 32)`, `char('m' & ~32)` and `char('k' ^ 32)` produce?
+
+**Q5. In-place removal.** Trace `removeChar` on `s = "mississippi"` with `target = 's'`. What is the final string and the final `writeIndex`?
+
+### Coding Exercises
+
+**E1 (Easy).** Convert every uppercase letter to lowercase using only ASCII arithmetic (no `tolower`). All other characters stay unchanged.
+
+```cpp
+string toLowerManual(string s);
+```
+
+- `"Hello, World 42!"` → `"hello, world 42!"`
+- `"abc"` → `"abc"`
+
+**E2 (Easy–Medium).** Sum the integers in a comma-separated string. Numbers may be negative; there are no spaces and no empty fields. Combine the `getline` split with the atoi loop (write your own digit loop; do not call `stoi`).
+
+```cpp
+long long sumCSV(const string& s);
+```
+
+- `"10,-3,25"` → `32`
+- `"7"` → `7`
+
+**E3 (Medium).** *Run-length decode.* The input is a sequence of `[count]letter` groups, where `count` is an optional multi-digit number (missing means 1). Expand it.
+
+```cpp
+string decodeRLE(const string& s);
+```
+
+- `"3a2bc"` → `"aaabbc"`
+- `"10z1y"` → `"zzzzzzzzzzy"`
+
+#### Dry-Run: Answers
+
+**Q1.** Output: **`16 Q 14 56`**
+- `c - 'a'` = 113 − 97 = 16 (an `int`).
+- `char(c - 32)` = `char(81)` = `'Q'`.
+- `('7' - '0') * 2` = 7 × 2 = 14.
+- `'7' + 1`: arithmetic on a `char` promotes it to `int`, so this is 55 + 1 = **56**, printed as a number, not `'8'`. Write `char('7' + 1)` to get `8`.
+
+**Q2.** `splitString("a,,b,", ',')` returns **3 tokens: `"a"`, `""`, `"b"`**.
+
+| Call | Reads up to | token | Pushed? |
+|------|-------------|-------|---------|
+| 1 | first `,` | `"a"` | yes |
+| 2 | second `,` (immediately) | `""` | yes — empty token between `,,` |
+| 3 | third `,` | `"b"` | yes |
+| 4 | end of stream, nothing read | — | `getline` fails → loop ends |
+
+The trailing delimiter does **not** produce a final empty token. `manualSplit("a,,b,")` returns `["a", "b"]`, because it only pushes non-empty `current` values.
+
+**Q3.** `stringToInt("-205")` → **-205**.
+
+| Step | i | s[i] | digit | result |
+|------|---|------|-------|--------|
+| sign | 0 | `'-'` | — | `negative = true`, `i = 1` |
+| 1 | 1 | `'2'` | 2 | 0·10 + 2 = 2 |
+| 2 | 2 | `'0'` | 0 | 2·10 + 0 = 20 |
+| 3 | 3 | `'5'` | 5 | 20·10 + 5 = 205 |
+| end | — | — | — | return −205 |
+
+`stringToInt("12a")` returns **169**: `'a' - '0'` = 97 − 48 = 49, so the last step is 12·10 + 49 = 169. The function never checks that each character is a digit (it also crashes on an empty string via `s[0]`) — the hardened `atoi` in the interview-problems file fixes this.
+
+**Q4.** `'m'`, `'M'`, `'K'`.
+- `'M'` = 77 = `01001101`; `| 32` sets bit 5 → 109 = `'m'`.
+- `'m'` = 109; `& ~32` clears bit 5 → 77 = `'M'`.
+- `'k'` = 107; `^ 32` flips bit 5 → 75 = `'K'` (XOR toggles case in both directions).
+Only use these on letters: `'5' ^ 32` = 21, a control character.
+
+**Q5.** Final string **`"miiippi"`**, `writeIndex = 7`.
+
+| i | s[i] | kept? | writeIndex after |
+|---|------|-------|------------------|
+| 0 | m | yes | 1 |
+| 1 | i | yes | 2 |
+| 2, 3 | s, s | no | 2 |
+| 4 | i | yes | 3 |
+| 5, 6 | s, s | no | 3 |
+| 7 | i | yes | 4 |
+| 8 | p | yes | 5 |
+| 9 | p | yes | 6 |
+| 10 | i | yes | 7 |
+
+`s.resize(7)` keeps `"miiippi"`. One pass, $O(N)$ time, $O(1)$ extra space.
+
+**E1 — reference solution**
+
+```cpp
+string toLowerManual(string s) {
+    for (char& c : s) {
+        if (c >= 'A' && c <= 'Z') c = c + ('a' - 'A');   // +32
+    }
+    return s;
+}
+```
+
+Time $O(N)$, space $O(1)$ extra (works on the by-value copy). The range check is what keeps `','`, `' '` and digits untouched.
+
+**E2 — reference solution**
+
+```cpp
+long long parseInt(const string& t) {
+    long long result = 0;
+    size_t i = 0;
+    bool negative = false;
+    if (!t.empty() && t[0] == '-') { negative = true; i = 1; }
+    for (; i < t.size(); i++) result = result * 10 + (t[i] - '0');
+    return negative ? -result : result;
+}
+
+long long sumCSV(const string& s) {
+    stringstream ss(s);
+    string token;
+    long long total = 0;
+    while (getline(ss, token, ',')) total += parseInt(token);
+    return total;
+}
+```
+
+Time $O(N)$, space $O(N)$ for the stream. `long long` leaves headroom when many values are summed.
+
+**E3 — reference solution**
+
+```cpp
+string decodeRLE(const string& s) {
+    string out;
+    int count = 0;
+    for (char c : s) {
+        if (c >= '0' && c <= '9') {
+            count = count * 10 + (c - '0');   // multi-digit count: atoi pattern
+        } else {
+            out.append(count == 0 ? 1 : count, c);
+            count = 0;                        // reset for the next group
+        }
+    }
+    return out;
+}
+```
+
+Time $O(N + L)$ where $L$ is the output length, space $O(L)$. Trace `"10z1y"`: `'1'` → 1, `'0'` → 10, `'z'` → append 10 z's, reset; `'1'` → 1, `'y'` → append 1 y.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

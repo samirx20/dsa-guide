@@ -323,6 +323,166 @@ Is the input only lowercase English?
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Expand from index 3 — carefully.** In `"abacaba"`, index 3 holds the character `'c'` (`a b a c a b a`). Trace `expandAroundCenter("abacaba", 3, 3)` step by step and give the returned length. Compare your answer with the dry-run table in section 1b.
+
+**Q2. Longest palindrome with an even center.** Trace `longestPalindrome("cbbd")`. For each `i`, give `len1`, `len2`, and whether `start` / `maxLen` change. What substring is returned?
+
+**Q3. Frequency array leftovers.** Run `isAnagram("rat", "car")`. Which `counts` indices are non-zero at the end, and with what values?
+
+**Q4. Early exit.** Run `isAnagramTwoPass("aab", "abb")`. Give `freq` for `a` and `b` after Pass 1, then after each character of Pass 2. At which character of `t` does it return, and what does it return?
+
+**Q5. Counting by expansion.** Using `expandAroundCenter`'s loop, count every palindromic substring of `"aaa"` (each successful expansion step is one palindrome). How many are found from each of the 5 centers, and what is the total?
+
+### Coding Exercises
+
+**E1 (Easy).** *Valid Palindrome.* Ignore every character that is not a letter or digit, and compare letters case-insensitively. Use two pointers; do not build a filtered copy.
+
+```cpp
+bool isPalindromeAlnum(const string& s);
+```
+
+- `"A man, a plan, a canal: Panama"` → `true`
+- `"race a car"` → `false`
+
+**E2 (Easy–Medium).** *Palindromic Substrings.* Return the number of palindromic substrings (substrings at different positions count separately) using Expand Around Center.
+
+```cpp
+int countSubstrings(const string& s);
+```
+
+- `"abc"` → `3`
+- `"aaa"` → `6`
+
+**E3 (Medium).** *Find All Anagrams in a String.* Return every start index `i` such that `s.substr(i, p.size())` is an anagram of `p`. Both strings are lowercase. Use a fixed-size sliding window with two `vector<int>(26)` frequency arrays, in $O(|s|)$.
+
+```cpp
+vector<int> findAnagrams(const string& s, const string& p);
+```
+
+- `s = "cbaebabacd", p = "abc"` → `[0, 6]`
+- `s = "abab", p = "ab"` → `[0, 1, 2]`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **7** — the whole string `"abacaba"` is a palindrome centred on `'c'`.
+
+| Step | left | right | s[left] | s[right] | Match? |
+|------|------|-------|---------|----------|--------|
+| 1 | 3 | 3 | c | c | yes |
+| 2 | 2 | 4 | a | a | yes |
+| 3 | 1 | 5 | b | b | yes |
+| 4 | 0 | 6 | a | a | yes |
+| 5 | -1 | 7 | — | — | out of bounds → stop |
+
+Length = `right - left - 1` = 7 − (−1) − 1 = 7. The table in section 1b reads `s[3]` as `'a'` and `s[0]` as `'c'`; its length formula is right, but those characters are misread. (A center that really gives `"bacab"` does not exist in this string.)
+
+**Q2.** Returns **`"bb"`**.
+
+| i | len1 = expand(i, i) | len2 = expand(i, i+1) | len | Update? |
+|---|---------------------|------------------------|-----|---------|
+| 0 | 1 (`c`) | 0 (`c` ≠ `b`) | 1 | yes: `start = 0 - 0 = 0`, `maxLen = 1` |
+| 1 | 1 (`b`; then `c` ≠ `b`) | 2 (`bb`; then `c` ≠ `d`) | 2 | yes: `start = 1 - (2-1)/2 = 1`, `maxLen = 2` |
+| 2 | 1 (`b`; then `b` ≠ `d`) | 0 (`b` ≠ `d`) | 1 | no |
+| 3 | 1 (`d`) | 0 (`right = 4` out of bounds) | 1 | no |
+
+`s.substr(1, 2)` = `"bb"`. Only the even-center call `expand(1, 2)` could find it.
+
+**Q3.** `counts[2] = -1` (`'c'`) and `counts[19] = +1` (`'t'`); returns `false`.
+
+| i | s[i] → ++ | t[i] → -- |
+|---|-----------|-----------|
+| 0 | r (17) +1 | c (2) −1 |
+| 1 | a (0) +1 | a (0) −1 → 0 |
+| 2 | t (19) +1 | r (17) −1 → 0 |
+
+**Q4.** After Pass 1: `a = 2, b = 1`. Pass 2: `'a'` → `a = 1`; `'b'` → `b = 0`; `'b'` → `b = -1 < 0` → **returns `false` at the third character** of `t`.
+
+**Q5.** Total **6**: `"a"` ×3, `"aa"` ×2, `"aaa"` ×1.
+
+| Center | Successful expansions | Palindromes found |
+|--------|-----------------------|-------------------|
+| (0, 0) | 1 | `a` |
+| (1, 1) | 2 | `a`, `aaa` |
+| (2, 2) | 1 | `a` |
+| (0, 1) | 1 | `aa` |
+| (1, 2) | 1 | `aa` |
+
+**E1 — reference solution**
+
+```cpp
+bool isAlnum(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+}
+char lower(char c) {
+    return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
+}
+
+bool isPalindromeAlnum(const string& s) {
+    int left = 0, right = (int)s.size() - 1;
+    while (left < right) {
+        while (left < right && !isAlnum(s[left])) left++;
+        while (left < right && !isAlnum(s[right])) right--;
+        if (lower(s[left]) != lower(s[right])) return false;
+        left++;
+        right--;
+    }
+    return true;
+}
+```
+
+Time $O(N)$, space $O(1)$. The inner `left < right` guards stop the skip loops from crossing on strings like `".,"`.
+
+**E2 — reference solution**
+
+```cpp
+int countSubstrings(const string& s) {
+    int n = s.size(), count = 0;
+    for (int center = 0; center < n; center++) {
+        // odd (center, center) then even (center, center + 1)
+        for (int r0 = center; r0 <= center + 1; r0++) {
+            int l = center, r = r0;
+            while (l >= 0 && r < n && s[l] == s[r]) {
+                count++;          // every successful step is a new palindrome
+                l--;
+                r++;
+            }
+        }
+    }
+    return count;
+}
+```
+
+Time $O(N^2)$, space $O(1)$. Same loop as `expandAroundCenter`, but it counts each step instead of returning only the final length.
+
+**E3 — reference solution**
+
+```cpp
+vector<int> findAnagrams(const string& s, const string& p) {
+    vector<int> result;
+    int n = s.size(), m = p.size();
+    if (m > n) return result;
+
+    vector<int> need(26, 0), window(26, 0);
+    for (char c : p) need[c - 'a']++;
+
+    for (int i = 0; i < n; i++) {
+        window[s[i] - 'a']++;                       // add the new right char
+        if (i >= m) window[s[i - m] - 'a']--;       // drop the char that left
+        if (i >= m - 1 && window == need)           // 26 comparisons: O(1)
+            result.push_back(i - m + 1);
+    }
+    return result;
+}
+```
+
+Time $O(26 \cdot |s|) = O(|s|)$, space $O(1)$ (two arrays of 26). Example 1: windows `"cba"` (index 0) and `"bac"` (index 6) match `need = {a:1, b:1, c:1}`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

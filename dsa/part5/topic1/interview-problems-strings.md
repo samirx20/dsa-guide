@@ -447,6 +447,173 @@ Sliding Window            Substring problems          Fixed/dynamic window size
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Stack trace for brackets.** Run `isValid` on three inputs: `"([)]"`, `"(([]){})"` and `"]"`. For each, say what it returns and at which character it decides. For `"(([]){})"`, what is the maximum stack size reached?
+
+**Q2. atoi edge cases.** What does the chapter's `myAtoi` return for each input, and at which index does it stop reading?
+- (a) `"   +0042abc7"`
+- (b) `"-91283472332"`
+- (c) `"  +-12"`
+- (d) `"words 987"`
+
+**Q3. Why the `#` in the frequency key?** In the frequency-signature version of `groupAnagrams`, what key is produced for `"bab"`? Which strings in `["abc", "bca", "aab", "aba", "cab", "bb"]` end up in the same group? Finally, find two strings that are *not* anagrams but would get the same key if the `"#"` separator were removed.
+
+**Q4. Longest palindrome, even center.** Run `longestPalindrome("forgeeksskeegfor")`. Which call (`i`, odd or even) finds the answer, what are `left` and `right` when its loop stops, and what `start` / `maxLen` result?
+
+**Q5. Reverse, mid-way.** Run `reverseString` on `"abcdefg"`. What does the array look like after 2 iterations? How many swaps happen in total, and what is the general formula?
+
+### Coding Exercises
+
+**E1 (Easy).** *Reverse Words.* Return the words in reverse order, separated by single spaces, with no leading/trailing spaces. Use `stringstream >>` to split.
+
+```cpp
+string reverseWords(const string& s);
+```
+
+- `"the sky is blue"` → `"blue is sky the"`
+- `"  hello   world  "` → `"world hello"`
+
+**E2 (Easy–Medium).** *Valid Palindrome II.* Return `true` if `s` can become a palindrome after deleting **at most one** character. Use opposite-end two pointers; on the first mismatch, try skipping either side once.
+
+```cpp
+bool validPalindrome(const string& s);
+```
+
+- `"abca"` → `true` (delete `'c'` or `'b'`)
+- `"abc"` → `false`
+
+**E3 (Medium).** *Minimum Remove to Make Valid Parentheses.* The string contains lowercase letters, `'('` and `')'`. Remove the minimum number of parentheses so the result is valid, keeping everything else in order. Use a stack of **indices** of unmatched `'('`.
+
+```cpp
+string minRemoveToMakeValid(string s);
+```
+
+- `"lee(t(c)o)de)"` → `"lee(t(c)o)de"`
+- `"a)b(c)d"` → `"ab(c)d"`;  `"))(("` → `""`
+
+#### Dry-Run: Answers
+
+**Q1.**
+- `"([)]"` → **false** at index 2: stack (bottom→top) is `[ ')', ']' ]`, the char is `')'`, but `top = ']'`.
+- `"(([]){})"` → **true**; max stack size **3**.
+
+| Char | Action | Stack (bottom → top) |
+|------|--------|----------------------|
+| `(` | push `)` | `)` |
+| `(` | push `)` | `) )` |
+| `[` | push `]` | `) ) ]` ← size 3 |
+| `]` | pop, matches | `) )` |
+| `)` | pop, matches | `)` |
+| `{` | push `}` | `) }` |
+| `}` | pop, matches | `)` |
+| `)` | pop, matches | empty → true |
+
+- `"]"` → **false** at index 0: a closer arrives while the stack is empty.
+
+Note that `"([)]"` has balanced counts of every bracket type, which is exactly why the "counting only" approach is wrong.
+
+**Q2.**
+- (a) **42**. Skips 3 spaces, reads `'+'` at index 3, digits `0,0,4,2` at indices 4–7 (result 0 → 0 → 4 → 42), stops at `'a'` (index 8). The trailing `7` is never reached.
+- (b) **-2147483648** (`INT_MIN`). Results grow 9, 91, …, 912834723 (9 digits, still above `INT_MIN` after the sign); the 10th digit (index 10) makes `result = 9128347233`, so `result * sign <= INT_MIN` → return immediately. (This assumes `long` is 64-bit, as on Linux/macOS. On Windows `long` is 32-bit and `9128347233` would itself overflow, so `long long` is the portable choice.)
+- (c) **0**. `'+'` is consumed as the sign at index 2; index 3 is `'-'`, which is not a digit, so the digit loop never runs.
+- (d) **0**. After skipping zero spaces, `s[0] = 'w'` is neither a sign nor a digit; nothing is read.
+
+**Q3.** `"bab"` has `a = 1`, `b = 2`, so its key is `"1#2#"` followed by `"0#"` 24 times. Groups: `{abc, bca, cab}`, `{aab, aba}`, `{bb}`.
+Without the separator, a string with `a = 1, b = 11` (e.g. `"a"` + 11 `b`s) and one with `a = 11, b = 1` (11 `a`s + `"b"`) both produce `"111"` followed by 24 `"0"`s — the same key for non-anagrams. With `"#"`, they become `"1#11#..."` vs `"11#1#..."`.
+
+**Q4.** Answer **`"geeksskeeg"`** (length 10), found by the **even** call at `i = 7`: `expandAroundCenter(s, 7, 8)`.
+
+| Indices compared | Chars | Match? |
+|------------------|-------|--------|
+| 7, 8 | s, s | yes |
+| 6, 9 | k, k | yes |
+| 5, 10 | e, e | yes |
+| 4, 11 | e, e | yes |
+| 3, 12 | g, g | yes |
+| 2, 13 | r, f | no → stop |
+
+The loop stops with `left = 2`, `right = 13`, so length = 13 − 2 − 1 = 10; `start = 7 - (10 - 1) / 2 = 7 - 4 = 3` and `maxLen = 10` → `s.substr(3, 10)`.
+
+**Q5.** After 2 iterations: `g f c d e b a`. Total swaps: **3** (`a↔g`, `b↔f`, `c↔e`); the loop stops when `left = right = 3` (the middle `'d'` stays). In general $\lfloor N / 2 \rfloor$ swaps.
+
+**E1 — reference solution**
+
+```cpp
+string reverseWords(const string& s) {
+    stringstream ss(s);
+    vector<string> words;
+    string w;
+    while (ss >> w) words.push_back(w);   // >> skips any run of whitespace
+
+    string result;
+    for (int i = (int)words.size() - 1; i >= 0; i--) {
+        result += words[i];
+        if (i > 0) result += ' ';
+    }
+    return result;
+}
+```
+
+Time $O(N)$, space $O(N)$. `>>` handles the extra spaces for free; no manual trimming needed.
+
+**E2 — reference solution**
+
+```cpp
+bool isPalRange(const string& s, int left, int right) {
+    while (left < right) {
+        if (s[left] != s[right]) return false;
+        left++;
+        right--;
+    }
+    return true;
+}
+
+bool validPalindrome(const string& s) {
+    int left = 0, right = (int)s.size() - 1;
+    while (left < right) {
+        if (s[left] != s[right]) {
+            // spend the one deletion: drop s[left] or drop s[right]
+            return isPalRange(s, left + 1, right) || isPalRange(s, left, right - 1);
+        }
+        left++;
+        right--;
+    }
+    return true;
+}
+```
+
+Time $O(N)$ (at most two extra linear scans), space $O(1)$. For `"abca"`: mismatch `b` vs `c` at (1, 2); dropping either leaves a 1-character range → true.
+
+**E3 — reference solution**
+
+```cpp
+string minRemoveToMakeValid(string s) {
+    stack<int> open;                         // indices of unmatched '('
+    for (int i = 0; i < (int)s.size(); i++) {
+        if (s[i] == '(') {
+            open.push(i);
+        } else if (s[i] == ')') {
+            if (!open.empty()) open.pop();   // matched
+            else s[i] = '*';                 // unmatched ')': mark for removal
+        }
+    }
+    while (!open.empty()) {                  // leftover '(' are unmatched
+        s[open.top()] = '*';
+        open.pop();
+    }
+    string result;
+    for (char c : s) if (c != '*') result += c;
+    return result;
+}
+```
+
+Time $O(N)$, space $O(N)$. Each removed character is provably unmatchable, so the number removed is minimal. `"a)b(c)d"`: the `')'` at index 1 has no partner → removed; `'('` at 3 and `')'` at 5 match → `"ab(c)d"`. The `'*'` marker is safe because the input contains only letters and parentheses.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
