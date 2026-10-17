@@ -377,6 +377,174 @@ void traverse(const vector<int>& nums, int index) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Using the chapter's backward traversal loop, what is printed for `nums = {3, 1, 4, 1, 5}`?
+```cpp
+for (int i = nums.size() - 1; i >= 0; i--) {
+    cout << nums[i] << " ";
+}
+```
+
+**Q2.** The chapter's column-major loop is run on a *non-square* matrix. What does it print?
+```cpp
+vector<vector<int>> matrix = {
+    {1, 2, 3},
+    {4, 5, 6}
+};
+int ROWS = matrix.size();     // ?
+int COLS = matrix[0].size();  // ?
+for (int c = 0; c < COLS; c++) {
+    for (int r = 0; r < ROWS; r++) {
+        cout << matrix[r][c] << " ";
+    }
+}
+```
+
+**Q3.** Run the chapter's anti-diagonal loop (`c = N - 1 - r`) on this $4 \times 4$ matrix. Fill in the dry-run table and give the printed output.
+```cpp
+vector<vector<int>> matrix = {
+    { 1,  2,  3,  4},
+    { 5,  6,  7,  8},
+    { 9, 10, 11, 12},
+    {13, 14, 15, 16}
+};
+```
+| Iteration | r | c = N-1-r | matrix[r][c] |
+|-----------|---|-----------|--------------|
+| 1         | 0 | ?         | ?            |
+| 2         | 1 | ?         | ?            |
+| 3         | 2 | ?         | ?            |
+| 4         | 3 | ?         | ?            |
+
+**Q4.** Variation 1 shows range-based loops by value and by reference. Starting from `nums = {1, 2, 3}` each time, what does each snippet print?
+```cpp
+// Snippet A
+for (int num : nums) { num *= 2; }
+for (int num : nums) cout << num << " ";
+
+// Snippet B
+for (int& num : nums) { num *= 2; }
+for (int num : nums) cout << num << " ";
+```
+
+**Q5.** With `nums = {10, 20, 30}`, Error 1's buggy loop `for (int i = 0; i <= nums.size(); i++)` runs how many times, and on which value of `i` does it read out of bounds?
+
+### Coding Exercises
+
+**E1 (Easy).** Diagonal sum. Return the sum of the main diagonal plus the anti-diagonal of a square matrix, counting the centre cell only once when $N$ is odd.
+```cpp
+int diagonalSum(const vector<vector<int>>& mat);
+```
+- `{{1,2,3},{4,5,6},{7,8,9}}` → `25`
+- A $4 \times 4$ matrix of all `1`s → `8`
+
+**E2 (Easy–Medium).** Transpose. Given an $R \times C$ matrix, return its $C \times R$ transpose (`result[c][r] = matrix[r][c]`). Handle the empty matrix.
+```cpp
+vector<vector<int>> transpose(const vector<vector<int>>& matrix);
+```
+- `{{1,2,3},{4,5,6}}` → `{{1,4},{2,5},{3,6}}`
+- `{}` → `{}`
+
+**E3 (Medium).** Spiral order. Return all elements in clockwise spiral order, starting at `(0,0)`. Must work for non-square and single-row/column matrices.
+```cpp
+vector<int> spiralOrder(const vector<vector<int>>& matrix);
+```
+- `{{1,2,3},{4,5,6},{7,8,9}}` → `1 2 3 6 9 8 7 4 5`
+- `{{1,2,3,4},{5,6,7,8},{9,10,11,12}}` → `1 2 3 4 8 12 11 10 9 5 6 7`
+
+#### Dry-Run: Answers
+
+**Q1.** Output: `5 1 4 1 3`
+
+| Iteration | i | nums[i] | Output so far |
+|-----------|---|---------|---------------|
+| 1 | 4 | 5 | 5 |
+| 2 | 3 | 1 | 5 1 |
+| 3 | 2 | 4 | 5 1 4 |
+| 4 | 1 | 1 | 5 1 4 1 |
+| 5 | 0 | 3 | 5 1 4 1 3 |
+
+**Q2.** `ROWS = 2`, `COLS = 3`. Output: `1 4 2 5 3 6`. The outer loop fixes a column, the inner loop walks down both rows: column 0 gives `1 4`, column 1 gives `2 5`, column 2 gives `3 6`.
+
+**Q3.** $N = 4$, so $c = 3 - r$. Output: `4 7 10 13`
+
+| Iteration | r | c = N-1-r | matrix[r][c] |
+|-----------|---|-----------|--------------|
+| 1         | 0 | 3         | 4            |
+| 2         | 1 | 2         | 7            |
+| 3         | 2 | 1         | 10           |
+| 4         | 3 | 0         | 13           |
+
+Every visited cell satisfies $r + c = N - 1 = 3$.
+
+**Q4.** Snippet A prints `1 2 3`, because `num` is a *copy* and doubling it never touches the vector. Snippet B prints `2 4 6`, because `int&` binds to each element, so `num *= 2` writes into `nums`.
+
+**Q5.** The condition `i <= 3` is true for `i = 0, 1, 2, 3`, so the body runs **4 times**. Iterations `i = 0, 1, 2` read `10, 20, 30`; iteration `i = 3` reads `nums[3]`, one past the last valid index, which is undefined behaviour (garbage, a crash, or apparently "nothing").
+
+**E1 — reference solution**
+```cpp
+int diagonalSum(const vector<vector<int>>& mat) {
+    int n = mat.size();
+    int sum = 0;
+    for (int i = 0; i < n; i++) {
+        sum += mat[i][i];                 // main diagonal: r == c
+        if (i != n - 1 - i) {             // skip the shared centre cell
+            sum += mat[i][n - 1 - i];     // anti-diagonal: c = N-1-r
+        }
+    }
+    return sum;
+}
+```
+Trace on the $3 \times 3$ example: main diagonal $1 + 5 + 9 = 15$, anti-diagonal without the centre $3 + 7 = 10$, total $25$. Time $O(N)$, space $O(1)$.
+
+**E2 — reference solution**
+```cpp
+vector<vector<int>> transpose(const vector<vector<int>>& matrix) {
+    if (matrix.empty() || matrix[0].empty()) return {};
+    int ROWS = matrix.size();
+    int COLS = matrix[0].size();
+    vector<vector<int>> result(COLS, vector<int>(ROWS));
+    for (int r = 0; r < ROWS; r++) {          // row-major read (cache-friendly)
+        for (int c = 0; c < COLS; c++) {
+            result[c][r] = matrix[r][c];
+        }
+    }
+    return result;
+}
+```
+The result has its dimensions swapped (`COLS` rows of length `ROWS`). Time $O(R \times C)$, space $O(R \times C)$ for the output.
+
+**E3 — reference solution**
+```cpp
+vector<int> spiralOrder(const vector<vector<int>>& matrix) {
+    vector<int> out;
+    if (matrix.empty() || matrix[0].empty()) return out;
+    int top = 0, bottom = matrix.size() - 1;
+    int left = 0, right = matrix[0].size() - 1;
+    while (top <= bottom && left <= right) {
+        for (int c = left; c <= right; c++) out.push_back(matrix[top][c]);
+        top++;
+        for (int r = top; r <= bottom; r++) out.push_back(matrix[r][right]);
+        right--;
+        if (top <= bottom) {                       // a row is still left
+            for (int c = right; c >= left; c--) out.push_back(matrix[bottom][c]);
+            bottom--;
+        }
+        if (left <= right) {                       // a column is still left
+            for (int r = bottom; r >= top; r--) out.push_back(matrix[r][left]);
+            left++;
+        }
+    }
+    return out;
+}
+```
+Four shrinking boundaries; the two `if` guards stop a single remaining row or column from being emitted twice. Each cell is pushed exactly once: time $O(R \times C)$, extra space $O(1)$ beyond the output.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

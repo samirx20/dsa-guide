@@ -625,6 +625,153 @@ Template:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run the basic `twoSum` on `nums = [3, 2, 4]`, `target = 6`. Fill in the dry-run table. Why does it *not* return `[0, 0]` even though `3 + 3 = 6`?
+
+| i | nums[i] | complement | found? | map after |
+|---|---------|------------|--------|-----------|
+| 0 | 3 | ? | ? | ? |
+| 1 | 2 | ? | ? | ? |
+| 2 | 4 | ? | ? | ? |
+
+**Q2.** Run the basic `maxProfit` on `prices = [2, 4, 1, 7, 5, 3]`. Give `minPrice` and `maxProfit` after each day, and the final answer. Note that the minimum price changes *after* a profitable day.
+
+**Q3.** Run the two-pass `productExceptSelf` on `nums = [-1, 1, 0, -3, 3]`. What is `result` after pass 1 and after pass 2?
+
+**Q4.** Run the dual-tracking `maxProduct` on `nums = [-2, 0, -1]`. What is returned, and what role does the `0` play?
+
+**Q5.** The "Forgetting tempMax" error scenario updates `currMax` and then uses the *new* `currMax` when computing `currMin`. On `nums = [-2, -2, -2]`, what does the correct version return, and what does the buggy version return? Show the state after each index.
+
+### Coding Exercises
+
+**E1 (Easy).** Contains Duplicate II. Return `true` if two *distinct* indices `i`, `j` have `nums[i] == nums[j]` and $|i - j| \le k$. Extend the hash-set idea from Problem 2 to a hash map of last-seen index.
+```cpp
+bool containsNearbyDuplicate(vector<int>& nums, int k);
+```
+- `nums = [1, 2, 3, 1]`, `k = 3` → `true`
+- `nums = [1, 2, 3, 1, 2, 3]`, `k = 2` → `false`
+
+**E2 (Easy–Medium).** Best buy/sell *days*. Same rules as Problem 3, but return the pair `{buyDay, sellDay}` of a maximum-profit trade (earliest such pair), or `{-1, -1}` if no profitable trade exists.
+```cpp
+pair<int, int> bestDays(vector<int>& prices);
+```
+- `[7, 1, 5, 3, 6, 4]` → `{1, 4}`
+- `[7, 6, 4, 3, 1]` → `{-1, -1}`
+
+**E3 (Medium).** Count Two-Sum pairs. Return the number of index pairs `(i, j)` with `i < j` and `nums[i] + nums[j] == target`. Duplicates count separately. $O(N)$ time.
+```cpp
+long long countPairs(vector<int>& nums, int target);
+```
+- `nums = [1, 5, 7, -1, 5]`, `target = 6` → `3` (pairs `(0,1)`, `(0,4)`, `(2,3)`)
+- `nums = [3, 3, 3]`, `target = 6` → `3`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns `[1, 2]`.
+
+| i | nums[i] | complement | found? | map after |
+|---|---------|------------|--------|-----------|
+| 0 | 3 | 6-3=3 | no (map empty) | {3:0} |
+| 1 | 2 | 6-2=4 | no | {3:0, 2:1} |
+| 2 | 4 | 6-4=2 | YES at 1 | return [1, 2] |
+
+At `i = 0` the complement `3` is looked up *before* `3` is inserted, so an element can never pair with itself. This is why the "check then insert" order matters.
+
+**Q2.** Answer `6` (buy at `1` on day 2, sell at `7` on day 3).
+
+| i | price | currentProfit = price - minPrice | maxProfit | minPrice after |
+|---|-------|---------------|-----------|----------|
+| 0 | 2 | — | 0 | 2 |
+| 1 | 4 | 4-2 = 2 | 2 | 2 |
+| 2 | 1 | 1-2 = -1 | 2 | 1 |
+| 3 | 7 | 7-1 = 6 | 6 | 1 |
+| 4 | 5 | 5-1 = 4 | 6 | 1 |
+| 5 | 3 | 3-1 = 2 | 6 | 1 |
+
+**Q3.** After pass 1 (left products): `[1, -1, -1, 0, 0]`. After pass 2: `[0, 0, 9, 0, 0]`.
+
+| i | nums[i] | result after pass 1 | rightPostfix used | result after pass 2 |
+|---|---------|---------------------|-------------------|---------------------|
+| 0 | -1 | 1 | 0 | 0 |
+| 1 | 1 | -1 | 0 | 0 |
+| 2 | 0 | -1 | -9 | 9 |
+| 3 | -3 | 0 | 3 | 0 |
+| 4 | 3 | 0 | 1 | 0 |
+
+Only index 2 (the zero itself) gets a non-zero answer: $(-1)(1)(-3)(3) = 9$. No division is needed, so the zero causes no trouble.
+
+**Q4.** Returns `0`.
+
+| i | val | currMax | currMin | globalMax |
+|---|-----|---------|---------|-----------|
+| 0 | -2 | -2 | -2 | -2 |
+| 1 | 0 | max(0, 0, 0) = 0 | 0 | 0 |
+| 2 | -1 | max(-1, 0, 0) = 0 | min(-1, 0, 0) = -1 | 0 |
+
+The `0` resets both running products, splitting the array into `[-2]` and `[-1]`; each side alone is negative, so the best is the subarray `[0]`.
+
+**Q5.** Correct: `4`. Buggy: `16` (impossible, since the full product is $-8$).
+
+| i | Correct currMax / currMin | Buggy currMax / currMin |
+|---|-----|-----|
+| 0 | -2 / -2 | -2 / -2 |
+| 1 | max(-2, 4, 4) = 4 / min(-2, 4, 4) = -2 | 4 / min(-2, **-2·4**, 4) = -8 |
+| 2 | max(-2, -8, 4) = 4 / min(-2, -8, 4) = -8 | max(-2, -8, **-2·-8**) = 16 / … |
+
+At `i = 1` the buggy `currMin` multiplies by the *already updated* `currMax = 4`, inventing a product `-8` that no subarray ending at index 1 has. That fake minimum then flips into a fake maximum `16`.
+
+**E1 — reference solution**
+```cpp
+bool containsNearbyDuplicate(vector<int>& nums, int k) {
+    unordered_map<int, int> lastIndex;           // value -> most recent index
+    for (int i = 0; i < (int)nums.size(); i++) {
+        auto it = lastIndex.find(nums[i]);
+        if (it != lastIndex.end() && i - it->second <= k) return true;
+        lastIndex[nums[i]] = i;                  // keep the closest occurrence
+    }
+    return false;
+}
+```
+Overwriting with the latest index is correct here (unlike the Two Sum duplicate variant) because the nearest previous copy gives the smallest gap. Time $O(N)$, space $O(N)$.
+
+**E2 — reference solution**
+```cpp
+pair<int, int> bestDays(vector<int>& prices) {
+    int minIdx = 0, bestProfit = 0;
+    pair<int, int> best = {-1, -1};
+    for (int i = 1; i < (int)prices.size(); i++) {
+        int profit = prices[i] - prices[minIdx];
+        if (profit > bestProfit) {               // strict: keep earliest pair
+            bestProfit = profit;
+            best = {minIdx, i};
+        }
+        if (prices[i] < prices[minIdx]) minIdx = i;   // update min AFTER selling check
+    }
+    return best;
+}
+```
+Same single pass as Problem 3, but tracking the *index* of the minimum. Time $O(N)$, space $O(1)$.
+
+**E3 — reference solution**
+```cpp
+long long countPairs(vector<int>& nums, int target) {
+    unordered_map<int, int> freq;                // value -> how many times seen so far
+    long long count = 0;
+    for (int x : nums) {
+        auto it = freq.find(target - x);
+        if (it != freq.end()) count += it->second;   // pair x with every earlier complement
+        freq[x]++;
+    }
+    return count;
+}
+```
+Trace on `[1, 5, 7, -1, 5]`, target 6: `1` adds 0; `5` finds one `1` (+1); `7` adds 0; `-1` finds one `7` (+1); `5` finds one `1` (+1). Total `3`. Counting *before* inserting guarantees `i < j` and no self-pairs. Time $O(N)$, space $O(N)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

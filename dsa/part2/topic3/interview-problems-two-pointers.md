@@ -528,6 +528,158 @@ public:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run Problem 1's `isPalindrome` on `s = "race a car"`. At which `left`/`right` does it stop, and what does it return?
+
+**Q2.** Run Problem 2's `threeSum` on `nums = [-2, 0, 1, 1, 2]` (already sorted). List every triplet pushed and explain why `i = 3` is skipped.
+
+**Q3.** Run Problem 3's `maxArea` on `height = [2, 3, 4, 5, 18, 17, 6]`. Fill in the dry-run table. Which pair of lines wins?
+
+| Step | left | right | h[left] | h[right] | Width | Area | Action |
+|------|------|-------|---------|----------|-------|------|--------|
+| 1 | 0 | 6 | ? | ? | ? | ? | ? |
+| … | | | | | | | |
+
+**Q4.** Run Problem 4's two-pointer `trap` on `height = [4, 2, 0, 3, 2, 5]`. Which pointer moves every step, how much water is added at each step, and what is the total?
+
+**Q5.** Problem 2's "Common Mistake" removes the two inner `while` duplicate-skip loops (but keeps the `i` skip). What does that buggy version return on `nums = [-1, -1, 0, 0, 1, 1]`, compared with the correct version?
+
+### Coding Exercises
+
+**E1 (Easy).** Valid Palindrome II. Return `true` if `s` (lowercase letters only) can be a palindrome after deleting **at most one** character.
+```cpp
+bool validPalindromeII(const string& s);
+```
+- `"abca"` → `true` (delete `'c'` or `'b'`)
+- `"abc"` → `false`
+
+**E2 (Easy–Medium).** 3Sum Closest. Given `nums` (size $\ge 3$) and `target`, return the sum of three elements closest to `target` (assume a unique answer). Reuse Problem 2's sort + fixed `i` + opposite-end pointers, $O(N^2)$.
+```cpp
+int threeSumClosest(vector<int>& nums, int target);
+```
+- `nums = [-1, 2, 1, -4]`, `target = 1` → `2` (`-1 + 2 + 1`)
+- `nums = [0, 0, 0]`, `target = 1` → `0`
+
+**E3 (Medium).** Boats to save people. Each boat carries at most two people and at most `limit` total weight (every person weighs $\le$ `limit`). Return the minimum number of boats.
+```cpp
+int numRescueBoats(vector<int>& people, int limit);
+```
+- `people = [3, 2, 2, 1]`, `limit = 3` → `3`
+- `people = [3, 5, 3, 4]`, `limit = 5` → `4`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns `false`. Indices: `r0 a1 c2 e3 _4 a5 _6 c7 a8 r9`.
+
+| Iteration | left | right | s[left] | s[right] | Match? |
+|-----------|------|-------|---------|----------|--------|
+| 1 | 0 | 9 | 'r' | 'r' | Yes |
+| 2 | 1 | 8 | 'a' | 'a' | Yes |
+| 3 | 2 | 7 | 'c' | 'c' | Yes |
+| 4 | 3 | 6 → 5 (skip space) | 'e' | 'a' | **No** → return false |
+
+**Q2.** Result `[[-2, 0, 2], [-2, 1, 1]]`.
+- `i = 0` (−2): `left = 1, right = 4`: $-2 + 0 + 2 = 0$ → push; move to `left = 2, right = 3` (no duplicates to skip). $-2 + 1 + 1 = 0$ → push; pointers cross.
+- `i = 1` (0): sums $0 + 1 + 2 = 3$ and $0 + 1 + 1 = 2$ are too big; `right` moves down until the pointers cross.
+- `i = 2` (1): $1 + 1 + 2 = 4 > 0$; pointers cross.
+- `i = 3` is skipped because `nums[3] == nums[2]` (both `1`): any triplet starting with that `1` was already explored at `i = 2`.
+- `i = 4`: `left = 5 > right = 4`, nothing to do.
+
+**Q3.** Answer `17`, from lines 4 and 5 (heights `18` and `17`, width `1`); the narrowest container wins here.
+
+| Step | left | right | h[left] | h[right] | Width | Area | Action |
+|------|------|-------|---------|----------|-------|------|--------|
+| 1 | 0 | 6 | 2 | 6 | 6 | 12 | left++ |
+| 2 | 1 | 6 | 3 | 6 | 5 | 15 | left++ |
+| 3 | 2 | 6 | 4 | 6 | 4 | 16 | left++ |
+| 4 | 3 | 6 | 5 | 6 | 3 | 15 | left++ |
+| 5 | 4 | 6 | 18 | 6 | 2 | 12 | right-- |
+| 6 | 4 | 5 | 18 | 17 | 1 | 17 | right-- (loop ends) |
+
+**Q4.** Total `9`. Since `left_max = 4 < right_max = 5` throughout, **only `left` moves**.
+
+| Step | left (after ++) | height[left] | left_max | Water added | Total |
+|------|-----------------|--------------|----------|-------------|-------|
+| 1 | 1 | 2 | 4 | 2 | 2 |
+| 2 | 2 | 0 | 4 | 4 | 6 |
+| 3 | 3 | 3 | 4 | 1 | 7 |
+| 4 | 4 | 2 | 4 | 2 | 9 |
+| 5 | 5 | 5 | 5 | 0 | 9 |
+
+The right wall `5` is taller than everything on the left, so each bar's water level is `left_max = 4`, exactly the chapter's "left side is the bottleneck" argument.
+
+**Q5.** Buggy: `[[-1, 0, 1], [-1, 0, 1]]`. Correct: `[[-1, 0, 1]]`.
+- `i = 0`: `left = 1, right = 5`: $-1 - 1 + 1 = -1$ → left++. `left = 2`: $-1 + 0 + 1 = 0$ → push, move to `left = 3, right = 4`.
+- Buggy: $-1 + 0 + 1 = 0$ again → pushes the same triplet a second time.
+- Correct: after the move, `nums[3] == nums[2]` so `left` advances to 4, which equals `right`; the loop ends without a second push.
+- `i = 1` is skipped (duplicate `-1`) in both versions; no other `i` finds a zero sum.
+
+**E1 — reference solution**
+```cpp
+bool isPalRange(const string& s, int left, int right) {
+    while (left < right) {
+        if (s[left] != s[right]) return false;
+        left++; right--;
+    }
+    return true;
+}
+
+bool validPalindromeII(const string& s) {
+    int left = 0, right = (int)s.size() - 1;
+    while (left < right) {
+        if (s[left] != s[right]) {
+            // Use the single deletion: drop the left char OR the right char.
+            return isPalRange(s, left + 1, right) || isPalRange(s, left, right - 1);
+        }
+        left++; right--;
+    }
+    return true;
+}
+```
+For `"abca"`: `a == a`, then `b != c` at `(1, 2)`; skipping left leaves `"c"`, a palindrome, so `true`. Only one mismatch is ever branched on, so it is still $O(N)$ time, $O(1)$ space.
+
+**E2 — reference solution**
+```cpp
+int threeSumClosest(vector<int>& nums, int target) {
+    sort(nums.begin(), nums.end());
+    int n = nums.size();
+    int best = nums[0] + nums[1] + nums[2];
+    for (int i = 0; i < n - 2; i++) {
+        int left = i + 1, right = n - 1;
+        while (left < right) {
+            int sum = nums[i] + nums[left] + nums[right];
+            if (abs(sum - target) < abs(best - target)) best = sum;
+            if (sum == target) return sum;          // cannot get closer than 0
+            else if (sum < target) left++;
+            else right--;
+        }
+    }
+    return best;
+}
+```
+Sorted `[-4, -1, 1, 2]`, target 1: `i = 0` gives sums `-1, 0`; `i = 1` gives `-1 + 1 + 2 = 2`, distance 1, which is the best. Time $O(N^2)$, space $O(1)$ beyond sorting.
+
+**E3 — reference solution**
+```cpp
+int numRescueBoats(vector<int>& people, int limit) {
+    sort(people.begin(), people.end());
+    int left = 0, right = (int)people.size() - 1;
+    int boats = 0;
+    while (left <= right) {                  // <= : a lone last person still needs a boat
+        if (people[left] + people[right] <= limit) left++;   // lightest rides along
+        right--;                             // heaviest always leaves now
+        boats++;
+    }
+    return boats;
+}
+```
+The heaviest remaining person must board some boat; pairing them with the lightest is the best possible partner (if even the lightest does not fit, nobody does). Sorted `[1, 2, 2, 3]`, limit 3: `1+3` no → `{3}`; `1+2` yes → `{1,2}`; `{2}` alone → 3 boats. Time $O(N \log N)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

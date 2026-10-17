@@ -587,6 +587,155 @@ public:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run Problem 1's set-based `lengthOfLongestSubstring` on `s = "dvdf"`. Give the set, `left` and `maxLen` after each `right`. Why would a naive "reset the window to start at the duplicate" approach get this wrong?
+
+**Q2.** Run Problem 2's main `characterReplacement` (the version with `if`, not `while`) on `s = "ABBBCA"`, `k = 1`. Fill in the table. After the last step the window is `s[2..5] = "BBCA"`: does it actually satisfy `len - (true max frequency) <= k`? Why is the returned answer still correct?
+
+| right | char | maxFreq | shrink? | left | window len | maxLen |
+|-------|------|---------|---------|------|------------|--------|
+| 0 | A | ? | ? | ? | ? | ? |
+| 1 | B | ? | ? | ? | ? | ? |
+| 2 | B | ? | ? | ? | ? | ? |
+| 3 | B | ? | ? | ? | ? | ? |
+| 4 | C | ? | ? | ? | ? | ? |
+| 5 | A | ? | ? | ? | ? | ? |
+
+**Q3.** Run Problem 3's `checkInclusion` with `s1 = "ab"`, `s2 = "eidboaoo"`. List every window it compares and the result.
+
+**Q4.** Run Problem 4's `minWindow` on `s = "ABAACBAB"`, `t = "ABC"`. List every window that is VALID inside the `while (matched == required)` loop (with its `left`/`right`), and give the returned string. Two windows of the best length appear; which one is returned and why?
+
+### Coding Exercises
+
+**E1 (Easy).** Find all anagrams. Return every start index `i` such that `s.substr(i, p.size())` is a permutation of `p` (lowercase letters). This is Problem 3, but collecting all matches instead of returning on the first.
+```cpp
+vector<int> findAnagrams(const string& s, const string& p);
+```
+- `s = "cbaebabacd"`, `p = "abc"` → `[0, 6]`
+- `s = "abab"`, `p = "ab"` → `[0, 1, 2]`
+
+**E2 (Easy–Medium).** Longest run of 1s after deleting exactly one element. `nums` is binary; you **must** delete one element. Return the length of the longest subarray of only `1`s in the result.
+```cpp
+int longestSubarray(const vector<int>& nums);
+```
+- `[1, 1, 0, 1]` → `3`
+- `[0, 1, 1, 1, 0, 1, 1, 0, 1]` → `5`
+- `[1, 1, 1]` → `2` (a `1` must be deleted)
+
+**E3 (Medium).** Count substrings containing all of `'a'`, `'b'`, `'c'`. `s` contains only those three letters. Use Problem 4's "shrink while valid" idea: once `s[left..right]` is the shortest valid window ending at `right`, every start `0..left-1` also works.
+```cpp
+int numberOfSubstrings(const string& s);
+```
+- `"abcabc"` → `10`
+- `"aaacb"` → `3`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns `3` (`"vdf"`).
+
+| right | char | duplicate? | erased | left | set after | maxLen |
+|-------|------|------------|--------|------|-----------|--------|
+| 0 | d | no | — | 0 | {d} | 1 |
+| 1 | v | no | — | 0 | {d,v} | 2 |
+| 2 | d | yes | d | 1 | {v,d} | 2 |
+| 3 | f | no | — | 1 | {v,d,f} | 3 |
+
+At `right = 2` the window shrinks only past the *first* `d`, keeping `v`. Restarting the window at index 2 would throw `v` away and find only `"df"` (length 2).
+
+**Q2.** Returns `4`.
+
+| right | char | maxFreq | shrink? | left | window len | maxLen |
+|-------|------|---------|---------|------|------------|--------|
+| 0 | A | 1 | no | 0 | 1 | 1 |
+| 1 | B | 1 | no | 0 | 2 | 2 |
+| 2 | B | 2 | no | 0 | 3 | 3 |
+| 3 | B | 3 | no | 0 | 4 | 4 |
+| 4 | C | 3 | yes (5 - 3 = 2 > 1) | 1 | 4 | 4 |
+| 5 | A | 3 | yes (5 - 3 = 2 > 1) | 2 | 4 | 4 |
+
+`"BBCA"` has true max frequency 2, so it needs $4 - 2 = 2 > 1$ replacements: it is **not** valid. That is fine: with the `if` version the window never shrinks below the best length found so far; it just slides. Because `maxFreq` is stale (still 3), `maxLen` can only grow when a genuinely higher frequency appears, so an invalid sliding window never inflates the answer.
+
+**Q3.** Returns `false`. Windows compared (size 2): `"ei"`, `"id"`, `"db"`, `"bo"`, `"oa"`, `"ao"`, `"oo"`. None has `a = 1` and `b = 1`: `"bo"` and `"oa"` each contain only one of the two letters, and the `a` and `b` are never adjacent.
+
+**Q4.** Returns `"ACB"`. Indices: `A0 B1 A2 A3 C4 B5 A6 B7`.
+
+| right | left | valid window | length | minLen / minStart after |
+|-------|------|--------------|--------|-------------------------|
+| 4 | 0 | ABAAC | 5 | 5 / 0 |
+| 4 | 1 | BAAC | 4 | 4 / 1 |
+| 5 | 2 | AACB | 4 | 4 / 1 (not shorter) |
+| 5 | 3 | ACB | 3 | 3 / 3 |
+| 6 | 4 | CBA | 3 | 3 / 3 (not shorter) |
+
+Dropping `B` at `left = 1` breaks validity (`matched` 3 → 2) until `B` reappears at `right = 5`. `"ACB"` and `"CBA"` both have length 3, but the update uses strict `<`, so the first one found (`minStart = 3`) is kept.
+
+**E1 — reference solution**
+```cpp
+vector<int> findAnagrams(const string& s, const string& p) {
+    vector<int> result;
+    int k = p.size();
+    if (k > (int)s.size()) return result;
+
+    vector<int> pCount(26, 0), windowCount(26, 0);
+    for (int i = 0; i < k; i++) {
+        pCount[p[i] - 'a']++;
+        windowCount[s[i] - 'a']++;
+    }
+    if (pCount == windowCount) result.push_back(0);
+
+    for (int i = k; i < (int)s.size(); i++) {
+        windowCount[s[i] - 'a']++;          // entering
+        windowCount[s[i - k] - 'a']--;      // leaving
+        if (pCount == windowCount) result.push_back(i - k + 1);   // window start
+    }
+    return result;
+}
+```
+On `"cbaebabacd"`: window `"cba"` (start 0) matches; later `"bac"` (start 6) matches. Each comparison is over 26 counters, so time is $O(26 \cdot N) = O(N)$, space $O(1)$.
+
+**E2 — reference solution**
+```cpp
+int longestSubarray(const vector<int>& nums) {
+    int left = 0, zeros = 0, best = 0;
+    for (int right = 0; right < (int)nums.size(); right++) {
+        if (nums[right] == 0) zeros++;
+        while (zeros > 1) {                 // at most one zero may be "deleted"
+            if (nums[left] == 0) zeros--;
+            left++;
+        }
+        best = max(best, right - left);     // window length minus the deleted element
+    }
+    return best;
+}
+```
+Window length is `right - left + 1`; subtracting the one mandatory deletion gives `right - left`. For `[1, 1, 1]` the full window has length 3, but one `1` must go, so the answer is 2. In the second example the best window is indices `1..6` (`[1,1,1,0,1,1]`), giving $6 - 1 = 5$. Time $O(N)$, space $O(1)$.
+
+**E3 — reference solution**
+```cpp
+int numberOfSubstrings(const string& s) {
+    int counts[3] = {0, 0, 0};
+    int left = 0, total = 0;
+    for (int right = 0; right < (int)s.size(); right++) {
+        counts[s[right] - 'a']++;
+        // Shrink while s[left..right] still contains a, b and c.
+        while (counts[0] > 0 && counts[1] > 0 && counts[2] > 0) {
+            counts[s[left] - 'a']--;
+            left++;
+        }
+        // Now s[left-1..right] was the shortest valid window ending at right,
+        // so every start in 0..left-1 gives a valid substring.
+        total += left;
+    }
+    return total;
+}
+```
+On `"abcabc"`, `left` after each `right` is `0, 0, 1, 2, 3, 4`, so the total is $0 + 0 + 1 + 2 + 3 + 4 = 10$. On `"aaacb"`, `left` is `0, 0, 0, 0, 3`, total `3`. Each pointer moves at most $N$ times: $O(N)$ time, $O(1)$ space.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

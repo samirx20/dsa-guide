@@ -614,6 +614,146 @@ But actual max is 5 + 5 = 10 (wrap around) ✓
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run the chapter's 5-line template on `nums = [3, -4, 5, -1, 2, -6, 4]`. Fill in the dry-run table (same columns as Section 5) and give the return value.
+
+| i | nums[i] | currentSum (before) | Decision | currentSum (after) | globalMax |
+|---|---------|---------------------|----------|--------------------|-----------|
+| 0 | 3  | — | Start | 3 | 3 |
+| 1 | -4 | ? | ? | ? | ? |
+| 2 | 5  | ? | ? | ? | ? |
+| 3 | -1 | ? | ? | ? | ? |
+| 4 | 2  | ? | ? | ? | ? |
+| 5 | -6 | ? | ? | ? | ? |
+| 6 | 4  | ? | ? | ? | ? |
+
+**Q2.** Now run Variation 1, `maxSubArrayWithIndices`, on the same array. What does it return? Pay attention to `i = 6`: does it start fresh or extend, and does `start`/`end` change?
+
+**Q3.** Trace Variation 3, `maxProduct`, on `nums = [-2, 3, -4]`. Give `currentMax`, `currentMin` and `globalMax` after each index and the final answer.
+
+**Q4.** Trace the circular variant `maxSubarraySumCircular` on `nums = [8, -1, -3, 8]`. What are `globalMax`, `globalMin`, `totalSum`, and the returned value? Which elements form the winning subarray?
+
+**Q5.** Mistake 3 forgets `globalMax = max(globalMax, currentSum);` inside the loop. Running that broken version on the chapter's array `[-2, 1, -3, 4, -1, 2, 1, -5, 4]` (still returning `globalMax`), what is returned? What would be returned if someone "fixed" it by returning `currentSum` instead?
+
+### Coding Exercises
+
+**E1 (Easy).** Minimum subarray sum. Flip Kadane's greedy choice to find the smallest sum of any non-empty contiguous subarray.
+```cpp
+int minSubArray(vector<int>& nums);
+```
+- `[3, -4, 2, -3, -1, 7, -5]` → `-6` (subarray `[-4, 2, -3, -1]`)
+- `[2, 3, 1]` → `1`
+
+**E2 (Easy–Medium).** Maximum absolute sum. Return the maximum of $\left|\sum_{k=i}^{j} \text{nums}[k]\right|$ over all subarrays, in one pass.
+```cpp
+int maxAbsoluteSum(vector<int>& nums);
+```
+- `[1, -3, 2, 3, -4]` → `5` (subarray `[2, 3]`)
+- `[2, -5, 1, -4, 3, -2]` → `8` (subarray `[-5, 1, -4]`)
+
+**E3 (Medium).** Maximum subarray sum with at most one deletion. You may delete at most one element from a chosen subarray, but the remaining subarray must be non-empty.
+```cpp
+int maximumSumOneDeletion(vector<int>& arr);
+```
+- `[1, -2, 0, 3]` → `4` (take `[1, -2, 0, 3]`, delete `-2`)
+- `[1, -2, -2, 3]` → `3`
+- `[-1, -1, -1, -1]` → `-1`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns `6` (subarray `[5, -1, 2]`).
+
+| i | nums[i] | currentSum (before) | Decision | currentSum (after) | globalMax |
+|---|---------|---------------------|----------|--------------------|-----------|
+| 0 | 3  | — | Start | 3 | 3 |
+| 1 | -4 | 3 | Extend: max(-4, -1) | -1 | 3 |
+| 2 | 5  | -1 | Start fresh: max(5, 4) | 5 | 5 |
+| 3 | -1 | 5 | Extend: max(-1, 4) | 4 | 5 |
+| 4 | 2  | 4 | Extend: max(2, 6) | 6 | 6 |
+| 5 | -6 | 6 | Extend: max(-6, 0) | 0 | 6 |
+| 6 | 4  | 0 | Tie: max(4, 4) | 4 | 6 |
+
+At `i = 2` the running sum `-1` is a liability, so the algorithm throws it away, exactly the chapter's intuition.
+
+**Q2.** Returns `{6, 2, 4}`, i.e. sum `6`, subarray `nums[2..4] = [5, -1, 2]`.
+
+| i | `nums[i] > currentSum + nums[i]`? | currentSum | tempStart | globalMax / start / end |
+|---|-----|-----|-----|-----|
+| 1 | -4 > -1? No → extend | -1 | 0 | 3 / 0 / 0 |
+| 2 | 5 > 4? Yes → fresh | 5 | 2 | 5 / 2 / 2 |
+| 3 | -1 > 4? No → extend | 4 | 2 | 5 / 2 / 2 |
+| 4 | 2 > 6? No → extend | 6 | 2 | 6 / 2 / 4 |
+| 5 | -6 > 0? No → extend | 0 | 2 | 6 / 2 / 4 |
+| 6 | 4 > 4? No (strict `>`) → extend | 4 | 2 | 6 / 2 / 4 |
+
+At `i = 6` it is a tie, so the strict `>` chooses *extend*; `currentSum = 4` is not `> 6`, so `start`/`end` stay `2`/`4`.
+
+**Q3.** Answer `24` (the whole array: $(-2) \cdot 3 \cdot (-4)$).
+
+| i | nums[i] | Swap? | currentMax | currentMin | globalMax |
+|---|---------|-------|------------|------------|-----------|
+| 0 | -2 | — | -2 | -2 | -2 |
+| 1 | 3 | No | max(3, -6) = 3 | min(3, -6) = -6 | 3 |
+| 2 | -4 | Yes → max=-6, min=3 | max(-4, 24) = 24 | min(-4, -12) = -12 | 24 |
+
+The swap is what lets the very negative `-6` become the source of the new maximum.
+
+**Q4.** Normal Kadane: `currentSum` goes `8, 7, 4, 12`, so `globalMax = 12`. Min-Kadane: `currentSum` goes `8, -1, -4, 4`, so `globalMin = -4` (subarray `[-1, -3]`). `totalSum = 12`. Since `globalMax >= 0`, return `max(12, 12 - (-4)) = 16`. The winning subarray wraps around: `nums[3], nums[0] = 8 + 8`.
+
+**Q5.** The broken version never changes `globalMax`, so it returns its initial value `nums[0] = -2`. Returning `currentSum` instead gives `5` (the best sum *ending at the last index*, `[4, -1, 2, 1, -5, 4]`), which is also wrong; the correct answer is `6`. `currentSum` is only "best ending at $i$"; `globalMax` is "best anywhere".
+
+**E1 — reference solution**
+```cpp
+int minSubArray(vector<int>& nums) {
+    int globalMin = nums[0];
+    int currentSum = nums[0];
+    for (int i = 1; i < (int)nums.size(); i++) {
+        // Start fresh, or extend if the running sum keeps us lower
+        currentSum = min(nums[i], currentSum + nums[i]);
+        globalMin = min(globalMin, currentSum);
+    }
+    return globalMin;
+}
+```
+On the first example `currentSum` runs `3, -4, -2, -5, -6, 1, -5`, so `globalMin = -6`. Time $O(N)$, space $O(1)$. This is the same "Case 2" loop used inside the circular variant.
+
+**E2 — reference solution**
+```cpp
+int maxAbsoluteSum(vector<int>& nums) {
+    int curMax = 0, curMin = 0, best = 0;
+    for (int x : nums) {
+        curMax = max(x, curMax + x);     // best sum ending here
+        curMin = min(x, curMin + x);     // worst sum ending here
+        best = max({best, curMax, -curMin});
+    }
+    return best;
+}
+```
+The largest absolute value is either the largest sum or the most negative sum, so run max-Kadane and min-Kadane side by side. Time $O(N)$, space $O(1)$.
+
+**E3 — reference solution**
+```cpp
+int maximumSumOneDeletion(vector<int>& arr) {
+    int keep = arr[0];          // best sum ending at i, no deletion used
+    int del  = INT_MIN / 2;     // best sum ending at i, one deletion used
+    int best = arr[0];
+    for (int i = 1; i < (int)arr.size(); i++) {
+        int prevKeep = keep;
+        keep = max(arr[i], keep + arr[i]);       // plain Kadane
+        del  = max(prevKeep,                     // delete arr[i] itself
+                   del + arr[i]);                // deletion happened earlier
+        best = max({best, keep, del});
+    }
+    return best;
+}
+```
+Two Kadane states. Deleting `arr[i]` means taking the best no-deletion sum ending at `i-1`; otherwise the deletion was earlier and we extend. `del` starts at a large negative value (not `INT_MIN`, to avoid overflow on `del + arr[i]`) because deleting the only element would leave an empty subarray. On `[1, -2, 0, 3]`: `keep` = `1, -1, 0, 3`, `del` = `-inf, 1, 1, 4`, answer `4`. Time $O(N)$, space $O(1)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

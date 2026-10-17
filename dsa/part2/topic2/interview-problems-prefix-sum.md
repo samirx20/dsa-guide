@@ -403,6 +403,142 @@ if (!firstSeen.count(currSum)) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run Problem 2's `pivotIndex` on `nums = [2, 3, -1, 8, 4]`, then on `nums = [2, 1, -1]`. Give the dry-run table for the first and the return value for both.
+
+**Q2.** Problem 2's "Common Mistake" adds `nums[i]` to `leftSum` *before* computing `rightSum`. What does that buggy version return on the problem's own example `[1, 7, 3, 6, 5, 6]` (correct answer `3`)?
+
+**Q3.** Trace Problem 5's `findMaxLength` on `nums = [1, 1, 0, 1, 0, 0, 1]`. Fill in `currSum`, whether it was seen, the candidate length, and `maxLen` at each index.
+
+**Q4.** Using Problem 3's prefix array `[0, -2, -2, 1, -4, -2, -3]` (built from `[-2, 0, 3, -5, 2, -1]`), compute `sumRange(2, 5)` and `sumRange(1, 3)`.
+
+**Q5.** Problem 5's "Common Mistake" overwrites the stored index every time a sum is seen. On `nums = [0, 1, 0, 1]`, what does the correct version return, and what does the overwriting version return?
+
+### Coding Exercises
+
+**E1 (Easy).** Number of valid splits. Count indices `i` with $0 \le i < n - 1$ such that $\text{sum}(\text{nums}[0..i]) \ge \text{sum}(\text{nums}[i+1..n-1])$. Use Problem 2's total-minus-left trick; $O(1)$ extra space.
+```cpp
+int waysToSplitArray(const vector<int>& nums);
+```
+- `[10, 4, -8, 7]` → `2`
+- `[2, 3, 1, 0]` → `2`
+
+**E2 (Easy–Medium).** Binary subarrays with sum. `nums` contains only `0`s and `1`s. Count the subarrays whose sum equals `goal`.
+```cpp
+int numSubarraysWithSum(const vector<int>& nums, int goal);
+```
+- `nums = [1, 0, 1, 0, 1]`, `goal = 2` → `4`
+- `nums = [0, 0, 0, 0, 0]`, `goal = 0` → `15`
+
+**E3 (Medium).** Continuous subarray sum. Values are non-negative and $k \ge 1$. Return `true` if there is a subarray of **length at least 2** whose sum is a multiple of `k` (0 counts as a multiple). Combine Problem 4's "remainder" idea with Problem 5's "first index" map.
+```cpp
+bool checkSubarraySum(const vector<int>& nums, int k);
+```
+- `nums = [23, 2, 4, 6, 7]`, `k = 6` → `true` (`[2, 4]`)
+- `nums = [23, 2, 6, 4, 7]`, `k = 13` → `false`
+
+#### Dry-Run: Answers
+
+**Q1.** First array: `totalSum = 16`, returns `3`.
+
+| i | nums[i] | leftSum | rightSum = 16 - left - nums[i] | Equal? |
+|---|---------|---------|--------------------------------|--------|
+| 0 | 2 | 0 | 14 | No |
+| 1 | 3 | 2 | 11 | No |
+| 2 | -1 | 5 | 12 | No |
+| 3 | 8 | 4 | 4 | **Yes** |
+
+Second array: `totalSum = 2`; at `i = 0`, `leftSum = 0` and `rightSum = 2 - 0 - 2 = 0`, so it returns `0`. The empty left side counts as sum 0; the pivot can be the first element.
+
+**Q2.** Returns `-1`.
+
+| i | leftSum (after early add) | rightSum = 28 - left - nums[i] | Equal? |
+|---|-----|-----|-----|
+| 0 | 1 | 26 | No |
+| 1 | 8 | 13 | No |
+| 2 | 11 | 14 | No |
+| 3 | 17 | 5 | No |
+| 4 | 22 | 1 | No |
+| 5 | 28 | -6 | No |
+
+`nums[i]` is subtracted twice (once inside `leftSum`, once explicitly), so the true pivot at index 3 is never detected.
+
+**Q3.** `maxLen = 6`.
+
+| i | nums[i] | currSum | Seen before at | length | maxLen | firstSeen added |
+|---|---------|---------|----------------|--------|--------|-----------------|
+| 0 | 1 | 1 | — | — | 0 | 1:0 |
+| 1 | 1 | 2 | — | — | 0 | 2:1 |
+| 2 | 0 | 1 | 0 | 2 | 2 | — |
+| 3 | 1 | 2 | 1 | 2 | 2 | — |
+| 4 | 0 | 1 | 0 | 4 | 4 | — |
+| 5 | 0 | 0 | -1 | 6 | 6 | — |
+| 6 | 1 | 1 | 0 | 6 | 6 | — |
+
+The winner is `nums[0..5] = [1, 1, 0, 1, 0, 0]`: three `1`s and three `0`s.
+
+**Q4.** `sumRange(2, 5) = prefix[6] - prefix[2] = -3 - (-2) = -1` (check: $3 - 5 + 2 - 1 = -1$). `sumRange(1, 3) = prefix[4] - prefix[1] = -4 - (-2) = -2` (check: $0 + 3 - 5 = -2$).
+
+**Q5.** Correct returns `4`; overwriting returns `2`. Prefix sums are `-1, 0, -1, 0`. Correct: at `i = 3`, sum `0` was first seen at `-1`, length $3 - (-1) = 4$. Overwriting: at `i = 1` the entry `0` is overwritten to `1`, so at `i = 3` the length is only $3 - 1 = 2$.
+
+**E1 — reference solution**
+```cpp
+int waysToSplitArray(const vector<int>& nums) {
+    long long total = 0;
+    for (int x : nums) total += x;
+    long long leftSum = 0;
+    int ways = 0;
+    for (int i = 0; i + 1 < (int)nums.size(); i++) {   // right part must be non-empty
+        leftSum += nums[i];
+        if (leftSum >= total - leftSum) ways++;
+    }
+    return ways;
+}
+```
+For `[10, 4, -8, 7]` (total 13): left sums `10, 14, 6` versus right sums `3, -1, 7` give two valid splits. `long long` avoids overflow when $N \times \max|x|$ exceeds `int`. Time $O(N)$, space $O(1)$.
+
+**E2 — reference solution**
+```cpp
+int numSubarraysWithSum(const vector<int>& nums, int goal) {
+    unordered_map<int, int> prefixCount;
+    prefixCount[0] = 1;
+    int currSum = 0, count = 0;
+    for (int x : nums) {
+        currSum += x;
+        auto it = prefixCount.find(currSum - goal);
+        if (it != prefixCount.end()) count += it->second;
+        prefixCount[currSum]++;
+    }
+    return count;
+}
+```
+This is Problem 4 verbatim with `k = goal`. For five zeros and `goal = 0`, the prefix sum is always `0`, so the counts added are `1, 2, 3, 4, 5`, totalling `15` (every one of the $5 \cdot 6 / 2$ subarrays). Time $O(N)$, space $O(N)$.
+
+**E3 — reference solution**
+```cpp
+bool checkSubarraySum(const vector<int>& nums, int k) {
+    unordered_map<int, int> firstSeen;     // remainder -> earliest prefix index
+    firstSeen[0] = -1;                     // empty prefix
+    int rem = 0;
+    for (int i = 0; i < (int)nums.size(); i++) {
+        rem = (rem + nums[i]) % k;
+        auto it = firstSeen.find(rem);
+        if (it != firstSeen.end()) {
+            if (i - it->second >= 2) return true;   // length >= 2
+        } else {
+            firstSeen[rem] = i;            // keep the FIRST index only
+        }
+    }
+    return false;
+}
+```
+First example, $k = 6$: remainders `5, 1, 5, ...`; at `i = 2` remainder `5` was first seen at `0`, length $2 \ge 2$, so `[2, 4]` (sum 6) works. Keeping the first index (as in Problem 5) is essential: a single `0` element repeats the remainder at distance 1, which must not overwrite the earlier index. Time $O(N)$, space $O(\min(N, k))$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

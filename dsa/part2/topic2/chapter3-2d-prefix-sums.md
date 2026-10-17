@@ -625,6 +625,147 @@ These are O(1) lookups using the prefix matrix!
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Build the padded prefix matrix for this $3 \times 3$ matrix using `prefix[r+1][c+1] = matrix[r][c] + prefix[r][c+1] + prefix[r+1][c] - prefix[r][c]`. Then answer `sumRegion(1, 1, 2, 2)` and `sumRegion(0, 1, 2, 1)`.
+```
+| 2  1  3 |
+| 0  4  1 |
+| 5  2  6 |
+```
+
+**Q2.** Section 8's buggy query drops the `+1` shift: `prefix[r2][c2] - prefix[r1][c2] - prefix[r2][c1] + prefix[r1][c1]`. Using the chapter's `1..9` matrix and its prefix matrix, what does the buggy `sumRegion(1, 1, 2, 2)` return? Which cells of the original matrix did it actually sum?
+
+**Q3.** Section 9's buggy query forgets to add back the overlap. On the chapter's $4 \times 4$ matrix (`1..16`, with `prefix[3][3] = 54`, `prefix[1][3] = 6`, `prefix[3][1] = 15`, `prefix[1][1] = 1`), what does the buggy `sumRegion(1, 1, 2, 2)` return, and by how much is it off?
+
+**Q4.** Using the `1..9` prefix matrix `[[0,0,0,0],[0,1,3,6],[0,5,12,21],[0,12,27,45]]` and the row/column formulas from Section 15, compute the sum of column `c = 1` and the sum of row `r = 2`.
+
+**Q5.** On the `1..9` matrix, trace `sumRegion(0, 1, 2, 2)` (the right two columns). Fill in `bottom_right`, `top_rectangle`, `left_rectangle`, `top_left_overlap` and the result.
+
+### Coding Exercises
+
+**E1 (Easy).** Best $k \times k$ square. Return the maximum sum of any $k \times k$ sub-square ($1 \le k \le \min(R, C)$), using $O(1)$ per candidate square.
+```cpp
+int maxSquareSum(const vector<vector<int>>& mat, int k);
+```
+- `{{1,2,3},{4,5,6},{7,8,9}}`, `k = 2` → `28` (`5+6+8+9`)
+- same matrix, `k = 3` → `45`
+
+**E2 (Easy–Medium).** Matrix block sum. Return `answer` where `answer[i][j]` is the sum of all `mat[r][c]` with $|r - i| \le k$ and $|c - j| \le k$ (clipped to the grid).
+```cpp
+vector<vector<int>> matrixBlockSum(const vector<vector<int>>& mat, int k);
+```
+- `{{1,2,3},{4,5,6},{7,8,9}}`, `k = 1` → `{{12,21,16},{27,45,33},{24,39,28}}`
+
+**E3 (Medium).** Largest square with sum $\le$ threshold. All values are non-negative. Return the largest side length `L` such that some $L \times L$ square has sum $\le$ `threshold`, or `0`.
+```cpp
+int maxSideLength(const vector<vector<int>>& mat, int threshold);
+```
+- `{{1,1,3,2,4,3,2},{1,1,3,2,4,3,2},{1,1,3,2,4,3,2}}`, `threshold = 4` → `2`
+- a $5 \times 5$ matrix of all `2`s, `threshold = 1` → `0`
+
+#### Dry-Run: Answers
+
+**Q1.** Prefix matrix:
+```
+|  0   0   0   0 |
+|  0   2   3   6 |
+|  0   2   7  11 |
+|  0   7  14  24 |
+```
+Key build steps: `prefix[2][2] = 4 + 3 + 2 - 2 = 7`, `prefix[2][3] = 1 + 6 + 7 - 3 = 11`, `prefix[3][2] = 2 + 7 + 7 - 2 = 14`, `prefix[3][3] = 6 + 11 + 14 - 7 = 24`.
+
+| Query | bottom_right | top_rectangle | left_rectangle | overlap | Result |
+|-------|--------------|---------------|----------------|---------|--------|
+| (1,1,2,2) | prefix[3][3] = 24 | prefix[1][3] = 6 | prefix[3][1] = 7 | prefix[1][1] = 2 | 24 - 6 - 7 + 2 = **13** |
+| (0,1,2,1) | prefix[3][2] = 14 | prefix[0][2] = 0 | prefix[3][1] = 7 | prefix[0][1] = 0 | 14 - 0 - 7 + 0 = **7** |
+
+Checks: $4 + 1 + 2 + 6 = 13$ and $1 + 4 + 2 = 7$.
+
+**Q2.** Buggy: `prefix[2][2] - prefix[1][2] - prefix[2][1] + prefix[1][1] = 12 - 3 - 5 + 1 = 5`. That is exactly the single cell `matrix[1][1]` (it is the correct formula for `sumRegion(1, 1, 1, 1)`). Without the shift, the bottom-right corner is treated as exclusive, so the last row and column of the query are dropped. The correct answer is `28`.
+
+**Q3.** Buggy: `54 - 6 - 15 = 33`; correct is `54 - 6 - 15 + 1 = 34`. It is off by exactly `prefix[1][1] = 1`, the top-left block `matrix[0][0]` that was subtracted twice.
+
+**Q4.** Column 1: `prefix[3][2] - prefix[3][1] = 27 - 12 = 15` ($2 + 5 + 8$). Row 2: `prefix[3][3] - prefix[2][3] = 45 - 21 = 24` ($7 + 8 + 9$).
+
+**Q5.** `bottom_right = prefix[3][3] = 45`, `top_rectangle = prefix[0][3] = 0`, `left_rectangle = prefix[3][1] = 12`, `top_left_overlap = prefix[0][1] = 0`. Result $45 - 0 - 12 + 0 = 33$ ($2+3+5+6+8+9 = 33$). With `r1 = 0`, the padded zero row makes two of the four terms vanish automatically.
+
+**E1 — reference solution**
+```cpp
+int maxSquareSum(const vector<vector<int>>& mat, int k) {
+    int R = mat.size(), C = mat[0].size();
+    vector<vector<long long>> prefix(R + 1, vector<long long>(C + 1, 0));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            prefix[r + 1][c + 1] = mat[r][c] + prefix[r][c + 1] + prefix[r + 1][c] - prefix[r][c];
+
+    long long best = LLONG_MIN;
+    for (int r1 = 0; r1 + k <= R; r1++) {
+        for (int c1 = 0; c1 + k <= C; c1++) {
+            int r2 = r1 + k - 1, c2 = c1 + k - 1;
+            long long s = prefix[r2 + 1][c2 + 1] - prefix[r1][c2 + 1]
+                        - prefix[r2 + 1][c1] + prefix[r1][c1];
+            best = max(best, s);
+        }
+    }
+    return (int)best;
+}
+```
+There are $(R-k+1)(C-k+1)$ candidate squares, each answered in $O(1)$: total $O(R \times C)$ time instead of $O(R \times C \times k^2)$. `long long` follows Section 10's overflow advice.
+
+**E2 — reference solution**
+```cpp
+vector<vector<int>> matrixBlockSum(const vector<vector<int>>& mat, int k) {
+    int R = mat.size(), C = mat[0].size();
+    vector<vector<int>> prefix(R + 1, vector<int>(C + 1, 0));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            prefix[r + 1][c + 1] = mat[r][c] + prefix[r][c + 1] + prefix[r + 1][c] - prefix[r][c];
+
+    vector<vector<int>> answer(R, vector<int>(C));
+    for (int i = 0; i < R; i++) {
+        for (int j = 0; j < C; j++) {
+            int r1 = max(0, i - k), c1 = max(0, j - k);          // clip to grid
+            int r2 = min(R - 1, i + k), c2 = min(C - 1, j + k);
+            answer[i][j] = prefix[r2 + 1][c2 + 1] - prefix[r1][c2 + 1]
+                         - prefix[r2 + 1][c1] + prefix[r1][c1];
+        }
+    }
+    return answer;
+}
+```
+Example: `answer[0][0]` clips to rows/cols `0..1`, giving `prefix[2][2] = 12`; `answer[1][1]` covers the whole grid, `45`. Time $O(R \times C)$, space $O(R \times C)$.
+
+**E3 — reference solution**
+```cpp
+int maxSideLength(const vector<vector<int>>& mat, int threshold) {
+    int R = mat.size(), C = mat[0].size();
+    vector<vector<int>> prefix(R + 1, vector<int>(C + 1, 0));
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            prefix[r + 1][c + 1] = mat[r][c] + prefix[r][c + 1] + prefix[r + 1][c] - prefix[r][c];
+
+    int best = 0;
+    for (int r = 0; r < R; r++) {
+        for (int c = 0; c < C; c++) {
+            // Only try lengths that would beat the current best.
+            for (int len = best + 1; r + len <= R && c + len <= C; len++) {
+                int s = prefix[r + len][c + len] - prefix[r][c + len]
+                      - prefix[r + len][c] + prefix[r][c];
+                if (s > threshold) break;      // non-negative values: bigger squares only grow
+                best = len;
+            }
+        }
+    }
+    return best;
+}
+```
+Every square sum is an $O(1)$ query. Because `len` always starts at `best + 1`, each cell costs at most one failed check, and successful checks raise `best`, which can happen at most $\min(R, C)$ times overall; total $O(R \times C)$ after the build. In the first example, the $2 \times 2$ square of `1`s at the top-left sums to `4`, but every $3 \times 3$ square sums to at least `15`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

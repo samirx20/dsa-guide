@@ -554,6 +554,139 @@ When NOT to use:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Build the *padded* prefix array (Section 3) for `nums = [4, -1, 3, 0, 2]`, then answer `getSum(1, 3)`, `getSum(0, 4)` and `getSum(3, 3)` using `prefix[right + 1] - prefix[left]`.
+
+**Q2.** Error 1 uses `prefix[right] - prefix[left]`. On the chapter's array `[2, 4, 1, 5, 3]` (padded prefix `[0, 2, 6, 7, 12, 15]`), what does the buggy `getSum(1, 3)` return, and which elements did it actually add up?
+
+**Q3.** Trace the hash-map version from Section 8, `subarraySum`, on `nums = [1, 2, 3, -3, 3]`, `k = 3`. Fill in the table and give `count`.
+
+| num | currentSum | currentSum - k | in map? (count) | count | prefixCount after |
+|-----|------------|----------------|-----------------|-------|-------------------|
+| 1 | ? | ? | ? | ? | ? |
+| 2 | ? | ? | ? | ? | ? |
+| 3 | ? | ? | ? | ? | ? |
+| -3 | ? | ? | ? | ? | ? |
+| 3 | ? | ? | ? | ? | ? |
+
+**Q4.** Reverse the process: you are given only the padded prefix array `[0, 3, 1, 6, 5, 9]`. What was `nums`? What single formula recovers `nums[i]`?
+
+**Q5.** On an array of size $N = 5$, answer the three queries `(0, 4)`, `(2, 4)`, `(1, 1)`. How many loop iterations does the brute-force `getSum` perform in total? How many additions does building the padded prefix take, and how many subtractions do the three prefix queries take?
+
+### Coding Exercises
+
+**E1 (Easy).** Left/right sum difference. Return `answer` where `answer[i] = |leftSum[i] - rightSum[i]|`, `leftSum[i]` is the sum of elements strictly left of `i` and `rightSum[i]` the sum strictly right of `i`.
+```cpp
+vector<int> leftRightDifference(const vector<int>& nums);
+```
+- `[10, 4, 8, 3]` → `[15, 1, 11, 22]`
+- `[1]` → `[0]`
+
+**E2 (Easy–Medium).** Range count queries. For each query `(l, r)`, return how many *even* numbers are in `nums[l..r]`, answering each query in $O(1)$ after $O(N)$ preprocessing.
+```cpp
+vector<int> countEvens(const vector<int>& nums, const vector<pair<int, int>>& queries);
+```
+- `nums = [2, 3, 4, 6, 7]`, queries `(0,2), (1,4), (3,3)` → `[2, 2, 1]`
+
+**E3 (Medium).** Range additions with a difference array (the inverse of a prefix sum). Start with `n` zeros; each update `{l, r, val}` adds `val` to every index in `[l, r]`. Return the final array in $O(N + U)$ time for $U$ updates.
+```cpp
+vector<int> applyRangeAdds(int n, const vector<array<int, 3>>& updates);
+```
+- `n = 5`, updates `{1,3,2}, {2,4,3}, {0,2,-2}` → `[-2, 0, 3, 5, 3]`
+
+#### Dry-Run: Answers
+
+**Q1.** Padded prefix: `[0, 4, 3, 6, 6, 8]`.
+
+| i | nums[i] | prefix[i] | prefix[i+1] |
+|---|---------|-----------|-------------|
+| 0 | 4 | 0 | 4 |
+| 1 | -1 | 4 | 3 |
+| 2 | 3 | 3 | 6 |
+| 3 | 0 | 6 | 6 |
+| 4 | 2 | 6 | 8 |
+
+- `getSum(1, 3) = prefix[4] - prefix[1] = 6 - 4 = 2` (check: $-1 + 3 + 0 = 2$)
+- `getSum(0, 4) = prefix[5] - prefix[0] = 8 - 0 = 8`
+- `getSum(3, 3) = prefix[4] - prefix[3] = 6 - 6 = 0` (just `nums[3] = 0`)
+
+**Q2.** Buggy result `prefix[3] - prefix[1] = 7 - 2 = 5`. Since `prefix[3]` is the sum of `nums[0..2]`, it computed `nums[1] + nums[2] = 4 + 1 = 5`; it silently dropped the right endpoint `nums[3] = 5`. The correct answer is `10`.
+
+**Q3.** `count = 5`.
+
+| num | currentSum | currentSum - k | in map? (count) | count | prefixCount after |
+|-----|------------|----------------|-----------------|-------|-------------------|
+| 1 | 1 | -2 | no | 0 | {0:1, 1:1} |
+| 2 | 3 | 0 | yes (1) | 1 | {0:1, 1:1, 3:1} |
+| 3 | 6 | 3 | yes (1) | 2 | {0:1, 1:1, 3:1, 6:1} |
+| -3 | 3 | 0 | yes (1) | 3 | {0:1, 1:1, 3:2, 6:1} |
+| 3 | 6 | 3 | yes (2) | 5 | {0:1, 1:1, 3:2, 6:2} |
+
+The five subarrays are `[1,2]`, `[1,2,3,-3]`, `[3]` (index 2), `[3,-3,3]` and `[3]` (index 4). The last step adds **2** because the prefix sum `3` was seen twice.
+
+**Q4.** `nums = [3, -2, 5, -1, 4]`, using $\text{nums}[i] = \text{prefix}[i+1] - \text{prefix}[i]$ (which is just `getSum(i, i)`): $3-0,\ 1-3,\ 6-1,\ 5-6,\ 9-5$.
+
+**Q5.** Brute force: $5 + 3 + 1 = 9$ iterations. Prefix: $5$ additions to build, then $3$ subtractions (one per query). The gap grows with $Q$: brute force is $O(Q \times N)$, prefix is $O(N + Q)$.
+
+**E1 — reference solution**
+```cpp
+vector<int> leftRightDifference(const vector<int>& nums) {
+    int n = nums.size();
+    vector<int> prefix(n + 1, 0);
+    for (int i = 0; i < n; i++) prefix[i + 1] = prefix[i] + nums[i];
+
+    vector<int> answer(n);
+    for (int i = 0; i < n; i++) {
+        int leftSum  = prefix[i];                    // sum of nums[0..i-1]
+        int rightSum = prefix[n] - prefix[i + 1];    // sum of nums[i+1..n-1]
+        answer[i] = abs(leftSum - rightSum);
+    }
+    return answer;
+}
+```
+For `[10, 4, 8, 3]`, prefix is `[0, 10, 14, 22, 25]`; at `i = 1`: left $10$, right $25 - 14 = 11$, answer $1$. Time $O(N)$, space $O(N)$.
+
+**E2 — reference solution**
+```cpp
+vector<int> countEvens(const vector<int>& nums, const vector<pair<int, int>>& queries) {
+    int n = nums.size();
+    vector<int> prefix(n + 1, 0);                    // prefix[i] = #evens in nums[0..i-1]
+    for (int i = 0; i < n; i++) {
+        prefix[i + 1] = prefix[i] + (nums[i] % 2 == 0 ? 1 : 0);
+    }
+    vector<int> out;
+    for (auto& q : queries) {
+        out.push_back(prefix[q.second + 1] - prefix[q.first]);
+    }
+    return out;
+}
+```
+A prefix sum over a 0/1 indicator turns "how many satisfy X in a range" into the usual $O(1)$ subtraction. Prefix here is `[0, 1, 1, 2, 3, 3]`. Time $O(N + Q)$.
+
+**E3 — reference solution**
+```cpp
+vector<int> applyRangeAdds(int n, const vector<array<int, 3>>& updates) {
+    vector<int> diff(n + 1, 0);
+    for (auto& u : updates) {
+        diff[u[0]]     += u[2];      // start adding at l
+        diff[u[1] + 1] -= u[2];      // stop after r (slot n absorbs r = n-1)
+    }
+    vector<int> result(n);
+    int running = 0;
+    for (int i = 0; i < n; i++) {    // prefix sum of diff = final values
+        running += diff[i];
+        result[i] = running;
+    }
+    return result;
+}
+```
+`diff` ends as `[-2, 2, 3, 2, -2, -3]`; its running sum is `[-2, 0, 3, 5, 3]`. Each update is $O(1)$ and one prefix pass rebuilds the array: $O(N + U)$ time, $O(N)$ space.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

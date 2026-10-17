@@ -433,6 +433,132 @@ Variations:
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Trace `subarraySumOptimal` on `nums = [2, -2, 2, -2]`, `k = 0`. Fill in the dry-run table (same columns as Section 4) and list every subarray that was counted.
+
+| i | val | prefixSum | target | map before | found? | count | map after |
+|---|-----|-----------|--------|------------|--------|-------|-----------|
+| 0 | 2 | ? | ? | {0:1} | ? | ? | ? |
+| 1 | -2 | ? | ? | ? | ? | ? | ? |
+| 2 | 2 | ? | ? | ? | ? | ? | ? |
+| 3 | -2 | ? | ? | ? | ? | ? | ? |
+
+**Q2.** Someone forgets `prefixCounts[0] = 1`. On `nums = [1, 2, 3]`, `k = 3`, what does the buggy code return, what is the correct answer, and which subarray is missed?
+
+**Q3.** Someone writes `count++` instead of `count += prefixCounts[target]` ("Using Count Instead of Frequency"). What does the buggy version return on the chapter's all-zeros example `[0, 0, 0]`, `k = 0`?
+
+**Q4.** Actually run the chapter's `subarraySumSlidingWindow` on `nums = [1, -1, 1, 1, 1]`, `k = 2`. What number does it return (versus the correct `4`)? Show `left`, `currentSum` and `count` after each `right`.
+
+**Q5.** The Quick Reference says the map update happens *after* checking the target. Suppose you swap the order (increment `prefixCounts[currentPrefixSum]` first, then look up `target`). What does that version return for `nums = [1, 2]`, `k = 0`, and why?
+
+### Coding Exercises
+
+**E1 (Easy).** Zero-sum subarray exists? Return `true` if some non-empty contiguous subarray sums to `0`. Use a hash *set* of prefix sums.
+```cpp
+bool hasZeroSumSubarray(const vector<int>& nums);
+```
+- `[4, 2, -3, 1, 6]` → `true` (`[2, -3, 1]`)
+- `[1, 2, 3]` → `false`
+
+**E2 (Easy–Medium).** Longest subarray with sum $K$ (the "Variations" note). Return the length of the longest contiguous subarray summing to `k`, or `0` if none. Store each prefix sum's **first** index.
+```cpp
+int longestSubarraySumK(const vector<int>& nums, int k);
+```
+- `nums = [1, -1, 5, -2, 3]`, `k = 3` → `4` (`[1, -1, 5, -2]`)
+- `nums = [-2, -1, 2, 1]`, `k = 1` → `2` (`[-1, 2]`)
+
+**E3 (Medium).** Subarray sums divisible by $K$. Count the non-empty subarrays whose sum is divisible by `k` ($k \ge 2$). Values may be negative.
+```cpp
+int subarraysDivByK(const vector<int>& nums, int k);
+```
+- `nums = [4, 5, 0, -2, -3, 1]`, `k = 5` → `7`
+- `nums = [5]`, `k = 9` → `0`
+
+#### Dry-Run: Answers
+
+**Q1.** `count = 4`.
+
+| i | val | prefixSum | target | map before | found? | count | map after |
+|---|-----|-----------|--------|------------|--------|-------|-----------|
+| 0 | 2 | 2 | 2 | {0:1} | no | 0 | {0:1, 2:1} |
+| 1 | -2 | 0 | 0 | {0:1, 2:1} | YES (1) | 1 | {0:2, 2:1} |
+| 2 | 2 | 2 | 2 | {0:2, 2:1} | YES (1) | 2 | {0:2, 2:2} |
+| 3 | -2 | 0 | 0 | {0:2, 2:2} | YES (2) | 4 | {0:3, 2:2} |
+
+Counted subarrays: `[2, -2]` (0–1), `[-2, 2]` (1–2), `[2, -2]` (2–3), `[2, -2, 2, -2]` (0–3).
+
+**Q2.** Buggy returns `1`; correct is `2`. Trace without the seed: `prefixSum = 1` (target `-2`, no), `prefixSum = 3` (target `0`, **not in map**), `prefixSum = 6` (target `3`, found once). It finds `[3]` but misses `[1, 2]`, the subarray starting at index 0, exactly the bug the chapter warns about.
+
+**Q3.** Returns `3` instead of `6`. Every prefix sum is `0`, so the target `0` is found at each of the 3 steps, but `count++` adds only 1 each time; the real frequencies are 1, 2, 3, summing to $1 + 2 + 3 = 6$.
+
+**Q4.** Returns `2`.
+
+| right | nums[right] | currentSum after add | shrink? | left | currentSum | count |
+|-------|-------------|----------------------|---------|------|------------|-------|
+| 0 | 1 | 1 | no | 0 | 1 | 0 |
+| 1 | -1 | 0 | no | 0 | 0 | 0 |
+| 2 | 1 | 1 | no | 0 | 1 | 0 |
+| 3 | 1 | 2 | no | 0 | 2 | 1 |
+| 4 | 1 | 3 | drop nums[0] | 1 | 2 | 2 |
+
+It finds `[1,-1,1,1]` and `[-1,1,1,1]` but never sees `[1, 1]` at 2–3 or 3–4, because the negative `-1` breaks the "shrinking always lowers the sum" assumption.
+
+**Q5.** Returns `2` (correct is `0`). With the increment first, at each step the map already contains the current `prefixSum`, and since `k = 0` the target *is* `prefixSum`, so each element "matches itself": that corresponds to the empty subarray. Checking first guarantees the matched prefix ends strictly before index `i`, so the subarray is non-empty.
+
+**E1 — reference solution**
+```cpp
+bool hasZeroSumSubarray(const vector<int>& nums) {
+    unordered_set<long long> seen = {0};   // empty prefix
+    long long prefixSum = 0;
+    for (int x : nums) {
+        prefixSum += x;
+        if (seen.count(prefixSum)) return true;   // same prefix twice => sum 0 between
+        seen.insert(prefixSum);
+    }
+    return false;
+}
+```
+On `[4, 2, -3, 1, 6]` the prefix sums are `4, 6, 3, 4`; `4` repeats, so `nums[1..3]` sums to 0. This is the $k = 0$ case of the chapter's equation $\text{Prefix}[j] = \text{Prefix}[i] - K$. Time $O(N)$, space $O(N)$.
+
+**E2 — reference solution**
+```cpp
+int longestSubarraySumK(const vector<int>& nums, int k) {
+    unordered_map<int, int> firstIndex;
+    firstIndex[0] = -1;                    // empty prefix "ends" at index -1
+    int prefixSum = 0, best = 0;
+    for (int i = 0; i < (int)nums.size(); i++) {
+        prefixSum += nums[i];
+        auto it = firstIndex.find(prefixSum - k);
+        if (it != firstIndex.end()) best = max(best, i - it->second);
+        if (!firstIndex.count(prefixSum)) firstIndex[prefixSum] = i;   // keep earliest
+    }
+    return best;
+}
+```
+Trace for the first example: prefix sums `1, 0, 5, 3, 6`; at `i = 3` the target `0` was first seen at index `-1`, length $3 - (-1) = 4$. Storing only the *first* index maximises the length. Time $O(N)$, space $O(N)$.
+
+**E3 — reference solution**
+```cpp
+int subarraysDivByK(const vector<int>& nums, int k) {
+    unordered_map<int, int> remCount;
+    remCount[0] = 1;                                  // empty prefix
+    int prefixSum = 0, count = 0;
+    for (int x : nums) {
+        prefixSum += x;
+        int rem = ((prefixSum % k) + k) % k;          // normalise negatives
+        count += remCount[rem];                       // same remainder => divisible gap
+        remCount[rem]++;
+    }
+    return count;
+}
+```
+Two prefixes with the same remainder mod $k$ differ by a multiple of $k$. For the example the remainders are `4, 4, 4, 2, 4, 0`; the counts added are `0, 1, 2, 0, 3, 1`, total `7`. In C++ `-7 % 5 == -2`, so the `+ k` fix is required. Time $O(N)$, space $O(\min(N, k))$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

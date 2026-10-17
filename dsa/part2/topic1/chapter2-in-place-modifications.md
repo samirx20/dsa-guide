@@ -414,6 +414,161 @@ int removeElement(vector<int>& nums, int val) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run the chapter's `removeElement` on `nums = [0, 1, 2, 2, 3, 0, 4, 2]` with `val = 2`. What does it return, which elements are "valid", and what does the *whole* array look like afterwards (including the garbage tail)?
+
+**Q2.** Trace the chapter's `findDuplicates` (negation technique) on `nums = [2, 1, 2, 1]`. What is `result`, and what is the final state of `nums`?
+
+**Q3.** Trace Variation 3, `sortArrayByParity`, on `nums = [3, 1, 2, 4]`. Fill in the table and give the returned array.
+
+| i | nums[i] | Even? | Swap | write_idx after | Array after |
+|---|---------|-------|------|-----------------|-------------|
+| 0 | 3 | ? | ? | ? | ? |
+| 1 | 1 | ? | ? | ? | ? |
+| 2 | 2 | ? | ? | ? | ? |
+| 3 | 4 | ? | ? | ? | ? |
+
+**Q4.** Mistake 2 shows the "increment before copy" bug. Run that buggy version on the chapter's input `[3, 2, 3, 4, 3]`, `val = 3`. What does the array look like at the end, what is returned, and why is the answer wrong?
+```cpp
+int write_idx = 0;
+for (int i = 0; i < nums.size(); i++) {
+    if (nums[i] != val) {
+        write_idx++;                 // BUG: increment first
+        nums[write_idx] = nums[i];
+    }
+}
+return write_idx;
+```
+
+**Q5.** The chapter shows the XOR swap. What does this print when the "two" elements are actually the same slot (as happens in a reversal or swap loop if `i == j`)?
+```cpp
+vector<int> nums = {10, 20};
+int i = 0, j = 0;
+nums[i] ^= nums[j];
+nums[j] ^= nums[i];
+nums[i] ^= nums[j];
+cout << nums[0] << " " << nums[1];
+```
+
+### Coding Exercises
+
+**E1 (Easy).** One-pass Move Zeroes. Variation 2 uses two passes; write the one-pass *swap* version mentioned in the chapter. Relative order of non-zero elements must be kept.
+```cpp
+void moveZeroes(vector<int>& nums);
+```
+- `[0, 1, 0, 3, 12]` → `[1, 3, 12, 0, 0]`
+- `[0]` → `[0]`
+
+**E2 (Easy–Medium).** Remove duplicates from a *sorted* array so each value appears **at most twice**. Return the new length `k`; the first `k` slots hold the answer. $O(1)$ extra space.
+```cpp
+int removeDuplicatesAtMostTwo(vector<int>& nums);
+```
+- `[1, 1, 1, 2, 2, 3]` → `5`, first 5 = `[1, 1, 2, 2, 3]`
+- `[0, 0, 1, 1, 1, 1, 2, 3, 3]` → `7`, first 7 = `[0, 0, 1, 1, 2, 3, 3]`
+
+**E3 (Medium).** Find all disappeared numbers. `nums` has length $N$ and every value is in $[1, N]$; some values appear twice and others are missing. Return the missing values in increasing order using the negation trick, $O(N)$ time and $O(1)$ extra space (the output does not count).
+```cpp
+vector<int> findDisappearedNumbers(vector<int>& nums);
+```
+- `[4, 3, 2, 7, 8, 2, 3, 1]` → `[5, 6]`
+- `[1, 1]` → `[2]`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns `5`; the valid prefix is `[0, 1, 3, 0, 4]`. Full array afterwards: `[0, 1, 3, 0, 4, 0, 4, 2]` (indices 5–7 are leftover garbage).
+
+| i | nums[i] | Action | write_idx after |
+|---|---------|--------|-----------------|
+| 0 | 0 | Copy to [0] | 1 |
+| 1 | 1 | Copy to [1] | 2 |
+| 2 | 2 | Skip | 2 |
+| 3 | 2 | Skip | 2 |
+| 4 | 3 | Copy to [2] | 3 |
+| 5 | 0 | Copy to [3] | 4 |
+| 6 | 4 | Copy to [4] | 5 |
+| 7 | 2 | Skip | 5 |
+
+Note that `0` is a perfectly valid value here; only `val = 2` is removed.
+
+**Q2.** `result = [2, 1]`, final `nums = [-2, -1, 2, 1]`.
+
+| i | val = abs(nums[i]) | idx | nums[idx] | Action | nums after | result |
+|---|-----|-----|-----------|--------|------------|--------|
+| 0 | 2 | 1 | 1 | Negate | [2,-1,2,1] | [] |
+| 1 | 1 | 0 | 2 | Negate | [-2,-1,2,1] | [] |
+| 2 | 2 | 1 | -1 | Add 2 | [-2,-1,2,1] | [2] |
+| 3 | 1 | 0 | -2 | Add 1 | [-2,-1,2,1] | [2,1] |
+
+At `i = 1` the value read is `abs(-1) = 1`: without `abs()` we would compute `idx = -2` and crash, exactly the chapter's "Not Using abs()" error.
+
+**Q3.** Returns `[2, 4, 3, 1]`.
+
+| i | nums[i] | Even? | Swap | write_idx after | Array after |
+|---|---------|-------|------|-----------------|-------------|
+| 0 | 3 | No | — | 0 | [3,1,2,4] |
+| 1 | 1 | No | — | 0 | [3,1,2,4] |
+| 2 | 2 | Yes | (0,2) | 1 | [2,1,3,4] |
+| 3 | 4 | Yes | (1,3) | 2 | [2,4,3,1] |
+
+Here the odds happen to keep their order (`3, 1`), but swap-based partitioning is not stable in general: on `[1, 3, 2]` it gives `[2, 3, 1]`, reversing the odds.
+
+**Q4.** Trace: `i=0` (3) skip; `i=1` (2): `write_idx = 1`, `nums[1] = 2`; `i=2` skip; `i=3` (4): `write_idx = 2`, `nums[2] = 4`; `i=4` skip. Final array `[3, 2, 4, 4, 3]`, returns `2`. The caller reads the first 2 slots as `[3, 2]`: it still contains the removed value `3` and lost the `4`. Writing to `write_idx` *after* incrementing skips slot 0 entirely, so every kept value lands one slot too far right.
+
+**Q5.** Prints `0 20`. With `i == j` the first line computes `nums[0] ^= nums[0]`, i.e. $x \oplus x = 0$, destroying the value; the next two lines compute $0 \oplus 0 = 0$. `std::swap` (or a temp variable) does not have this problem, which is one more reason to prefer it.
+
+**E1 — reference solution**
+```cpp
+void moveZeroes(vector<int>& nums) {
+    int write_idx = 0;                           // next slot for a non-zero
+    for (int i = 0; i < (int)nums.size(); i++) {
+        if (nums[i] != 0) {
+            swap(nums[write_idx], nums[i]);      // zero (or itself) moves back
+            write_idx++;
+        }
+    }
+}
+```
+Everything in `[0, write_idx)` is non-zero in original order; everything in `[write_idx, i)` is zero. Time $O(N)$, space $O(1)$.
+
+**E2 — reference solution**
+```cpp
+int removeDuplicatesAtMostTwo(vector<int>& nums) {
+    int write_idx = 0;
+    for (int i = 0; i < (int)nums.size(); i++) {
+        // Keep nums[i] unless the kept prefix already ends with two copies of it.
+        if (write_idx < 2 || nums[i] != nums[write_idx - 2]) {
+            nums[write_idx] = nums[i];
+            write_idx++;
+        }
+    }
+    return write_idx;
+}
+```
+Because the array is sorted, comparing against `nums[write_idx - 2]` (the *written* prefix, not the read side) is enough: if they are equal, two copies are already kept. Time $O(N)$, space $O(1)$. Changing `2` to `k` generalises it to "at most $k$ copies".
+
+**E3 — reference solution**
+```cpp
+vector<int> findDisappearedNumbers(vector<int>& nums) {
+    // Pass 1: mark every value v as seen by making nums[v-1] negative.
+    for (int i = 0; i < (int)nums.size(); i++) {
+        int idx = abs(nums[i]) - 1;              // abs(): slot may already be negated
+        if (nums[idx] > 0) nums[idx] = -nums[idx];
+    }
+    // Pass 2: any slot still positive was never marked -> value i+1 is missing.
+    vector<int> missing;
+    for (int i = 0; i < (int)nums.size(); i++) {
+        if (nums[i] > 0) missing.push_back(i + 1);
+    }
+    return missing;
+}
+```
+On `[4,3,2,7,8,2,3,1]` the marked array becomes `[-4,-3,-2,-7,8,2,-3,-1]`; slots 4 and 5 stay positive, so the answer is `[5, 6]`. Time $O(N)$, extra space $O(1)$. The `if (nums[idx] > 0)` guard prevents a duplicate from flipping a slot back to positive.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

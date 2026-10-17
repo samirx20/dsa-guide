@@ -513,6 +513,165 @@ int variableWindow(vector<int>& nums, int target) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run `findMaxAverage` on `nums = [4, 2, 1, 7, 8, 1, 2, 8, 1, 0]`, `k = 3`. List every window sum, the maximum sum, and the returned average.
+
+**Q2.** The "Common Mistake" subtracts `nums[i - k + 1]` instead of `nums[i - k]`. On `nums = [3, 1, 4, 1, 5, 9]`, `k = 3`, give `currentSum` after each slide for both the correct and the buggy code, and the max sum each would report.
+
+**Q3.** Fill in the Golden Template for "longest substring without repeating characters" with the invalid condition `counts[s[right]] > 1`, and run it on `s = "pwwkew"`. Give `left`, the window, its length and `maxLength` after each `right`.
+
+| right | char | left (after shrink) | window | length | maxLength |
+|-------|------|---------------------|--------|--------|-----------|
+| 0 | p | ? | ? | ? | ? |
+| 1 | w | ? | ? | ? | ? |
+| 2 | w | ? | ? | ? | ? |
+| 3 | k | ? | ? | ? | ? |
+| 4 | e | ? | ? | ? | ? |
+| 5 | w | ? | ? | ? | ? |
+
+**Q4.** "Shortest subarray with sum $\ge$ K" is a variable window that shrinks *while valid*. Trace it on `nums = [2, 3, 1, 2, 4, 3]`, `target = 7`: record every time the window is valid (sum $\ge 7$), its length, and the final answer.
+```cpp
+int left = 0, sum = 0, best = INT_MAX;
+for (int right = 0; right < nums.size(); right++) {
+    sum += nums[right];
+    while (sum >= target) {
+        best = min(best, right - left + 1);
+        sum -= nums[left];
+        left++;
+    }
+}
+```
+
+**Q5.** The template has a `while` loop inside a `for` loop, yet the chapter claims $O(N)$. Running the Q3 version on the chapter's `"abcabcbb"`, how many times in total does `left++` execute? What does that tell you?
+
+### Coding Exercises
+
+**E1 (Easy).** Count fixed windows above a threshold. Return how many windows of size `k` have average $\ge$ `threshold` (compare sums against `k * threshold` to stay in integers).
+```cpp
+int numOfSubarrays(const vector<int>& arr, int k, int threshold);
+```
+- `arr = [2, 2, 2, 2, 5, 5, 5, 8]`, `k = 3`, `threshold = 4` → `3`
+- `arr = [11, 13, 17, 23, 29, 31, 7, 5, 2, 3]`, `k = 3`, `threshold = 5` → `6`
+
+**E2 (Easy–Medium).** Max consecutive ones with `k` flips. `nums` is binary; you may flip at most `k` zeros to ones. Return the longest run of ones possible (a variable window that is invalid when it holds more than `k` zeros).
+```cpp
+int longestOnes(const vector<int>& nums, int k);
+```
+- `nums = [1,1,1,0,0,0,1,1,1,1,0]`, `k = 2` → `6`
+- `nums = [0,0,1,1,0,0,1,1,1,0,1,1,0,0,0,1,1,1,1]`, `k = 3` → `10`
+
+**E3 (Medium).** Longest substring with at most `k` distinct characters (from the Decision Table). This is where erasing zero-count keys matters: the window is invalid when `counts.size() > k`.
+```cpp
+int lengthOfLongestSubstringKDistinct(const string& s, int k);
+```
+- `s = "eceba"`, `k = 2` → `3` (`"ece"`)
+- `s = "aa"`, `k = 1` → `2`
+
+#### Dry-Run: Answers
+
+**Q1.** Window sums: `7, 10, 16, 16, 11, 11, 11, 9`. Max sum `16` (windows `[1, 7, 8]` and `[7, 8, 1]`), returned average $16 / 3 \approx 5.333$.
+
+| i (entering) | leaving nums[i-3] | currentSum | maxSum |
+|---|---|---|---|
+| (initial) | — | 4+2+1 = 7 | 7 |
+| 3 | 4 | 7 + 7 - 4 = 10 | 10 |
+| 4 | 2 | 10 + 8 - 2 = 16 | 16 |
+| 5 | 1 | 16 + 1 - 1 = 16 | 16 |
+| 6 | 7 | 16 + 2 - 7 = 11 | 16 |
+| 7 | 8 | 11 + 8 - 8 = 11 | 16 |
+| 8 | 1 | 11 + 1 - 1 = 11 | 16 |
+| 9 | 2 | 11 + 0 - 2 = 9 | 16 |
+
+**Q2.** Correct reports `15`; buggy reports `17`, a sum no window of size 3 actually has.
+
+| i | Correct: subtract nums[i-3] | Correct sum | Buggy: subtract nums[i-2] | Buggy sum |
+|---|-----|-----|-----|-----|
+| init | — | 8 | — | 8 |
+| 3 | nums[0] = 3 | 8 + 1 - 3 = 6 | nums[1] = 1 | 8 + 1 - 1 = 8 |
+| 4 | nums[1] = 1 | 6 + 5 - 1 = 10 | nums[2] = 4 | 8 + 5 - 4 = 9 |
+| 5 | nums[2] = 4 | 10 + 9 - 4 = 15 | nums[3] = 1 | 9 + 9 - 1 = 17 |
+
+**Q3.** Answer `3` (`"wke"`).
+
+| right | char | left (after shrink) | window | length | maxLength |
+|-------|------|---------------------|--------|--------|-----------|
+| 0 | p | 0 | p | 1 | 1 |
+| 1 | w | 0 | pw | 2 | 2 |
+| 2 | w | 2 (drop p, w) | w | 1 | 2 |
+| 3 | k | 2 | wk | 2 | 2 |
+| 4 | e | 2 | wke | 3 | 3 |
+| 5 | w | 3 (drop w) | kew | 3 | 3 |
+
+**Q4.** Answer `2` (`[4, 3]`). The window becomes valid five times:
+
+| right | left | window | sum | length | best |
+|-------|------|--------|-----|--------|------|
+| 3 | 0 | [2,3,1,2] | 8 | 4 | 4 |
+| 4 | 1 | [3,1,2,4] | 10 | 4 | 4 |
+| 4 | 2 | [1,2,4] | 7 | 3 | 3 |
+| 5 | 3 | [2,4,3] | 9 | 3 | 3 |
+| 5 | 4 | [4,3] | 7 | 2 | 2 |
+
+Unlike the "longest" template, the result is updated *inside* the `while`, because here every valid window is a candidate and we shrink to find a shorter one.
+
+**Q5.** `left++` runs **7** times in total: once each at `right = 3, 4, 5`, and twice each at `right = 6, 7`. Since `left` only moves forward and never passes `right`, the inner loop can run at most $N$ times over the *whole* algorithm. Total work is at most $2N$ pointer moves: $O(N)$, not $O(N^2)$ (amortised analysis).
+
+**E1 — reference solution**
+```cpp
+int numOfSubarrays(const vector<int>& arr, int k, int threshold) {
+    int windowSum = 0, count = 0;
+    int need = k * threshold;                    // avg >= t  <=>  sum >= k*t
+    for (int i = 0; i < (int)arr.size(); i++) {
+        windowSum += arr[i];                     // element entering
+        if (i >= k) windowSum -= arr[i - k];     // element leaving
+        if (i >= k - 1 && windowSum >= need) count++;
+    }
+    return count;
+}
+```
+First example: window sums `6, 6, 9, 12, 15, 18`, and `need = 12`, so the last three count. Folding the "build" loop into the slide loop with the `i >= k` guard is a common compact form. Time $O(N)$, space $O(1)$.
+
+**E2 — reference solution**
+```cpp
+int longestOnes(const vector<int>& nums, int k) {
+    int left = 0, zeros = 0, best = 0;
+    for (int right = 0; right < (int)nums.size(); right++) {
+        if (nums[right] == 0) zeros++;           // EXPAND
+        while (zeros > k) {                      // SHRINK while invalid
+            if (nums[left] == 0) zeros--;
+            left++;
+        }
+        best = max(best, right - left + 1);      // UPDATE (window valid)
+    }
+    return best;
+}
+```
+The tracking state is just a zero counter. In the first example the best window is indices `5..10` (`[0,1,1,1,1,0]`, two zeros flipped), length 6. Time $O(N)$, space $O(1)$.
+
+**E3 — reference solution**
+```cpp
+int lengthOfLongestSubstringKDistinct(const string& s, int k) {
+    unordered_map<char, int> counts;
+    int left = 0, best = 0;
+    for (int right = 0; right < (int)s.size(); right++) {
+        counts[s[right]]++;
+        while ((int)counts.size() > k) {         // too many distinct characters
+            char c = s[left];
+            if (--counts[c] == 0) counts.erase(c);   // erase so size() stays truthful
+            left++;
+        }
+        best = max(best, right - left + 1);
+    }
+    return best;
+}
+```
+On `"eceba"`, `k = 2`: the window grows to `"ece"` (length 3); adding `'b'` at index 3 makes 3 distinct, so `left` drops `e` (count 2 → 1, key stays) and then `c` (count 1 → 0, key erased), leaving `"eb"`. Without the `erase`, `counts.size()` would never shrink, so the `while` loop would keep moving `left` past perfectly valid windows (and eventually past `right`). Time $O(N)$, space $O(k)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

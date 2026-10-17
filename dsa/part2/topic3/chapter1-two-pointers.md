@@ -357,6 +357,156 @@ bool hasCycle(ListNode *head) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run `twoSumSorted` on `nums = [1, 3, 4, 6, 8, 11]`, `target = 10`. Fill in the dry-run table (same columns as Section 1) until it returns.
+
+| Step | left | right | nums[left] | nums[right] | currentSum | Action |
+|------|------|-------|------------|-------------|------------|--------|
+| 1 | 0 | 5 | ? | ? | ? | ? |
+| … | | | | | | |
+
+**Q2.** The "Common Mistake" uses `while (left <= right)`. On `nums = [1, 2, 5]`, `target = 10`, what does the correct version return, and what does the `<=` version return?
+
+**Q3.** Run the slow/fast `removeDuplicates` on `nums = [0, 0, 1, 1, 1, 2, 2, 3, 3, 4]`. What is returned, and what does the full array look like afterwards?
+
+**Q4.** Trace the production variation `twoSumUniquePairs` on `nums = [1, 1, 2, 45, 46, 46]`, `target = 47`. Which pairs are pushed, and what are `left`/`right` after each duplicate-skipping step?
+
+**Q5.** Trace Floyd's `hasCycle` on the list `1 → 2 → 3 → 4`, where node `4`'s `next` points back to node `2`. How many iterations of the `while` loop run, and at which node do `slow` and `fast` meet?
+
+### Coding Exercises
+
+**E1 (Easy).** Squares of a sorted array. `nums` is sorted ascending (may contain negatives). Return the squares, also sorted, in $O(N)$ time using opposite-end pointers.
+```cpp
+vector<int> sortedSquares(const vector<int>& nums);
+```
+- `[-4, -1, 0, 3, 10]` → `[0, 1, 9, 16, 100]`
+- `[-7, -3, 2, 3, 11]` → `[4, 9, 9, 49, 121]`
+
+**E2 (Easy–Medium).** Count pairs below target. `nums` is sorted ascending. Count index pairs `i < j` with `nums[i] + nums[j] < target` in $O(N)$.
+```cpp
+long long countPairsLess(const vector<int>& nums, int target);
+```
+- `nums = [1, 2, 3, 4, 5]`, `target = 6` → `4`
+- `nums = [-3, -1, 0, 2, 4]`, `target = 1` → `4`
+
+**E3 (Medium).** Sort colors (Dutch national flag). `nums` contains only `0`, `1`, `2`. Sort it in-place in one pass with $O(1)$ space using three pointers `low`, `mid`, `high`.
+```cpp
+void sortColors(vector<int>& nums);
+```
+- `[2, 0, 2, 1, 1, 0]` → `[0, 0, 1, 1, 2, 2]`
+- `[2, 0, 1]` → `[0, 1, 2]`
+
+#### Dry-Run: Answers
+
+**Q1.** Returns `[2, 3]` (`4 + 6 = 10`).
+
+| Step | left | right | nums[left] | nums[right] | currentSum | Action |
+|------|------|-------|------------|-------------|------------|--------|
+| 1 | 0 | 5 | 1 | 11 | 12 | > 10 → right-- |
+| 2 | 0 | 4 | 1 | 8 | 9 | < 10 → left++ |
+| 3 | 1 | 4 | 3 | 8 | 11 | > 10 → right-- |
+| 4 | 1 | 3 | 3 | 6 | 9 | < 10 → left++ |
+| 5 | 2 | 3 | 4 | 6 | 10 | == → return [2, 3] |
+
+**Q2.** Correct: sums are `6` (left++), `7` (left++), then `left = right = 2` stops the loop → returns `{}`. With `<=`, the loop continues at `left = right = 2` and checks `5 + 5 = 10`, returning `[2, 2]`: the same element used twice.
+
+**Q3.** Returns `5`; array afterwards `[0, 1, 2, 3, 4, 2, 2, 3, 3, 4]`.
+
+| fast | nums[fast] | nums[slow] | New? | slow after | write |
+|------|------------|------------|------|------------|-------|
+| 1 | 0 | 0 | No | 0 | — |
+| 2 | 1 | 0 | Yes | 1 | nums[1] = 1 |
+| 3 | 1 | 1 | No | 1 | — |
+| 4 | 1 | 1 | No | 1 | — |
+| 5 | 2 | 1 | Yes | 2 | nums[2] = 2 |
+| 6 | 2 | 2 | No | 2 | — |
+| 7 | 3 | 2 | Yes | 3 | nums[3] = 3 |
+| 8 | 3 | 3 | No | 3 | — |
+| 9 | 4 | 3 | Yes | 4 | nums[4] = 4 |
+
+Only the first `slow + 1 = 5` slots are meaningful; the tail keeps old values.
+
+**Q4.** Result `[[1, 46], [2, 45]]`.
+- `left = 0, right = 5`: `1 + 46 = 47` → push `[1, 46]`. Skip: `nums[0] == nums[1]` so `left = 1`; `nums[5] == nums[4]` so `right = 4`. Then `left++, right--` → `left = 2, right = 3`.
+- `left = 2, right = 3`: `2 + 45 = 47` → push `[2, 45]`. No duplicates to skip; `left = 3, right = 2`, loop ends.
+
+Without the skipping, step 1 would move to `left = 1, right = 4` and push `[1, 46]` a second time.
+
+**Q5.** 2 iterations; they meet at node `3`, so it returns `true`.
+
+| Iteration | slow (before) | fast (before) | slow (after) | fast (after) |
+|-----------|---------------|---------------|--------------|--------------|
+| start | — | — | 1 | 2 |
+| 1 | 1 | 2 | 2 | 4 |
+| 2 | 2 | 4 | 3 | 3 (4 → 2 → 3) |
+
+After iteration 2, `slow == fast`, so the loop condition fails and the function returns `true`.
+
+**E1 — reference solution**
+```cpp
+vector<int> sortedSquares(const vector<int>& nums) {
+    int n = nums.size();
+    vector<int> result(n);
+    int left = 0, right = n - 1;
+    // The largest square is always at one of the two ends: fill from the back.
+    for (int write = n - 1; write >= 0; write--) {
+        if (abs(nums[left]) > abs(nums[right])) {
+            result[write] = nums[left] * nums[left];
+            left++;
+        } else {
+            result[write] = nums[right] * nums[right];
+            right--;
+        }
+    }
+    return result;
+}
+```
+On `[-4, -1, 0, 3, 10]`: `10` beats `-4` (100), `-4` beats `3` (16), `3` beats `-1` (9), `-1` beats `0` (1), then `0`. Time $O(N)$, space $O(N)$ for the output.
+
+**E2 — reference solution**
+```cpp
+long long countPairsLess(const vector<int>& nums, int target) {
+    int left = 0, right = (int)nums.size() - 1;
+    long long count = 0;
+    while (left < right) {
+        if (nums[left] + nums[right] < target) {
+            // nums[left] pairs with EVERY index in (left, right]
+            count += right - left;
+            left++;
+        } else {
+            right--;
+        }
+    }
+    return count;
+}
+```
+On `[1, 2, 3, 4, 5]`, target 6: `1+5` no → right=3; `1+4 = 5 < 6` → +3 (pairs with 2, 3, 4); `2+4` no → right=2; `2+3 = 5 < 6` → +1. Total `4`. Counting a whole block at once is what keeps it $O(N)$.
+
+**E3 — reference solution**
+```cpp
+void sortColors(vector<int>& nums) {
+    // [0, low) = 0s, [low, mid) = 1s, (high, n-1] = 2s, [mid, high] unknown
+    int low = 0, mid = 0, high = (int)nums.size() - 1;
+    while (mid <= high) {
+        if (nums[mid] == 0) {
+            swap(nums[low], nums[mid]);
+            low++; mid++;
+        } else if (nums[mid] == 1) {
+            mid++;
+        } else {
+            swap(nums[mid], nums[high]);
+            high--;                 // do NOT advance mid: the swapped-in value is unchecked
+        }
+    }
+}
+```
+Trace on `[2, 0, 2, 1, 1, 0]`: swap mid/high → `[0,0,2,1,1,2]`; two `0`s advance low and mid; swap mid/high → `[0,0,1,1,2,2]`; two `1`s advance mid past `high`. One pass, $O(N)$ time, $O(1)$ space. Here `mid` is a same-direction pointer and `high` is an opposite-end pointer.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
