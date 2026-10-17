@@ -465,6 +465,165 @@ while (top <= bottom && left <= right) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Trace the chapter's recursive `gcd` for `gcd(84, 36)` and for `gcd(18, 48)` (note the smaller number comes first). Fill in the table (`a`, `b`, `a % b`, next call) for each. Then compute `lcm(84, 36)` using the chapter's divide-first formula.
+
+**Q2.** Run the chapter's `sieve(20)`. For which values of `p` does the outer loop body run, which of them pass `isPrime[p]`, and exactly which indices does each prime cross out? What vector is returned?
+
+**Q3.** Trace the chapter's `power(2, 10)` (with `MOD = 1e9 + 7`, which never triggers here). For each loop iteration give `exp` in binary, `exp & 1`, `result`, and `base` **after** the iteration. How many times does `result` get multiplied?
+
+**Q4.** In `rotate`, the inner transpose loop starts at `j = i`. Suppose a bug makes it start at `j = 0`:
+
+```cpp
+for (int i = 0; i < n; i++)
+    for (int j = 0; j < n; j++)          // BUG: should be j = i
+        swap(matrix[i][j], matrix[j][i]);
+// ...then reverse each row as before
+```
+
+What does the buggy `rotate` produce for `[[1,2,3],[4,5,6],[7,8,9]]`? What should it produce?
+
+**Q5.** Run the chapter's `spiralOrder` on the 3×2 matrix `[[1,2],[3,4],[5,6]]`. Track `top`, `bottom`, `left`, `right` after each of the four passes, and note when each `if` guard is checked. What is returned?
+
+### Coding Exercises
+
+**E1 (Easy).** Transpose a **non-square** $M \times N$ matrix (the in-place `swap` trick only works for square matrices, so build a new $N \times M$ result).
+
+```cpp
+vector<vector<int>> transpose(vector<vector<int>>& matrix);
+// [[1,2,3],[4,5,6]] -> [[1,4],[2,5],[3,6]]
+// [[7]]             -> [[7]]
+```
+
+**E2 (Easy–Medium).** Rotate an $N \times N$ matrix 90° **counter-clockwise** in place, using only transpose + one kind of reversal.
+
+```cpp
+void rotateCCW(vector<vector<int>>& matrix);
+// [[1,2,3],[4,5,6],[7,8,9]] -> [[3,6,9],[2,5,8],[1,4,7]]
+// [[1,2],[3,4]]             -> [[2,4],[1,3]]
+```
+
+**E3 (Medium).** Spiral Matrix II. Return an $n \times n$ matrix filled with $1, 2, \ldots, n^2$ in spiral order (the reverse of `spiralOrder`: write instead of read).
+
+```cpp
+vector<vector<int>> generateSpiral(int n);
+// n = 3 -> [[1,2,3],[8,9,4],[7,6,5]]
+// n = 1 -> [[1]]
+```
+
+#### Dry-Run: Answers
+
+**Q1 — `gcd(84, 36) = 12`, `gcd(18, 48) = 6`, `lcm(84, 36) = 252`.**
+
+| Call | a | b | a % b | Next call |
+|---|---|---|---|---|
+| 1 | 84 | 36 | 12 | gcd(36, 12) |
+| 2 | 36 | 12 | 0 | gcd(12, 0) |
+| 3 | 12 | 0 | — | return 12 |
+
+| Call | a | b | a % b | Next call |
+|---|---|---|---|---|
+| 1 | 18 | 48 | 18 | gcd(48, 18) |
+| 2 | 48 | 18 | 12 | gcd(18, 12) |
+| 3 | 18 | 12 | 6 | gcd(12, 6) |
+| 4 | 12 | 6 | 0 | gcd(6, 0) |
+| 5 | 6 | 0 | — | return 6 |
+
+When `a < b`, `a % b = a`, so the first call simply swaps the arguments — no special case needed. LCM: `84 / 12 * 36 = 7 * 36 = 252`.
+
+**Q2 — returns `[2, 3, 5, 7, 11, 13, 17, 19]`.** The outer loop runs while `p * p <= 20`, i.e. for `p = 2, 3, 4` (`5 * 5 = 25 > 20` stops it).
+
+| p | isPrime[p]? | Crossed out (start at $p^2$, step $p$) |
+|---|---|---|
+| 2 | YES | 4, 6, 8, 10, 12, 14, 16, 18, 20 |
+| 3 | YES | 9, 12, 15, 18 (12 and 18 were already false) |
+| 4 | NO (crossed by 2) | — |
+
+Survivors from 2 to 20: 2, 3, 5, 7, 11, 13, 17, 19.
+
+**Q3 — returns `1024`; `result` is multiplied 2 times.** $10 = 1010_2$.
+
+| Iteration | exp (start) | exp & 1 | result (after) | base (after squaring) | exp (after `>>= 1`) |
+|---|---|---|---|---|---|
+| 1 | 1010 | 0 | 1 | 4 | 101 |
+| 2 | 101 | 1 | 1 × 4 = 4 | 16 | 10 |
+| 3 | 10 | 0 | 4 | 256 | 1 |
+| 4 | 1 | 1 | 4 × 256 = 1024 | 65536 | 0 |
+
+$2^{10} = 2^8 \cdot 2^2$: the two set bits of 10 pick out $2^2 = 4$ and $2^8 = 256$.
+
+**Q4 — buggy output `[[3,2,1],[6,5,4],[9,8,7]]`; correct output `[[7,4,1],[8,5,2],[9,6,3]]`.** With `j` from 0, every off-diagonal pair is swapped **twice**: e.g. `(0,1)↔(1,0)` when `i=0, j=1`, then swapped back when `i=1, j=0`. The "transpose" therefore leaves the matrix unchanged, and reversing each row only mirrors it left–right.
+
+**Q5 — returns `[1, 2, 4, 6, 5, 3]`.** Start: `top=0, bottom=2, left=0, right=1`.
+
+| Pass | Guard | Elements added | Boundaries after |
+|---|---|---|---|
+| L→R on row 0 | — | 1, 2 | top = 1 |
+| T→B on col 1 (rows 1..2) | — | 4, 6 | right = 0 |
+| R→L on row 2 (cols 0..0) | `1 <= 2` YES | 5 | bottom = 1 |
+| B→T on col 0 (rows 1..1) | `0 <= 0` YES | 3 | left = 1 |
+| loop test | `left 1 <= right 0`? NO | — | stop |
+
+**E1 — reference solution.**
+
+```cpp
+vector<vector<int>> transpose(vector<vector<int>>& matrix) {
+    int m = matrix.size(), n = matrix[0].size();
+    vector<vector<int>> t(n, vector<int>(m));
+    for (int i = 0; i < m; i++)
+        for (int j = 0; j < n; j++)
+            t[j][i] = matrix[i][j];   // row i becomes column i
+    return t;
+}
+```
+
+Time and space $O(M \cdot N)$. The shape changes from $M \times N$ to $N \times M$, which is why in-place swapping is impossible here.
+
+**E2 — reference solution.** Clockwise = transpose + reverse each row. Counter-clockwise = transpose + reverse each **column**, which is the same as reversing the order of the rows.
+
+```cpp
+void rotateCCW(vector<vector<int>>& matrix) {
+    int n = matrix.size();
+    for (int i = 0; i < n; i++)
+        for (int j = i; j < n; j++)               // j = i: swap each pair once
+            swap(matrix[i][j], matrix[j][i]);
+    reverse(matrix.begin(), matrix.end());         // flip rows top <-> bottom
+}
+```
+
+Time $O(N^2)$, space $O(1)$. Trace: transpose gives `[[1,4,7],[2,5,8],[3,6,9]]`; reversing the row order gives `[[3,6,9],[2,5,8],[1,4,7]]`.
+
+**E3 — reference solution.** Same four shrinking boundaries as `spiralOrder`, but write a counter instead of reading.
+
+```cpp
+vector<vector<int>> generateSpiral(int n) {
+    vector<vector<int>> a(n, vector<int>(n));
+    int top = 0, bottom = n - 1, left = 0, right = n - 1, k = 1;
+    while (top <= bottom && left <= right) {
+        for (int j = left; j <= right; j++) a[top][j] = k++;
+        top++;
+        for (int i = top; i <= bottom; i++) a[i][right] = k++;
+        right--;
+        if (top <= bottom) {
+            for (int j = right; j >= left; j--) a[bottom][j] = k++;
+            bottom--;
+        }
+        if (left <= right) {
+            for (int i = bottom; i >= top; i--) a[i][left] = k++;
+            left++;
+        }
+    }
+    return a;
+}
+```
+
+Time $O(n^2)$. For `n = 3`: row 0 gets 1, 2, 3; column 2 gets 4, 5; row 2 (right to left) gets 6, 7; column 0 (upward) gets 8; the second round writes 9 in the centre.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

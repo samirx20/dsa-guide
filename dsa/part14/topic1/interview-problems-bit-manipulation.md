@@ -472,6 +472,148 @@ return a;
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run Problem 1's `singleNumber` on `nums = [7, 3, 5, 3, 7]`. Fill in the table (`num`, `res` before, binary XOR, `res` after). What is returned?
+
+**Q2.** Problem 3's `countBits` is called with `n = 8`. You already know `dp[0..5] = [0,1,1,2,1,2]` from the chapter's table. Fill in the rows for `i = 6, 7, 8` (`i >> 1`, `i & 1`, `dp[i>>1]`, `dp[i]`) and give the full returned vector.
+
+**Q3.** Run Problem 4's `reverseBits` on `n = 6` (binary `110`). Show `n & 1`, `result` and `n` after each of the first 3 steps. What is the final 32-bit result in binary, hex and decimal?
+
+**Q4.** Run Problem 5's `missingNumber` (the `result = nums.size()` version) on `nums = [0, 1, 3, 4]`. Show `result` after every loop iteration. What is returned?
+
+**Q5.** Run Problem 6's `getSum(6, 7)`. For every iteration of the `while` loop give `a`, `b`, `a & b`, `carry`, and the new `a`, `b` (in 4-bit binary). How many iterations run, and what is returned?
+
+### Coding Exercises
+
+**E1 (Easy).** Number Complement. Flip every bit of a positive integer's binary representation, **ignoring leading zeros**.
+
+```cpp
+int findComplement(int num);
+// 5 (101) -> 2 (010)
+// 1 (1)   -> 0
+```
+
+**E2 (Easy–Medium).** Alternating Bits. Return `true` if the binary representation of positive `n` has no two adjacent bits equal. Do it without a loop over the bits.
+
+```cpp
+bool hasAlternatingBits(int n);
+// 5  (101)  -> true
+// 7  (111)  -> false
+// 10 (1010) -> true
+// 11 (1011) -> false
+```
+
+**E3 (Medium).** Single Number III. Exactly two elements appear once and every other element appears twice. Return the two singles (any order) in $O(N)$ time and $O(1)$ extra space.
+
+```cpp
+vector<int> singleNumberIII(vector<int>& nums);
+// [1,2,1,3,2,5] -> [3,5]
+// [-1,0]        -> [-1,0]
+```
+
+#### Dry-Run: Answers
+
+**Q1 — returns `5`.**
+
+| Step | num | res (before) | binary | res (after) |
+|---|---|---|---|---|
+| 1 | 7 | 0 | 000 ^ 111 = 111 | 7 |
+| 2 | 3 | 7 | 111 ^ 011 = 100 | 4 |
+| 3 | 5 | 4 | 100 ^ 101 = 001 | 1 |
+| 4 | 3 | 1 | 001 ^ 011 = 010 | 2 |
+| 5 | 7 | 2 | 010 ^ 111 = 101 | 5 |
+
+The intermediate values look random, but the pairs (7, 7) and (3, 3) still cancel because XOR is order-independent.
+
+**Q2 — returns `[0, 1, 1, 2, 1, 2, 2, 3, 1]`.**
+
+| i | binary | i >> 1 | i & 1 | dp[i>>1] | dp[i] |
+|---|---|---|---|---|---|
+| 6 | 110 | 3 | 0 | 2 | 2 |
+| 7 | 111 | 3 | 1 | 2 | 3 |
+| 8 | 1000 | 4 | 0 | 1 | 1 |
+
+**Q3 — result is `0110 0000 ... 0000` = `0x60000000` = `1610612736`.**
+
+| Step | n & 1 | result (after) | n (after `>>= 1`) |
+|---|---|---|---|
+| 1 | 0 | 0 | 011 (3) |
+| 2 | 1 | 1 | 001 (1) |
+| 3 | 1 | 11 (3) | 000 (0) |
+| 4–32 | 0 | shifted left 29 more times | 0 |
+
+After step 3, `result = 11` sits at bits 1 and 0; the remaining 29 left-shifts move it to bits 30 and 29. Check: bits 1 and 2 of the input map to bits $31-1 = 30$ and $31-2 = 29$, and $2^{30} + 2^{29} = 1073741824 + 536870912 = 1610612736$.
+
+**Q4 — returns `2`.** Initial `result = 4` (the size).
+
+| i | nums[i] | i ^ nums[i] | result (after) |
+|---|---|---|---|
+| 0 | 0 | 0 | 4 ^ 0 = 4 |
+| 1 | 1 | 0 | 4 ^ 0 = 4 |
+| 2 | 3 | 2 ^ 3 = 1 | 4 ^ 1 = 5 |
+| 3 | 4 | 3 ^ 4 = 7 | 5 ^ 7 = 2 |
+
+Everything in $\{0,1,2,3,4\}$ appears twice (once as an index or the initial size, once as a value) except 2.
+
+**Q5 — 2 iterations, returns `13`.** $6 = 0110_2$, $7 = 0111_2$.
+
+| Iteration | a | b | a & b | carry = (a & b) << 1 | new a = a ^ b | new b |
+|---|---|---|---|---|---|---|
+| 1 | 0110 | 0111 | 0110 | 1100 | 0001 | 1100 |
+| 2 | 0001 | 1100 | 0000 | 0000 | 1101 | 0000 |
+
+`b == 0`, loop ends, `a = 1101 = 13`.
+
+**E1 — reference solution.** Build a mask of 1s exactly as wide as `num`, then XOR.
+
+```cpp
+int findComplement(int num) {
+    unsigned int mask = 0;
+    unsigned int x = (unsigned int)num;
+    while (x) {               // one 1-bit in the mask per bit of num
+        mask = (mask << 1) | 1;
+        x >>= 1;
+    }
+    return (int)(num ^ mask);
+}
+```
+
+Time $O(\log num)$. Example: `5 = 101`, `mask = 111`, `101 ^ 111 = 010 = 2`.
+
+**E2 — reference solution.** If the bits alternate, `n ^ (n >> 1)` is all 1s (e.g. `1010 ^ 0101 = 1111`). A value of the form `0...0111...1` satisfies `x & (x + 1) == 0` — the Kernighan-style trick in reverse.
+
+```cpp
+bool hasAlternatingBits(int n) {
+    unsigned int x = (unsigned int)n ^ ((unsigned int)n >> 1);
+    return (x & (x + 1)) == 0;   // unsigned: x + 1 cannot overflow into UB
+}
+```
+
+$O(1)$. `11 = 1011`: `1011 ^ 0101 = 1110`, `1110 & 1111 = 1110 ≠ 0` → false.
+
+**E3 — reference solution.** XOR of everything is `a ^ b` (non-zero since `a ≠ b`). Its lowest set bit is a position where `a` and `b` differ; split all numbers into two groups by that bit and XOR each group separately (Problem 1 inside each group).
+
+```cpp
+vector<int> singleNumberIII(vector<int>& nums) {
+    unsigned int xr = 0;
+    for (int x : nums) xr ^= (unsigned int)x;          // = a ^ b
+    unsigned int low = xr & (~xr + 1);                  // lowest set bit (same as xr & -xr, no signed overflow)
+    int a = 0, b = 0;
+    for (int x : nums) {
+        if ((unsigned int)x & low) a ^= x;              // group with the bit set
+        else                       b ^= x;              // group with the bit clear
+    }
+    return {a, b};
+}
+```
+
+Time $O(N)$, space $O(1)$. Trace `[1,2,1,3,2,5]`: `xr = 3 ^ 5 = 011 ^ 101 = 110`, `low = 010`. Bit 1 set: `2, 3, 2` → XOR = 3. Bit 1 clear: `1, 1, 5` → XOR = 5. Result `[3, 5]`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

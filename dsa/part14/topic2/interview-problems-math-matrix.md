@@ -484,6 +484,198 @@ Check palindrome:           Original == reversed
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Using Problem 1's **Hash Set** version of `isHappy`, list every value inserted into `seen` for `n = 19` and for `n = 2`. What does each call return, and on which value does the unhappy one detect its cycle?
+
+**Q2.** Apply Problem 2's Rotate Image (transpose + reverse rows) to the 4×4 matrix
+
+```
+ 1  2  3  4
+ 5  6  7  8
+ 9 10 11 12
+13 14 15 16
+```
+
+What is the rotated matrix? Where does the value `7` (originally at row 1, column 2) end up? State the general rule for where `(r, c)` goes.
+
+**Q3.** Run Problem 3's `spiralOrder` on the single-row matrix `[[1, 2, 3, 4]]`. Then answer: if the guard `if (top <= bottom)` before the Right → Left loop were deleted, what would the function return for the same input?
+
+**Q4.** Run Problem 4's `setZeroes` on
+
+```
+0 1 2
+3 4 5
+6 7 0
+```
+
+Give `firstRowZero` / `firstColZero`, the matrix after Step 2, after Step 3, and the final matrix.
+
+**Q5.** Run Problem 5's `multiply("25", "4")`. The `result` vector has size `m + n = 3`. Fill in one row per `(i, j)` pair: `mul`, `sum`, `result[i+j+1]`, carry into `result[i+j]`, and the whole array. What string is returned?
+
+### Coding Exercises
+
+**E1 (Easy).** Palindrome Number. Using the "Reverse number" tip from the cheat sheet, return `true` if integer `x` reads the same forwards and backwards. Negative numbers are never palindromes.
+
+```cpp
+bool isPalindromeNumber(int x);
+// 121 -> true,  -121 -> false,  10 -> false,  0 -> true
+```
+
+**E2 (Easy–Medium).** Add Strings. Add two non-negative integers given as decimal strings, without converting them to `int` / `long long` (same carry idea as Multiply Strings).
+
+```cpp
+string addStrings(string num1, string num2);
+// "11",  "123" -> "134"
+// "456", "77"  -> "533"
+// "999", "1"   -> "1000"
+```
+
+**E3 (Medium).** Diagonal Traverse. Return all elements of an $M \times N$ matrix in zig-zag diagonal order: diagonal $d$ contains the cells with $r + c = d$; even diagonals are read going **up** (row decreasing), odd diagonals going **down**.
+
+```cpp
+vector<int> findDiagonalOrder(vector<vector<int>>& mat);
+// [[1,2,3],[4,5,6],[7,8,9]] -> [1,2,4,7,5,3,6,8,9]
+// [[1,2],[3,4]]             -> [1,2,3,4]
+```
+
+#### Dry-Run: Answers
+
+**Q1 — `isHappy(19) = true`, `isHappy(2) = false`.**
+
+For 19: inserts `19` → $1^2 + 9^2 = 82$; inserts `82` → $64 + 4 = 68$; inserts `68` → $36 + 64 = 100$; inserts `100` → $1 + 0 + 0 = 1$; loop ends because `n == 1`. Seen = {19, 82, 68, 100}.
+
+For 2: the chain is
+
+| Value inserted | Next (digit-square sum) |
+|---|---|
+| 2 | 4 |
+| 4 | 16 |
+| 16 | 37 |
+| 37 | 58 |
+| 58 | 89 |
+| 89 | 145 |
+| 145 | 42 |
+| 42 | 20 |
+| 20 | 4 |
+
+Next `n = 4` is already in `seen` → return `false`. This is the same 8-number cycle shown at the top of the file (4 → 16 → … → 20 → 4).
+
+**Q2 — rotated matrix, and `7` moves to `(2, 2)`.**
+
+```
+13  9  5  1
+14 10  6  2
+15 11  7  3
+16 12  8  4
+```
+
+Transpose sends `(r, c)` to `(c, r)`; reversing a row of length $n$ sends column $r$ to column $n-1-r$. So `(r, c)` → `(c, n-1-r)`. For `7`: `(1, 2)` → `(2, 4-1-1)` = `(2, 2)`.
+
+**Q3 — returns `[1, 2, 3, 4]`; without the guard it returns `[1, 2, 3, 4, 3, 2, 1]`.** Start `top=0, bottom=0, left=0, right=3`.
+
+| Pass | Guard | Added | Boundaries after |
+|---|---|---|---|
+| L→R row 0 | — | 1, 2, 3, 4 | top = 1 |
+| T→B col 3, rows 1..0 | — | nothing (empty range) | right = 2 |
+| R→L | `1 <= 0`? NO → skipped | — | bottom stays 0 |
+| B→T col 0, rows 0..1 | `0 <= 2` YES | nothing (`i` from 0 down to 1 is empty) | left = 1 |
+| loop test | `1 <= 0`? NO | — | stop |
+
+Without the guard, the R→L loop runs on `matrix[bottom = 0]` for `j = 2, 1, 0` and re-reads 3, 2, 1 from the row that was already consumed.
+
+**Q4 — final matrix `[[0,0,0],[0,4,0],[0,0,0]]`.**
+
+Step 1: row 0 contains `matrix[0][0] = 0` → `firstRowZero = true`; column 0 contains `matrix[0][0] = 0` → `firstColZero = true`.
+
+Step 2 (inner cells only): `matrix[2][2] = 0` → set `matrix[2][0] = 0` and `matrix[0][2] = 0`:
+
+```
+0 1 0
+3 4 5
+0 7 0
+```
+
+Step 3 (inner cells): `(1,1)`: flags `matrix[1][0]=3`, `matrix[0][1]=1` → keep 4. `(1,2)`: `matrix[0][2]=0` → 0. `(2,1)`: `matrix[2][0]=0` → 0. `(2,2)`: already 0.
+
+```
+0 1 0
+3 4 0
+0 0 0
+```
+
+Step 4: zero row 0 and column 0 → `[[0,0,0],[0,4,0],[0,0,0]]`. Check: the original zeros at `(0,0)` and `(2,2)` wipe rows 0, 2 and columns 0, 2, leaving only `(1,1) = 4`.
+
+**Q5 — returns `"100"`.** `m = 2, n = 1`, `result = [0, 0, 0]`.
+
+| i | j | digits | mul | sum = mul + result[i+j+1] | result[i+j+1] | carry → result[i+j] | result |
+|---|---|---|---|---|---|---|---|
+| 1 | 0 | 5 × 4 | 20 | 20 + 0 = 20 | result[2] = 0 | result[1] += 2 | [0, 2, 0] |
+| 0 | 0 | 2 × 4 | 8 | 8 + 2 = 10 | result[1] = 0 | result[0] += 1 | [1, 0, 0] |
+
+No leading zeros to skip → `"100"`.
+
+**E1 — reference solution.** Reverse the number with `rev = rev * 10 + n % 10` (in `long long` so it cannot overflow) and compare.
+
+```cpp
+bool isPalindromeNumber(int x) {
+    if (x < 0) return false;
+    long long rev = 0;
+    int n = x;
+    while (n > 0) {
+        rev = rev * 10 + n % 10;
+        n /= 10;
+    }
+    return rev == x;
+}
+```
+
+Time $O(\log_{10} x)$. `10` reverses to `1` ≠ 10 → false; `0` skips the loop, `rev = 0 == 0` → true.
+
+**E2 — reference solution.** Walk both strings from the right with a carry, exactly like column addition.
+
+```cpp
+string addStrings(string num1, string num2) {
+    int i = num1.size() - 1, j = num2.size() - 1, carry = 0;
+    string res;
+    while (i >= 0 || j >= 0 || carry) {
+        int sum = carry;
+        if (i >= 0) sum += num1[i--] - '0';
+        if (j >= 0) sum += num2[j--] - '0';
+        res.push_back(char('0' + sum % 10));
+        carry = sum / 10;
+    }
+    reverse(res.begin(), res.end());
+    return res;
+}
+```
+
+Time $O(\max(M, N))$. Trace `"999" + "1"`: 9+1 = 10 → digit 0, carry 1; 9+1 → 0, carry 1; 9+1 → 0, carry 1; only carry left → 1. Reversed: `"1000"`.
+
+**E3 — reference solution.** For each diagonal $d$, the valid rows are $\max(0, d-N+1) \le r \le \min(d, M-1)$ with $c = d - r$. Walk them upward for even $d$, downward for odd $d$.
+
+```cpp
+vector<int> findDiagonalOrder(vector<vector<int>>& mat) {
+    int m = mat.size(), n = mat[0].size();
+    vector<int> res;
+    for (int d = 0; d <= m + n - 2; d++) {
+        int lo = max(0, d - n + 1), hi = min(d, m - 1);   // valid row range on diagonal d
+        if (d % 2 == 0) {
+            for (int r = hi; r >= lo; r--) res.push_back(mat[r][d - r]);  // going up
+        } else {
+            for (int r = lo; r <= hi; r++) res.push_back(mat[r][d - r]);  // going down
+        }
+    }
+    return res;
+}
+```
+
+Time $O(M \cdot N)$, each cell visited once. 3×3 trace: d=0 → 1; d=1 (down) → 2, 4; d=2 (up, rows 2..0) → 7, 5, 3; d=3 (down, rows 1..2) → 6, 8; d=4 → 9.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
