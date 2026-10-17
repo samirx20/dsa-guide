@@ -150,11 +150,14 @@ Level 2:  4 calls of size N/4
 Level K:  2^K calls of size N/2^K
 
 Base case: N/2^K = 1  →  K = log₂(N)
-Total work per level: N (each element compared once)
+Work per call: O(1) (one max() comparison, no merging)
+Total calls: 1 + 2 + 4 + ... + N = 2N - 1
 Total levels: log₂(N)
 
-Time: O(N log N)
+Time: O(N)   (2N - 1 calls × O(1) each)
 ```
+
+> **Why not $O(N \log N)$ like Merge Sort?** Merge Sort's combine step touches every element at every level ($O(N)$ work per level × $\log N$ levels). Here the combine step is a single comparison, so the work per level is just the number of calls at that level ($1, 2, 4, \dots, N$), which sums to $2N - 1$. Recurrence: $T(N) = 2T(N/2) + O(1) = O(N)$.
 
 **Space Complexity:**
 - Recursion tree depth: $O(\log N)$

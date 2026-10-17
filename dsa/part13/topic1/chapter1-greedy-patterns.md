@@ -192,15 +192,15 @@ for (int i = 1; i < intervals.size(); i++) {
 Input: [[1,3], [2,4], [3,5], [0,6], [5,7], [8,9], [5,9]]
 
 Step 1: Sort by end time
-[[1,3], [2,4], [3,5], [5,7], [0,6], [5,9], [8,9]]
+[[1,3], [2,4], [3,5], [0,6], [5,7], [5,9], [8,9]]
   ↑ sorted order: end times are 3, 4, 5, 6, 7, 9, 9
 
 Step 2: Iterate
 i=0: Pick [1,3], count=1, currentEnd=3
 i=1: [2,4] starts at 2 < 3 → overlap, skip
 i=2: [3,5] starts at 3 >= 3 → pick! count=2, currentEnd=5
-i=3: [5,7] starts at 5 >= 5 → pick! count=3, currentEnd=7
-i=4: [0,6] starts at 0 < 7 → overlap, skip
+i=3: [0,6] starts at 0 < 5 → overlap, skip
+i=4: [5,7] starts at 5 >= 5 → pick! count=3, currentEnd=7
 i=5: [5,9] starts at 5 < 7 → overlap, skip
 i=6: [8,9] starts at 8 >= 7 → pick! count=4, currentEnd=9
 
@@ -214,8 +214,8 @@ Answer: 4 meetings
 | 0 | — | [1,3] | — (always pick first) | 1 | 3 |
 | 1 | 1 | [2,4] | 2 >= 3? NO | 1 | 3 |
 | 2 | 2 | [3,5] | 3 >= 3? YES | 2 | 5 |
-| 3 | 3 | [5,7] | 5 >= 5? YES | 3 | 7 |
-| 4 | 4 | [0,6] | 0 >= 7? NO | 3 | 7 |
+| 3 | 3 | [0,6] | 0 >= 5? NO | 2 | 5 |
+| 4 | 4 | [5,7] | 5 >= 5? YES | 3 | 7 |
 | 5 | 5 | [5,9] | 5 >= 7? NO | 3 | 7 |
 | 6 | 6 | [8,9] | 8 >= 7? YES | 4 | 9 |
 

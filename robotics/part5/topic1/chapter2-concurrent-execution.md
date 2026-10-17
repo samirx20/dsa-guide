@@ -159,7 +159,7 @@ data = await task  # Get result later
 
 ### 3. Error Handling in `gather()`
 
-By default, if one coroutine raises an exception, `gather()` propagates it and cancels the remaining tasks. Pass `return_exceptions=True` to collect exceptions as return values instead.
+By default, if one coroutine raises an exception, `gather()` immediately propagates it to the `await` — but it does **not** cancel the remaining tasks. They keep running in the background and their results are simply lost. Pass `return_exceptions=True` to collect exceptions as return values instead, or use `TaskGroup` (below) if you want siblings cancelled on failure.
 
 ```python
 async def might_fail(task_id: int) -> str:
@@ -191,7 +191,7 @@ async def main():
 results = await asyncio.gather(might_fail(1), might_fail(2), might_fail(3))
 # might_fail(2) raises ValueError
 # gather() IMMEDIATELY propagates the exception
-# might_fail(3) is CANCELLED — it never finishes
+# might_fail(3) is NOT cancelled — it keeps running, but its result is discarded
 # You get: ValueError: Task 2 failed
 
 # With return_exceptions=True:
