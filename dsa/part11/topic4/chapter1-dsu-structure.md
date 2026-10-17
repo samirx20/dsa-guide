@@ -523,6 +523,164 @@ bool hasCycle(vector<vector<int>>& edges, int n) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run the same four calls on a `DSUBasic(5)` and on a `UnionFind(5)` (union by rank + path compression):
+
+```cpp
+unite(0, 1); unite(1, 2); unite(2, 3); unite(3, 4);
+```
+
+What is `parent[]` in each case (and `rank[]` for `UnionFind`)? How many hops does `find(0)` take in `DSUBasic` afterwards?
+
+**Q2.** The last row of the chapter's Dry-Run Table runs `find(3)` on `parent = [0,0,0,2,0]`. Trace the production `UnionFind::find(3)` call by call. What is `parent[]` **after** it returns?
+
+**Q3.** On a `DSUUnionBySize(6)`, run:
+
+```cpp
+unite(0, 1); unite(2, 3); unite(4, 2); unite(1, 4);
+```
+
+Give `parent[]` and `size[]` after each call. What do `getSize(3)` and `getSize(5)` return at the end?
+
+**Q4.** Run the chapter's `hasCycle(edges, 4)` with `edges = [(0,1), (2,3), (1,3), (0,2)]`. Which edge makes `unite` return `false`? Show `parent[]` and `rank[]` after each edge.
+
+**Q5.** `DSUPathCompression` has path compression but **no** rank, and always does `parent[rootI] = rootJ`. On 4 nodes run `unite(0,1); unite(0,2); unite(0,3);`. What is `parent[]` after each call?
+
+### Coding Exercises
+
+**E1 (Easy).** Number of Provinces: `isConnected[i][j] == 1` means cities `i` and `j` are directly connected. Return the number of connected groups.
+
+```cpp
+int findCircleNum(vector<vector<int>>& isConnected);
+// [[1,1,0],[1,1,0],[0,0,1]]  ->  2
+// [[1,0,0],[0,1,0],[0,0,1]]  ->  3
+```
+
+**E2 (Easy–Medium).** Graph Valid Tree: return `true` iff the `n` nodes and undirected `edges` form a single tree (connected, no cycle).
+
+```cpp
+bool validTree(int n, vector<vector<int>>& edges);
+// n = 5, edges = [[0,1],[0,2],[0,3],[1,4]]        ->  true
+// n = 5, edges = [[0,1],[1,2],[2,3],[1,3],[1,4]]  ->  false  (cycle 1-2-3)
+// n = 4, edges = [[0,1],[2,3]]                    ->  false  (two components)
+```
+
+**E3 (Medium).** Satisfiability of Equality Equations: each string is `"x==y"` or `"x!=y"` over lowercase single-letter variables. Return `true` iff integers can be assigned to satisfy all of them.
+
+```cpp
+bool equationsPossible(vector<string>& equations);
+// ["a==b","b!=a"]          ->  false
+// ["a==b","b==c","a!=c"]   ->  false
+// ["c==c","b==d","x!=z"]   ->  true
+```
+
+#### Dry-Run: Answers
+
+**Q1.** `DSUBasic`: **`parent = [1, 2, 3, 4, 4]`**, a chain. `unite(i, j)` always hangs `i`'s root under `j`'s root: `0→1`, then `1→2`, `2→3`, `3→4`. `find(0)` walks `0 → 1 → 2 → 3 → 4`, which is **4 hops**.
+
+`UnionFind`: **`parent = [0, 0, 0, 0, 0]`**, **`rank = [1, 0, 0, 0, 0]`**.
+
+| Call | roots (rank) | Action |
+|------|--------------|--------|
+| unite(0,1) | 0 (0), 1 (0) | equal: `parent[1] = 0`, rank[0] = 1 |
+| unite(1,2) | 0 (1), 2 (0) | `parent[2] = 0` |
+| unite(2,3) | 0 (1), 3 (0) | `parent[3] = 0` |
+| unite(3,4) | 0 (1), 4 (0) | `parent[4] = 0` |
+
+The same inputs give a star of height 1 instead of a chain of height 4.
+
+**Q2.** `parent = [0, 0, 0, 0, 0]`. The table leaves `parent[3] = 2`, but `find` compresses it.
+
+| Call | parent[i] == i? | Effect |
+|------|-----------------|--------|
+| find(3) | parent[3] = 2, no | recurse on 2 |
+| find(2) | parent[2] = 0, no | recurse on 0 |
+| find(0) | yes | return 0 |
+| (back in 2) | | parent[2] = 0 (unchanged), return 0 |
+| (back in 3) | | **parent[3] = 0**, return 0 |
+
+**Q3.**
+
+| Call | Roots (size) | parent[] after | size[] after |
+|------|--------------|----------------|--------------|
+| unite(0,1) | 0 (1), 1 (1) → tie, 1 under 0 | [0,0,2,3,4,5] | [2,1,1,1,1,1] |
+| unite(2,3) | 2 (1), 3 (1) → tie, 3 under 2 | [0,0,2,2,4,5] | [2,1,2,1,1,1] |
+| unite(4,2) | 4 (1) < 2 (2) → 4 under 2 | [0,0,2,2,2,5] | [2,1,3,1,1,1] |
+| unite(1,4) | find(1) = 0 (2) < find(4) = 2 (3) → 0 under 2 | [2,0,2,2,2,5] | [2,1,5,1,1,1] |
+
+`getSize(3)` = `size[2]` = **5**; `getSize(5)` = **1**. Only roots' `size` entries matter, so the stale `size[0] = 2` is never read again.
+
+**Q4.** The 4th edge **(0,2)** returns `false`, so a cycle is detected (`0-1-3-2-0`).
+
+| Edge | find results | Action | parent[] | rank[] |
+|------|--------------|--------|----------|--------|
+| (0,1) | 0, 1 | tie → 1 under 0 | [0,0,2,3] | [1,0,0,0] |
+| (2,3) | 2, 3 | tie → 3 under 2 | [0,0,2,2] | [1,0,1,0] |
+| (1,3) | 0, 2 (both rank 1) | tie → 2 under 0 | [0,0,0,2] | [2,0,1,0] |
+| (0,2) | 0, 0 | same root → **false** | unchanged | unchanged |
+
+**Q5.**
+
+| Call | find(0), find(other) | parent[] after |
+|------|----------------------|----------------|
+| unite(0,1) | 0, 1 → parent[0] = 1 | [1, 1, 2, 3] |
+| unite(0,2) | 1, 2 → parent[1] = 2 | [1, 2, 2, 3] |
+| unite(0,3) | find(0) walks 0→1→2 and compresses parent[0] = 2; root 2, parent[2] = 3 | [2, 2, 3, 3] |
+
+Compression only flattens paths you have already walked. Without rank the new root is always the *other* side, so the tree keeps growing upward (`0 → 2 → 3`).
+
+**E1 — reference solution**
+
+```cpp
+int findCircleNum(vector<vector<int>>& isConnected) {
+    int n = isConnected.size();
+    UnionFind uf(n);                 // the chapter's production class
+    int components = n;
+    for (int i = 0; i < n; i++)
+        for (int j = i + 1; j < n; j++)          // matrix is symmetric
+            if (isConnected[i][j] && uf.unite(i, j))
+                components--;                    // each successful merge removes one group
+    return components;
+}
+```
+
+Start with $n$ singletons, and each `unite` that returns `true` merges two groups. Time $O(n^2 \cdot \alpha(n))$, which is dominated by reading the matrix.
+
+**E2 — reference solution**
+
+```cpp
+bool validTree(int n, vector<vector<int>>& edges) {
+    if (edges.size() != n - 1) return false;      // a tree has exactly n-1 edges
+    UnionFind uf(n);
+    for (auto& e : edges)
+        if (!uf.unite(e[0], e[1])) return false;  // cycle
+    return true;
+}
+```
+
+$n - 1$ edges with no cycle means exactly one component: each successful union reduces the count from $n$ by one, ending at $n - (n-1) = 1$. Example 3 fails the edge count ($2 \neq 3$). Time $O(E \cdot \alpha(n))$.
+
+**E3 — reference solution**
+
+```cpp
+bool equationsPossible(vector<string>& equations) {
+    UnionFind uf(26);
+    for (auto& e : equations)                     // pass 1: merge all equalities
+        if (e[1] == '=') uf.unite(e[0] - 'a', e[3] - 'a');
+    for (auto& e : equations)                     // pass 2: check inequalities
+        if (e[1] == '!' && uf.find(e[0] - 'a') == uf.find(e[3] - 'a'))
+            return false;
+    return true;
+}
+```
+
+Equality is transitive, which is exactly what DSU components model. All `==` must be applied *before* any `!=` is checked, otherwise `["a!=c","a==b","b==c"]` would be wrongly accepted. Time $O(N \cdot \alpha(26))$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

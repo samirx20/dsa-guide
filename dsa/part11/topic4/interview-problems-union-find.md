@@ -478,6 +478,143 @@ int minCostConnectPoints(vector<vector<int>>& points) {
 
 ---
 
+## Practice & Self-Check
+
+All traces use the production `UnionFind` (union by rank + path compression) from Chapter 1.
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run `findRedundantConnection` on `edges = [[1,2],[2,3],[3,4],[1,4],[1,5]]`. Show `parent[1..5]` and `rank[1]` after each edge that merges. Which edge is returned? Is `[1,5]` ever processed?
+
+**Q2.** What does `makeConnected` return for `n = 6`, `connections = [[0,1],[0,2],[0,3],[1,2],[1,3]]`? Which cables are redundant? What if the last cable `[1,3]` is removed?
+
+**Q3.** Run `accountsMerge` on:
+
+```
+[["A","a@x","b@x"],
+ ["A","c@x"],
+ ["A","c@x","b@x"]]
+```
+
+What IDs are assigned, which `unite` calls happen (with their results), and what is the final output? Why would a solution that only merges accounts sharing the *first* email fail here?
+
+**Q4.** Run `minCostConnectPoints` on `points = [[0,0],[1,1],[3,0],[3,3]]`. List the sorted `edges` vector (`{dist, i, j}`), mark each as added or skipped, and give the total cost.
+
+### Coding Exercises
+
+**E1 (Easy).** Find if Path Exists: return `true` iff `source` and `destination` are in the same component of the undirected graph.
+
+```cpp
+bool validPath(int n, vector<vector<int>>& edges, int source, int destination);
+// n = 3, edges = [[0,1],[1,2],[2,0]], source = 0, destination = 2               ->  true
+// n = 6, edges = [[0,1],[0,2],[3,5],[5,4],[4,3]], source = 0, destination = 5   ->  false
+```
+
+**E2 (Easy–Medium).** Return the sizes of all connected components, sorted in descending order.
+
+```cpp
+vector<int> componentSizes(int n, vector<vector<int>>& edges);
+// n = 6, edges = [[0,1],[1,2],[3,4]]  ->  [3, 2, 1]
+```
+
+**E3 (Medium).** Most Stones Removed with Same Row or Column: a stone can be removed if another remaining stone shares its row or column. Return the maximum number of stones that can be removed.
+
+```cpp
+int removeStones(vector<vector<int>>& stones);
+// [[0,0],[0,1],[1,0],[1,2],[2,1],[2,2]]  ->  5
+// [[0,0],[0,2],[1,1],[2,0],[2,2]]        ->  3
+// [[0,0]]                                ->  0
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **`[1,4]`**. `[1,5]` is **never processed**, because the function returns on the first `false`.
+
+| Edge | find(u), find(v) | Action | parent[1..5] | rank[1] |
+|------|------------------|--------|--------------|---------|
+| [1,2] | 1, 2 (ranks 0, 0) | tie → 2 under 1 | [1,1,3,4,5] | 1 |
+| [2,3] | 1, 3 (1 > 0) | 3 under 1 | [1,1,1,4,5] | 1 |
+| [3,4] | 1, 4 | 4 under 1 | [1,1,1,1,5] | 1 |
+| [1,4] | 1, 1 | **same root → return [1,4]** | unchanged | 1 |
+
+**Q2.** Returns **2**. There are 5 cables and $n - 1 = 5$, so it is feasible. `[0,1]`, `[0,2]`, `[0,3]` merge (components $6 \to 3$: `{0,1,2,3}`, `{4}`, `{5}`). `[1,2]` and `[1,3]` are **redundant** (`unite` returns `false`). Answer $= 3 - 1 = 2$: move the two redundant cables to reach 4 and 5. Without `[1,3]` there are only 4 cables, $4 < 5$, so it returns **-1** immediately.
+
+**Q3.** IDs: `a@x → 0`, `b@x → 1`, `c@x → 2`.
+
+| Account | firstIndex | unite calls | Result |
+|---------|------------|-------------|--------|
+| ["A", a, b] | 0 | unite(0, 1) | true: 1 under 0, rank[0] = 1 |
+| ["A", c] | 2 | none (single email) | — |
+| ["A", c, b] | 2 | unite(2, 1) → find(2) = 2, find(1) = 0 | true: 2 under 0 (rank 0 < 1) |
+
+All three emails have root 0, so the output is **`[["A", "a@x", "b@x", "c@x"]]`**. The first two accounts share **no** email. They are linked only *through* the third account, which shares `b@x` with the first and `c@x` with the second. The three first emails are `a@x`, `c@x`, `c@x`, so first-email matching would join accounts 2 and 3 but never connect them to account 1. DSU captures the transitive link.
+
+**Q4.** Total cost **8**.
+
+| Sorted edge `{d, i, j}` | Action | Running cost |
+|-------------------------|--------|--------------|
+| {2, 0, 1} | add | 2 |
+| {3, 0, 2} | add | 5 |
+| {3, 1, 2} | skip (0, 1, 2 already connected) | 5 |
+| {3, 2, 3} | add → 3 edges = $n - 1$, **break** | 8 |
+| {4, 1, 3} | not reached | — |
+| {6, 0, 3} | not reached | — |
+
+Ties on distance 3 are ordered by `i`, then `j`, because `sort` compares whole vectors lexicographically.
+
+**E1 — reference solution**
+
+```cpp
+bool validPath(int n, vector<vector<int>>& edges, int source, int destination) {
+    UnionFind uf(n);
+    for (auto& e : edges) uf.unite(e[0], e[1]);
+    return uf.find(source) == uf.find(destination);
+}
+```
+
+Same root means same component. Time $O(E \cdot \alpha(n))$, and each later query is near $O(1)$.
+
+**E2 — reference solution**
+
+```cpp
+vector<int> componentSizes(int n, vector<vector<int>>& edges) {
+    UnionFind uf(n);
+    for (auto& e : edges) uf.unite(e[0], e[1]);
+    vector<int> count(n, 0);
+    for (int i = 0; i < n; i++) count[uf.find(i)]++;   // tally members per root
+    vector<int> sizes;
+    for (int c : count)
+        if (c > 0) sizes.push_back(c);
+    sort(sizes.rbegin(), sizes.rend());                // descending
+    return sizes;
+}
+```
+
+After all unions, `find(i)` labels each node with its component. Counting labels gives the sizes. Time $O(n \log n + E \cdot \alpha(n))$. (With the union-by-size DSU, `size[root]` gives the same numbers directly.)
+
+**E3 — reference solution**
+
+```cpp
+int removeStones(vector<vector<int>>& stones) {
+    int n = stones.size();
+    UnionFind uf(n);
+    unordered_map<int,int> rowOwner, colOwner;   // first stone seen in each row / column
+    int components = n;
+    for (int i = 0; i < n; i++) {
+        int r = stones[i][0], c = stones[i][1];
+        if (rowOwner.count(r)) { if (uf.unite(i, rowOwner[r])) components--; }
+        else rowOwner[r] = i;
+        if (colOwner.count(c)) { if (uf.unite(i, colOwner[c])) components--; }
+        else colOwner[c] = i;
+    }
+    return n - components;
+}
+```
+
+Stones sharing a row or column form components, and every component of size $k$ can be removed down to one stone (always remove a leaf of its spanning tree), so the answer is $n - \#\text{components}$. Example 2: `{(0,0),(0,2),(2,0),(2,2)}` and `{(1,1)}` give $5 - 2 = 3$. Uniting with one "owner" per row/column avoids the $O(n^2)$ pair loop: time $O(n \cdot \alpha(n))$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

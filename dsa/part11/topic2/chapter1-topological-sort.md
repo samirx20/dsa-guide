@@ -537,6 +537,175 @@ string alienOrder(vector<string>& words) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+Q1 and Q2 use this input (format `[course, prereq]`, so each pair is the edge `prereq -> course`):
+
+```cpp
+int numNodes = 6;
+vector<vector<int>> prerequisites = {{2,5}, {0,5}, {0,4}, {1,4}, {3,2}, {1,3}};
+```
+
+**Q1.** Write down the in-degree array and the adjacency list built by `topologicalSort`, then trace Kahn's algorithm. What exact order does it return?
+
+**Q2.** Build `adjList` the same way (`adjList[prereq].push_back(course)`) and pass it to `topoSortDFS`. What is the post-order `order` vector *before* the reverse, and what is the final returned order? Is it the same as Q1's answer? Are both valid?
+
+**Q3.** Run `topologicalSort(4, {{1,0},{2,1},{3,2},{1,3}})`. What does `sortedOrder` contain when the queue empties, and what does the function return? Which nodes never reach in-degree 0?
+
+**Q4.** Call `topoSortWithCyclePath(4, adjList)` with `adjList = {{1}, {2}, {3}, {1}}` (edges `0->1, 1->2, 2->3, 3->1`). Fill in `parent[]` at the moment the cycle is found, and give the exact line printed.
+
+**Q5.** What does `alienOrder` return for `["wrt","wrf","er","ett","rftt"]`? And for `["abc","ab"]`?
+
+### Coding Exercises
+
+**E1 (Easy).** Return every node that has no incoming edge (the set Kahn's algorithm starts with), in increasing order. Edges are `[from, to]`.
+
+```cpp
+vector<int> findSources(int n, vector<vector<int>>& edges);
+// n = 6, edges = [[0,1],[0,2],[2,5],[3,4],[4,2]]  ->  [0, 3]
+```
+
+**E2 (Easy–Medium).** Given a DAG (edges `[from, to]`) and a candidate `order`, return `true` iff `order` is a permutation of `0..n-1` that is a valid topological order.
+
+```cpp
+bool isValidTopoOrder(int n, vector<vector<int>>& edges, vector<int>& order);
+// n = 4, edges = [[0,1],[0,2],[1,3],[2,3]], order = [0,2,1,3]  ->  true
+// same edges,                                order = [0,3,1,2]  ->  false
+```
+
+**E3 (Medium).** Parallel Courses: courses are labeled `1..n`, `relations[i] = [prev, next]`. In one semester you may take any number of courses whose prerequisites are all done. Return the minimum number of semesters, or `-1` if a cycle makes it impossible.
+
+```cpp
+int minimumSemesters(int n, vector<vector<int>>& relations);
+// n = 3, relations = [[1,3],[2,3]]        ->  2
+// n = 3, relations = [[1,2],[2,3],[3,1]]  ->  -1
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **`[4, 5, 2, 0, 3, 1]`**.
+
+Adjacency (in insertion order): `0: []`, `1: []`, `2: [3]`, `3: [1]`, `4: [0, 1]`, `5: [2, 0]`. In-degree: `[2, 2, 1, 1, 0, 0]`.
+
+| Pop | Decrements | inDegree after | Queue after |
+|-----|------------|----------------|-------------|
+| (init) | — | [2,2,1,1,0,0] | [4, 5] |
+| 4 | 0, 1 | [1,1,1,1,0,0] | [5] |
+| 5 | 2, 0 | [0,1,0,1,0,0] | [2, 0] |
+| 2 | 3 | [0,1,0,0,0,0] | [0, 3] |
+| 0 | — | same | [3] |
+| 3 | 1 | [0,0,0,0,0,0] | [1] |
+| 1 | — | same | [] |
+
+Size 6 equals `numNodes`, so the order is returned.
+
+**Q2.** Post-order before reverse: **`[0, 1, 3, 2, 4, 5]`**. Returned: **`[5, 4, 2, 3, 1, 0]`**.
+
+| Outer `i` | DFS work | `order` after |
+|-----------|----------|---------------|
+| 0 | no neighbors, push 0 | [0] |
+| 1 | no neighbors, push 1 | [0, 1] |
+| 2 | 2 → 3 → (1 visited); push 3, push 2 | [0, 1, 3, 2] |
+| 3 | already visited | — |
+| 4 | 0, 1 visited; push 4 | [0, 1, 3, 2, 4] |
+| 5 | 2, 0 visited; push 5 | [0, 1, 3, 2, 4, 5] |
+
+It differs from Q1, and both are valid: every edge (`5→2, 5→0, 4→0, 4→1, 2→3, 3→1`) points left-to-right in each order. A DAG can have many topological orders.
+
+**Q3.** In-degree starts `[0, 2, 1, 1]`. Pop 0 and decrement node 1 to `1`. The queue is now empty, so `sortedOrder = [0]`. Since $1 < 4$, the function returns **`{}`** (empty). Nodes **1, 2, 3** never reach in-degree 0; they form the cycle `1 → 2 → 3 → 1`, and node 1 still waits on node 3.
+
+**Q4.** Printed: **`Cycle found: 1 2 3 1 `**.
+
+| Event | state | parent |
+|-------|-------|--------|
+| dfs(0) | [1,0,0,0] | [-1,-1,-1,-1] |
+| visit 1 from 0 | [1,1,0,0] | [-1,0,-1,-1] |
+| visit 2 from 1 | [1,1,1,0] | [-1,0,1,-1] |
+| visit 3 from 2 | [1,1,1,1] | [-1,0,1,2] |
+| 3 sees 1 in-progress | cycleStart = 1 | **[-1,3,1,2]** |
+
+Walking parents from 1: `1 → parent[1]=3 → parent[3]=2 → parent[2]=1` (stop) collects `[1, 3, 2]`, then appends `1` → `[1, 3, 2, 1]`, reversed → `[1, 2, 3, 1]`.
+
+**Q5.** `"wertf"` and `""`.
+
+| Adjacent pair | First difference | Edge |
+|---------------|------------------|------|
+| wrt / wrf | t vs f | t → f |
+| wrf / er | w vs e | w → e |
+| er / ett | r vs t | r → t |
+| ett / rftt | e vs r | e → r |
+
+Only `w` starts with in-degree 0, and the chain `w → e → r → t → f` is forced. For `["abc","ab"]`, the longer word comes first and `"ab"` is its prefix, so the prefix rule returns `""`.
+
+**E1 — reference solution**
+
+```cpp
+vector<int> findSources(int n, vector<vector<int>>& edges) {
+    vector<int> inDegree(n, 0);
+    for (auto& e : edges) inDegree[e[1]]++;
+    vector<int> res;
+    for (int i = 0; i < n; i++)
+        if (inDegree[i] == 0) res.push_back(i);
+    return res;
+}
+```
+
+This is step 1 of Kahn's algorithm on its own. Time $O(V + E)$.
+
+**E2 — reference solution**
+
+```cpp
+bool isValidTopoOrder(int n, vector<vector<int>>& edges, vector<int>& order) {
+    if (order.size() != n) return false;
+    vector<int> pos(n, -1);
+    for (int i = 0; i < n; i++) {
+        int v = order[i];
+        if (v < 0 || v >= n || pos[v] != -1) return false;  // not a permutation
+        pos[v] = i;
+    }
+    for (auto& e : edges)
+        if (pos[e[0]] > pos[e[1]]) return false;          // edge points backwards
+    return true;
+}
+```
+
+By definition an order is topological iff every edge `u → v` has `u` before `v`. For `[0,3,1,2]`, edge `1 → 3` has `pos[1] = 2 > pos[3] = 1`. Time $O(V + E)$.
+
+**E3 — reference solution**
+
+```cpp
+int minimumSemesters(int n, vector<vector<int>>& relations) {
+    vector<vector<int>> adj(n + 1);
+    vector<int> inDegree(n + 1, 0);
+    for (auto& r : relations) {
+        adj[r[0]].push_back(r[1]);
+        inDegree[r[1]]++;
+    }
+    queue<int> q;
+    for (int i = 1; i <= n; i++)
+        if (inDegree[i] == 0) q.push(i);
+
+    int semesters = 0, taken = 0;
+    while (!q.empty()) {
+        int sz = q.size();          // everything currently ready = one semester
+        semesters++;
+        for (int k = 0; k < sz; k++) {
+            int c = q.front(); q.pop();
+            taken++;
+            for (int next : adj[c])
+                if (--inDegree[next] == 0) q.push(next);
+        }
+    }
+    return taken == n ? semesters : -1;
+}
+```
+
+Kahn's algorithm processed level-by-level: the number of BFS layers equals the longest prerequisite chain. `taken < n` is the usual cycle check. Time $O(V + E)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

@@ -413,6 +413,180 @@ int bellmanFordK(int n, vector<vector<int>>& edges, int src, int dst, int k) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run `networkDelayTime(times, 4, 1)` with `times = [[1,2,4],[1,3,1],[3,2,2],[2,4,1]]`. What is the final `dist[]` for nodes 1–4, and what is returned? What is returned if the same `times` are passed with `n = 5`?
+
+**Q2.** Run `minimumEffortPath` **exactly as coded** (direction order up, down, left, right) on this problem's example `[[1,2,2],[3,8,2],[5,3,5]]`. List every pop from the heap until it returns. What value does the code return, and which route achieves it? (Check your answer against the walkthrough above. The heap still holds `(2, 1, 0)` when `(2,2)` is first assigned effort 3.)
+
+**Q3.** Using this problem's `flights` (`[[0,1,100],[1,2,100],[2,0,100],[1,3,600],[2,3,200]]`, `src = 0`, `dst = 3`), what does `findCheapestPrice` return for `k = 2`? For `k = 0`? What would the buggy version **without** `tempPrices` (updating `prices` in place) return for `k = 0`?
+
+**Q4.** What does `swimInWater` return for the grid below? Explain without a full trace which cell forces the answer.
+
+```
+ 0  1  2  3  4
+24 23 22 21  5
+12 13 14 15 16
+11 17 18 19 20
+10  9  8  7  6
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Network Delay, but return **which node** receives the signal last (smallest label on ties), or `-1` if some node never receives it.
+
+```cpp
+int lastToReceive(vector<vector<int>>& times, int n, int k);
+// times = [[1,2,4],[1,3,1],[3,2,2],[2,4,1]], n = 4, k = 1  ->  4
+// times = [[2,1,1],[2,3,1],[3,4,1]],         n = 4, k = 2  ->  4
+```
+
+**E2 (Easy–Medium).** Every cell has a non-negative cost. Entering a cell (including the start) costs its value. You may move in **all 4 directions**, so a right/down DP is not enough. Return the minimum total cost from `(0,0)` to `(R-1,C-1)`.
+
+```cpp
+int minPathCost(vector<vector<int>>& grid);
+// [[1,3,1],[1,5,1],[4,2,1]]                                   ->  7
+// [[1,1,1,1],[9,9,9,1],[1,1,1,1],[1,9,9,9],[1,1,1,1]]         ->  14  (snake path)
+```
+
+**E3 (Medium).** Solve Path With Minimum Effort a different way: binary search on the answer `limit` and use BFS to test "can I reach the corner using only steps with `|diff| <= limit`?".
+
+```cpp
+int minimumEffortBS(vector<vector<int>>& heights);   // heights values in [1, 10^6]
+// [[1,2,2],[3,8,2],[5,3,5]]  ->  2
+// [[1,2,3],[3,8,4],[5,3,5]]  ->  1
+```
+
+#### Dry-Run: Answers
+
+**Q1.** `dist[1..4] = [0, 3, 1, 4]`; returns **4**.
+
+| Pop | Relaxations |
+|-----|-------------|
+| (0, 1) | 2 → 4, 3 → 1 |
+| (1, 3) | 2: 1 + 2 = 3 < 4 → 3 |
+| (3, 2) | 4 → 3 + 1 = 4 |
+| (4, 2) | stale (4 > 3), skip |
+| (4, 4) | no edges |
+
+With `n = 5`, node 5 has no incoming edge, so `dist[5] = 1e9` and the function returns **-1**.
+
+**Q2.** The code returns **2**, via the route `1 → 3 → 5 → 3 → 5` (down, down, right, right). Its steps are $|1-3| = 2$, $|3-5| = 2$, $|5-3| = 2$, $|3-5| = 2$.
+
+| Pop (eff, r, c) | Pushes |
+|-----------------|--------|
+| (0, 0, 0) | (1,0) = 2, (0,1) = 1 |
+| (1, 0, 1) | (1,1) = max(1, \|2−8\|) = **6**, (0,2) = 1 |
+| (1, 0, 2) | (1,2) = 1 |
+| (1, 1, 2) | (2,2) = max(1, 3) = 3 |
+| (2, 1, 0) | (2,0) = 2, (1,1) improves 6 → 5 |
+| (2, 2, 0) | (2,1) = 2 |
+| (2, 2, 1) | (2,2) improves 3 → **2** |
+| (2, 2, 2) | destination, return 2 |
+
+The walkthrough stops at effort 3 because it pops `(2,2)` while `(2, 1, 0)` (effort 2) is still waiting in the heap. A min-heap never pops 3 before 2. (Its value `7` for cell (1,1) should also be $\max(1, 6) = 6$.)
+
+**Q3.** `k = 2` → **400** (`0→1→2→3`: 100 + 100 + 200). A third iteration, starting from `prices = [0, 100, 200, 700]`, relaxes `2→3` to $200 + 200 = 400$. `k = 0` → **-1**, since there is no direct `0→3` flight. Without `tempPrices`, for `k = 0` a single pass updates `prices[1] = 100`, then `prices[2] = 200`, `prices[3] = 700`, then `prices[3] = 400`. It returns **400**, which uses 3 flights while 0 stops were allowed.
+
+**Q4.** Returns **16**. Every route from the top row to the bottom half must cross row 1 (`24 23 22 21 5`); the only cheap crossing is the `5` at (1,4). From there the only cells below or beside it are `16` (2,4) and `21` (1,3), so the path must wait until time 16. After 16, the route `15 14 13 12 → 11 → 10 9 8 7 6` never exceeds 16, so it is exactly 16.
+
+**E1 — reference solution**
+
+```cpp
+int lastToReceive(vector<vector<int>>& times, int n, int k) {
+    vector<vector<pair<int,int>>> adj(n + 1);
+    for (auto& t : times) adj[t[0]].push_back({t[1], t[2]});
+    vector<int> dist(n + 1, 1e9);
+    dist[k] = 0;
+    priority_queue<pair<int,int>, vector<pair<int,int>>, greater<pair<int,int>>> pq;
+    pq.push({0, k});
+    while (!pq.empty()) {
+        int d = pq.top().first, u = pq.top().second;
+        pq.pop();
+        if (d > dist[u]) continue;
+        for (auto& [v, w] : adj[u])
+            if (d + w < dist[v]) { dist[v] = d + w; pq.push({dist[v], v}); }
+    }
+    int best = -1;
+    for (int i = 1; i <= n; i++) {
+        if (dist[i] == 1e9) return -1;
+        if (best == -1 || dist[i] > dist[best]) best = i;   // strict > keeps smallest label
+    }
+    return best;
+}
+```
+
+Same Dijkstra as Network Delay, but it tracks the *argmax* instead of the max. Time $O(E \log V)$.
+
+**E2 — reference solution**
+
+```cpp
+int minPathCost(vector<vector<int>>& grid) {
+    int R = grid.size(), C = grid[0].size();
+    vector<vector<int>> cost(R, vector<int>(C, INT_MAX));
+    cost[0][0] = grid[0][0];
+    priority_queue<tuple<int,int,int>, vector<tuple<int,int,int>>, greater<>> pq;
+    pq.push({grid[0][0], 0, 0});
+    int dr[] = {-1, 1, 0, 0}, dc[] = {0, 0, -1, 1};
+    while (!pq.empty()) {
+        auto [d, r, c] = pq.top(); pq.pop();
+        if (d > cost[r][c]) continue;
+        if (r == R - 1 && c == C - 1) return d;
+        for (int k = 0; k < 4; k++) {
+            int nr = r + dr[k], nc = c + dc[k];
+            if (nr < 0 || nr >= R || nc < 0 || nc >= C) continue;
+            int nd = d + grid[nr][nc];            // SUM, unlike Min Effort's max()
+            if (nd < cost[nr][nc]) { cost[nr][nc] = nd; pq.push({nd, nr, nc}); }
+        }
+    }
+    return -1;
+}
+```
+
+The grid is a graph whose edge weight is the cost of the cell you enter. The second example forces left moves (row 2 and row 4 are walked right-to-left / left-to-right), which a right/down DP cannot do. Time $O(RC \log RC)$.
+
+**E3 — reference solution**
+
+```cpp
+bool canReach(vector<vector<int>>& h, int limit) {
+    int R = h.size(), C = h[0].size();
+    vector<vector<bool>> seen(R, vector<bool>(C, false));
+    queue<pair<int,int>> q;
+    q.push({0, 0});
+    seen[0][0] = true;
+    int dr[] = {-1, 1, 0, 0}, dc[] = {0, 0, -1, 1};
+    while (!q.empty()) {
+        int r = q.front().first, c = q.front().second;
+        q.pop();
+        if (r == R - 1 && c == C - 1) return true;
+        for (int k = 0; k < 4; k++) {
+            int nr = r + dr[k], nc = c + dc[k];
+            if (nr < 0 || nr >= R || nc < 0 || nc >= C || seen[nr][nc]) continue;
+            if (abs(h[r][c] - h[nr][nc]) > limit) continue;
+            seen[nr][nc] = true;
+            q.push({nr, nc});
+        }
+    }
+    return false;
+}
+
+int minimumEffortBS(vector<vector<int>>& heights) {
+    int lo = 0, hi = 1000000;               // max possible difference
+    while (lo < hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (canReach(heights, mid)) hi = mid;   // feasible: try smaller
+        else lo = mid + 1;
+    }
+    return lo;
+}
+```
+
+Feasibility is monotonic: if you can reach the corner with limit $L$, you can with any $L' > L$. So binary search for the smallest feasible limit. Time $O(RC \log H)$ where $H = 10^6$. It agrees with the Dijkstra version (2 and 1).
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

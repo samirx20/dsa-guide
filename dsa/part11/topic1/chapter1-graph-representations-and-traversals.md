@@ -365,6 +365,210 @@ void gridDFS8(vector<vector<int>>& grid, int r, int c) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+All questions use the chapter's undirected `buildGraph` (neighbors are appended in edge order) on this edge list:
+
+```cpp
+vector<vector<int>> edges = {{0,1}, {0,2}, {1,3}, {2,3}, {3,4}};
+// n = 5 nodes
+```
+
+**Q1.** Write out `adjList` after `buildGraph(5, edges)`. How many total entries does it hold, and how many cells would the equivalent adjacency matrix have?
+
+**Q2.** Run the chapter's first `dfs` (the version with `if (!visited[neighbor])`) from node `0`. In what order are the `Visited:` lines printed?
+
+**Q3.** Run the chapter's `bfs` from node `0`. In what order are nodes printed? What does `bfsShortestPath(0, 4, adjList)` return?
+
+**Q4.** A student "simplifies" BFS by marking nodes visited when they are **popped** instead of when they are **pushed**:
+
+```cpp
+q.push(start);
+while (!q.empty()) {
+    int curr = q.front(); q.pop();
+    if (visited[curr]) continue;
+    visited[curr] = true;
+    for (int nb : adjList[curr])
+        if (!visited[nb]) q.push(nb);
+}
+```
+
+On the chapter's square graph (`0: [1,3]`, `1: [0,2]`, `2: [1,3]`, `3: [0,2]`) starting at `0`, how many times is node `2` pushed, and how many pushes happen in total? How many does the correct version do?
+
+**Q5.** How many islands does this grid contain with the chapter's 4-directional `gridDFS`, and how many with `gridDFS8`?
+
+```
+1 0 1
+0 1 0
+1 0 0
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Count connected components of an undirected graph.
+
+```cpp
+int countComponents(int n, vector<vector<int>>& edges);
+// n = 5, edges = [[0,1],[1,2],[3,4]]  ->  2
+// n = 4, edges = []                   ->  4
+```
+
+**E2 (Easy–Medium).** Given a grid where `1` is walkable and `0` is a wall, return the minimum number of 4-directional moves from `(0,0)` to `(R-1,C-1)`, or `-1` if impossible.
+
+```cpp
+int shortestGridPath(vector<vector<int>>& grid);
+// [[1,1,1],[0,0,1],[1,1,1]]  ->  4
+// [[1,0],[0,1]]              ->  -1
+```
+
+**E3 (Medium).** Return `true` if a simple undirected graph (no self-loops, no duplicate edges) contains a cycle.
+
+```cpp
+bool hasCycle(int n, vector<vector<int>>& edges);
+// n = 4, edges = [[0,1],[1,2],[2,0],[2,3]]  ->  true
+// n = 4, edges = [[0,1],[1,2],[2,3]]        ->  false
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Each edge `[u,v]` appends `v` to `u` and `u` to `v`:
+
+```
+0: [1, 2]
+1: [0, 3]
+2: [0, 3]
+3: [1, 2, 4]
+4: [3]
+```
+
+Total entries $= 2E = 2 \cdot 5 = 10$. The matrix would have $V^2 = 25$ cells.
+
+**Q2.** Output: `0 1 3 2 4`.
+
+| Call | Neighbors scanned | Action |
+|------|-------------------|--------|
+| dfs(0) | [1, 2] | recurse into 1 |
+| dfs(1) | [0, 3] | 0 visited; recurse into 3 |
+| dfs(3) | [1, 2, 4] | 1 visited; recurse into 2 |
+| dfs(2) | [0, 3] | both visited, return to 3 |
+| (back in 3) | 4 | recurse into 4 |
+| dfs(4) | [3] | visited, return |
+
+Node 2 is reached through 3, not directly from 0, because DFS goes deep through 1 first.
+
+**Q3.** BFS order: `0 1 2 3 4`. `bfsShortestPath(0, 4)` returns `3`.
+
+| Pop | Queue after pushes | Distances discovered |
+|-----|--------------------|----------------------|
+| 0 | [1, 2] | 1 → 1, 2 → 1 |
+| 1 | [2, 3] | 3 → 2 |
+| 2 | [3] | 3 already visited |
+| 3 | [4] | 4 → 3 |
+| 4 | [] | target reached, dist 3 (0-1-3-4) |
+
+**Q4.** Node `2` is pushed **twice**; total pushes = **5** (0, 1, 3, 2, 2). The correct mark-on-push version does exactly **4** pushes, one per node.
+
+| Pop | visited after | Pushed | Queue |
+|-----|---------------|--------|-------|
+| 0 | {0} | 1, 3 | [1, 3] |
+| 1 | {0,1} | 2 | [3, 2] |
+| 3 | {0,1,3} | 2 (not yet visited!) | [2, 2] |
+| 2 | {0,1,2,3} | none | [2] |
+| 2 | already visited, skip | none | [] |
+
+On dense graphs this duplication grows toward $O(E)$ queue entries.
+
+**Q5.** 4-directional: **4** islands (every `1` is isolated). 8-directional: **1** island, because `(0,0)`, `(0,2)` and `(2,0)` all touch the centre `(1,1)` diagonally.
+
+**E1 — reference solution**
+
+```cpp
+void dfsC(int u, vector<vector<int>>& adj, vector<bool>& vis) {
+    vis[u] = true;
+    for (int v : adj[u])
+        if (!vis[v]) dfsC(v, adj, vis);
+}
+
+int countComponents(int n, vector<vector<int>>& edges) {
+    vector<vector<int>> adj(n);
+    for (auto& e : edges) {
+        adj[e[0]].push_back(e[1]);
+        adj[e[1]].push_back(e[0]);
+    }
+    vector<bool> vis(n, false);
+    int comps = 0;
+    for (int i = 0; i < n; i++) {
+        if (!vis[i]) { comps++; dfsC(i, adj, vis); }
+    }
+    return comps;
+}
+```
+
+Every unvisited node found by the outer loop starts a new component; DFS then swallows the whole component. Time $O(V+E)$, space $O(V+E)$.
+
+**E2 — reference solution**
+
+```cpp
+int shortestGridPath(vector<vector<int>>& grid) {
+    int R = grid.size(), C = grid[0].size();
+    if (grid[0][0] == 0 || grid[R-1][C-1] == 0) return -1;
+    vector<vector<int>> dist(R, vector<int>(C, -1));
+    queue<pair<int,int>> q;
+    q.push({0, 0});
+    dist[0][0] = 0;                       // dist doubles as the visited array
+    int dr[] = {1, -1, 0, 0}, dc[] = {0, 0, 1, -1};
+    while (!q.empty()) {
+        int r = q.front().first, c = q.front().second;
+        q.pop();
+        if (r == R-1 && c == C-1) return dist[r][c];
+        for (int k = 0; k < 4; k++) {
+            int nr = r + dr[k], nc = c + dc[k];
+            if (nr < 0 || nr >= R || nc < 0 || nc >= C) continue;
+            if (grid[nr][nc] == 0 || dist[nr][nc] != -1) continue;
+            dist[nr][nc] = dist[r][c] + 1;  // mark on push
+            q.push({nr, nc});
+        }
+    }
+    return -1;
+}
+```
+
+BFS on an unweighted implicit graph finds the shortest path. Time and space $O(R \cdot C)$.
+
+**E3 — reference solution**
+
+```cpp
+bool dfsCycle(int u, int parent, vector<vector<int>>& adj, vector<bool>& vis) {
+    vis[u] = true;
+    for (int v : adj[u]) {
+        if (!vis[v]) {
+            if (dfsCycle(v, u, adj, vis)) return true;
+        } else if (v != parent) {
+            return true;                  // visited and not the edge we came in on
+        }
+    }
+    return false;
+}
+
+bool hasCycle(int n, vector<vector<int>>& edges) {
+    vector<vector<int>> adj(n);
+    for (auto& e : edges) {
+        adj[e[0]].push_back(e[1]);
+        adj[e[1]].push_back(e[0]);
+    }
+    vector<bool> vis(n, false);
+    for (int i = 0; i < n; i++)
+        if (!vis[i] && dfsCycle(i, -1, adj, vis)) return true;
+    return false;
+}
+```
+
+In an undirected graph every edge appears twice, so seeing your own parent is not a cycle; any *other* visited neighbor is. Time $O(V+E)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

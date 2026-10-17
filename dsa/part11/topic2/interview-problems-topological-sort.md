@@ -469,6 +469,164 @@ vector<int> topoSort(int n, vector<vector<int>>& edges) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run the Kahn's `canFinish` with `numCourses = 5` and `prerequisites = [[1,0],[2,1],[3,2],[1,3],[4,0]]`. What is the initial in-degree array, what is the final `count`, and what is returned?
+
+**Q2.** Run the Kahn's `findOrder` on Edge Case 3 (`numCourses = 4`, `prerequisites = [[1,0],[3,2]]`). The edge-case list says "`[0,1,2,3]` or `[2,3,0,1]` etc." — which exact array does *this* code return?
+
+**Q3.** Run the **DFS** `findOrder` on the same input as Q2. What is `result` just before `reverse`, and what is returned?
+
+**Q4.** Edge Case 2 (`numCourses = 2`, `prerequisites = [[0,0]]`). For the Kahn's `canFinish`, what is `count` at the end? For the DFS `canFinish`, what is the `state` array at the moment `hasCycle` returns `true`?
+
+**Q5.** Run the DFS `canFinish` on the diamond from this file (`[[1,0],[2,0],[3,1],[3,2]]`). How many times is `hasCycle` called in total? When node 2 looks at neighbor 3, what is `state[3]`? What would go wrong if the code treated state `2` the same as state `1`?
+
+### Coding Exercises
+
+**E1 (Easy).** Return how many courses can actually be completed (courses stuck behind a cycle can't be).
+
+```cpp
+int countFinishable(int numCourses, vector<vector<int>>& prerequisites);
+// numCourses = 5, prerequisites = [[1,0],[2,1],[3,2],[1,3],[4,0]]  ->  2
+// numCourses = 4, prerequisites = [[1,0],[2,0],[3,1],[3,2]]        ->  4
+```
+
+**E2 (Easy–Medium).** Course Schedule II, but among all valid orders return the **lexicographically smallest** one (or `{}` if a cycle exists).
+
+```cpp
+vector<int> findOrderSmallest(int numCourses, vector<vector<int>>& prerequisites);
+// numCourses = 4, prerequisites = [[1,0],[3,2]]  ->  [0,1,2,3]
+// numCourses = 3, prerequisites = [[0,2]]        ->  [1,2,0]
+```
+
+**E3 (Medium).** Find Eventual Safe States: `graph[i]` lists the nodes `i` points to. A node is *safe* if every path starting from it ends at a node with no outgoing edges (i.e., it can never reach a cycle). Return all safe nodes in increasing order.
+
+```cpp
+vector<int> eventualSafeNodes(vector<vector<int>>& graph);
+// [[1,2],[2,3],[5],[0],[5],[],[]]  ->  [2,4,5,6]
+// [[1,2,3,4],[1,2],[3,4],[0,4],[]] ->  [4]
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Edges: `0→1, 1→2, 2→3, 3→1, 0→4`. In-degree: **`[0, 2, 1, 1, 1]`**. Final `count = 2`, returns **`false`**.
+
+| Pop | Decrements | Queue after | count |
+|-----|------------|-------------|-------|
+| (init) | — | [0] | 0 |
+| 0 | 1 → 1, 4 → 0 | [4] | 1 |
+| 4 | none | [] | 2 |
+
+Node 1 still needs node 3, which needs 2, which needs 1, so the cycle `1 → 2 → 3 → 1` is never unlocked.
+
+**Q2.** Returns **`[0, 2, 1, 3]`**. Both 0 and 2 start with in-degree 0, so the initial queue is `[0, 2]`.
+
+| Pop | Pushes | Queue after | result |
+|-----|--------|-------------|--------|
+| 0 | 1 | [2, 1] | [0] |
+| 2 | 3 | [1, 3] | [0, 2] |
+| 1 | — | [3] | [0, 2, 1] |
+| 3 | — | [] | [0, 2, 1, 3] |
+
+It's one of the "etc." orders. The FIFO queue interleaves the two components.
+
+**Q3.** Before reverse: **`[1, 0, 3, 2]`**. Returned: **`[2, 3, 0, 1]`**. `dfs(0)` visits 1, which finishes first (push 1), then 0 finishes (push 0). Outer `i = 1` is done; `i = 2` visits 3 (push 3), then 2 (push 2).
+
+**Q4.** Kahn's: in-degree is `[1, 0]`, so the queue starts as `[1]`. Node 1 is processed, giving **`count = 1`**, and $1 \neq 2$ returns `false`. DFS: `hasCycle(0)` sets `state = [1, 0]`, then sees neighbor 0 with `state[0] == 1` and returns `true` with **`state = [1, 0]`**.
+
+**Q5.** **4** calls: `hasCycle(0)`, `hasCycle(1)`, `hasCycle(3)`, `hasCycle(2)`. The outer loop then finds 1, 2, 3 already non-zero.
+
+| Call | state after entering | Notes |
+|------|----------------------|-------|
+| hasCycle(0) | [1,0,0,0] | neighbors 1, 2 |
+| hasCycle(1) | [1,1,0,0] | neighbor 3 |
+| hasCycle(3) | [1,1,0,1] | no neighbors, becomes 2 |
+| (1 finishes) | [1,2,0,2] | |
+| hasCycle(2) | [1,2,1,2] | neighbor 3 has **state 2**, skip |
+
+When 2 looks at 3, `state[3] = 2`. If state 2 were treated like state 1 ("on the current path"), the second route into 3 would be reported as a cycle and `canFinish` would wrongly return `false` on a perfectly valid DAG. Reaching a node again through a different branch is not a cycle; only a back edge to a node *on the current path* is.
+
+**E1 — reference solution**
+
+```cpp
+int countFinishable(int numCourses, vector<vector<int>>& prerequisites) {
+    vector<vector<int>> adj(numCourses);
+    vector<int> inDegree(numCourses, 0);
+    for (auto& pre : prerequisites) {
+        adj[pre[1]].push_back(pre[0]);
+        inDegree[pre[0]]++;
+    }
+    queue<int> q;
+    for (int i = 0; i < numCourses; i++)
+        if (inDegree[i] == 0) q.push(i);
+    int count = 0;
+    while (!q.empty()) {
+        int curr = q.front(); q.pop();
+        count++;
+        for (int nb : adj[curr])
+            if (--inDegree[nb] == 0) q.push(nb);
+    }
+    return count;   // canFinish just compares this to numCourses
+}
+```
+
+Kahn's `count` already *is* the number of courses not blocked by a cycle (or by anything downstream of one). Time $O(V + E)$.
+
+**E2 — reference solution**
+
+```cpp
+vector<int> findOrderSmallest(int numCourses, vector<vector<int>>& prerequisites) {
+    vector<vector<int>> adj(numCourses);
+    vector<int> inDegree(numCourses, 0);
+    for (auto& pre : prerequisites) {
+        adj[pre[1]].push_back(pre[0]);
+        inDegree[pre[0]]++;
+    }
+    priority_queue<int, vector<int>, greater<int>> pq;   // min-heap instead of FIFO
+    for (int i = 0; i < numCourses; i++)
+        if (inDegree[i] == 0) pq.push(i);
+    vector<int> result;
+    while (!pq.empty()) {
+        int curr = pq.top(); pq.pop();
+        result.push_back(curr);
+        for (int nb : adj[curr])
+            if (--inDegree[nb] == 0) pq.push(nb);
+    }
+    if (result.size() == numCourses) return result;
+    return {};
+}
+```
+
+At every step, greedily taking the smallest *available* course gives the lexicographically smallest order. In the second example, 1 and 2 are available, so 1 is taken first, then 2, which unlocks 0. Time $O((V + E)\log V)$.
+
+**E3 — reference solution**
+
+```cpp
+// state: 0 = unvisited, 1 = in progress OR known unsafe, 2 = known safe
+bool isUnsafe(vector<vector<int>>& graph, vector<int>& state, int node) {
+    if (state[node] != 0) return state[node] == 1;
+    state[node] = 1;
+    for (int nb : graph[node])
+        if (isUnsafe(graph, state, nb)) return true;   // leave state = 1 (unsafe)
+    state[node] = 2;
+    return false;
+}
+
+vector<int> eventualSafeNodes(vector<vector<int>>& graph) {
+    int n = graph.size();
+    vector<int> state(n, 0), result;
+    for (int i = 0; i < n; i++)
+        if (!isUnsafe(graph, state, i)) result.push_back(i);
+    return result;
+}
+```
+
+This reuses the 3-state DFS from `hasCycle`. A node is unsafe iff the DFS from it hits an "in progress" node (a cycle). On early return the state stays `1`, which caches "unsafe" for later queries. Each node and edge is processed once: $O(V + E)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

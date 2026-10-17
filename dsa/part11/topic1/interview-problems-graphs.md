@@ -516,6 +516,181 @@ int ladderLength(string beginWord, string endWord, vector<string>& wordList) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1.** Run this file's `numIslands` and `maxAreaOfIsland` on the same grid (characters for the first, ints for the second). What does each return?
+
+```
+1 0 1 1
+1 0 0 1
+0 1 0 0
+0 1 1 0
+```
+
+**Q2.** Run `orangesRotting` on the grid below. What does it return, and which cell(s) rot in each minute? Then change the bottom-left `0` at `(2,0)` to `1`. What is the new answer?
+
+```
+2 1 1
+0 1 1
+0 0 1
+```
+
+**Q3.** Run `isBipartite` on the 5-cycle `0-1-2-3-4-0`, given as `graph = [[1,4],[0,2],[1,3],[2,4],[3,0]]`. What does it return, and at which popped node / neighbor pair is the conflict detected?
+
+**Q4.** Run `ladderLength("hit", "cog", wordList)` with `wordList = ["hot","dot","lot","log","cog"]` (note: `"dog"` is missing). What does it return? What does it return if `"cog"` is removed from the list instead?
+
+**Q5.** Run the recursive `cloneGraph` on the path graph `1 -- 2 -- 3` (`1:[2]`, `2:[1,3]`, `3:[2]`), starting from node 1. How many times is `cloneGraph` called in total, and how many times is `new Node` executed?
+
+### Coding Exercises
+
+**E1 (Easy).** Flood Fill: starting from pixel `(sr, sc)`, recolor every 4-connected pixel that has the same original color as the start pixel.
+
+```cpp
+vector<vector<int>> floodFill(vector<vector<int>>& image, int sr, int sc, int color);
+// image = [[1,1,1],[1,1,0],[1,0,1]], sr = 1, sc = 1, color = 2
+//   -> [[2,2,2],[2,2,0],[2,0,1]]
+// image = [[0,0],[0,0]], sr = 0, sc = 0, color = 0  -> unchanged
+```
+
+**E2 (Easy–Medium).** 01 Matrix: for every cell, return the distance (in 4-directional steps) to the nearest `0`. Use the multi-source BFS idea from Rotting Oranges.
+
+```cpp
+vector<vector<int>> updateMatrix(vector<vector<int>>& mat);
+// [[0,0,0],[0,1,0],[1,1,1]]  ->  [[0,0,0],[0,1,0],[1,2,1]]
+```
+
+**E3 (Medium).** Number of Enclaves: count land cells (`1`) from which you can **not** walk off the grid boundary. Use the "start from the border" trick from Pacific Atlantic.
+
+```cpp
+int numEnclaves(vector<vector<int>>& grid);
+// [[0,0,0,0],[1,0,1,0],[0,1,1,0],[0,0,0,0]]  ->  3
+// [[0,1,1,0],[0,0,1,0],[0,0,1,0],[0,0,0,0]]  ->  0
+```
+
+#### Dry-Run: Answers
+
+**Q1.** `numIslands` returns **3**; `maxAreaOfIsland` returns **3**.
+
+| Scan hits | Island cells sunk | Area |
+|-----------|-------------------|------|
+| (0,0) | (0,0), (1,0) | 2 |
+| (0,2) | (0,2), (0,3), (1,3) | 3 |
+| (2,1) | (2,1), (3,1), (3,2) | 3 |
+
+Two islands tie for the maximum area of 3.
+
+**Q2.** Returns **4**. Initially `fresh = 5`.
+
+| Minute | Popped | Newly rotten | fresh after |
+|--------|--------|--------------|-------------|
+| 1 | (0,0) | (0,1) | 4 |
+| 2 | (0,1) | (1,1), (0,2) | 2 |
+| 3 | (1,1), (0,2) | (1,2) | 1 |
+| 4 | (1,2) | (2,2) | 0 |
+
+With `(2,0) = 1`: that orange's neighbors `(1,0)` and `(2,1)` are both empty, so it can never rot. `fresh` ends at 1 and the function returns **-1**.
+
+**Q3.** Returns **false** (an odd cycle is never bipartite).
+
+| Pop | Neighbors | Action |
+|-----|-----------|--------|
+| 0 (color 1) | 1, 4 | color both -1 |
+| 1 (-1) | 0, 2 | 0 is 1, OK; color 2 = 1 |
+| 4 (-1) | 3, 0 | color 3 = 1; 0 is 1, OK |
+| 2 (1) | 1, 3 | 1 is -1, OK; **3 is 1 = same as 2 → return false** |
+
+The conflict is found when popping node **2** and examining neighbor **3**.
+
+**Q4.** Returns **5** (`hit → hot → lot → log → cog`). The code counts *words* in the sequence, not edges: `hit` starts at level 1, `hot` 2, `dot`/`lot` 3, `log` 4, and generating `cog` from `log` returns `4 + 1 = 5`. `dot` is a dead end because `dog` is missing. If `"cog"` is removed, the guard `if (!wordSet.count(endWord)) return 0;` returns **0** immediately.
+
+**Q5.** **5** calls, **3** `new Node` executions.
+
+| Call | Already in `copies`? | Effect |
+|------|----------------------|--------|
+| cloneGraph(1) | no | new clone1, recurse on [2] |
+| cloneGraph(2) | no | new clone2, recurse on [1, 3] |
+| cloneGraph(1) | yes | return clone1 |
+| cloneGraph(3) | no | new clone3, recurse on [2] |
+| cloneGraph(2) | yes | return clone2 |
+
+In general: $1 + 2E$ calls for a connected graph ($1 + 4 = 5$ here) and exactly $V$ allocations.
+
+**E1 — reference solution**
+
+```cpp
+void fill(vector<vector<int>>& img, int r, int c, int orig, int color) {
+    if (r < 0 || r >= img.size() || c < 0 || c >= img[0].size() || img[r][c] != orig)
+        return;
+    img[r][c] = color;                 // recoloring doubles as "visited"
+    fill(img, r + 1, c, orig, color);
+    fill(img, r - 1, c, orig, color);
+    fill(img, r, c + 1, orig, color);
+    fill(img, r, c - 1, orig, color);
+}
+
+vector<vector<int>> floodFill(vector<vector<int>>& image, int sr, int sc, int color) {
+    int orig = image[sr][sc];
+    if (orig == color) return image;   // otherwise infinite recursion
+    fill(image, sr, sc, orig, color);
+    return image;
+}
+```
+
+Same grid-DFS as Number of Islands. The `orig == color` guard is essential, since the "visited" mark would otherwise be indistinguishable from unvisited. Time $O(M \times N)$.
+
+**E2 — reference solution**
+
+```cpp
+vector<vector<int>> updateMatrix(vector<vector<int>>& mat) {
+    int R = mat.size(), C = mat[0].size();
+    vector<vector<int>> dist(R, vector<int>(C, -1));
+    queue<pair<int,int>> q;
+    for (int r = 0; r < R; r++)
+        for (int c = 0; c < C; c++)
+            if (mat[r][c] == 0) { dist[r][c] = 0; q.push({r, c}); }  // all sources
+    int dr[] = {-1, 1, 0, 0}, dc[] = {0, 0, -1, 1};
+    while (!q.empty()) {
+        int r = q.front().first, c = q.front().second;
+        q.pop();
+        for (int d = 0; d < 4; d++) {
+            int nr = r + dr[d], nc = c + dc[d];
+            if (nr < 0 || nr >= R || nc < 0 || nc >= C || dist[nr][nc] != -1) continue;
+            dist[nr][nc] = dist[r][c] + 1;
+            q.push({nr, nc});
+        }
+    }
+    return dist;
+}
+```
+
+Seeding the queue with every `0` makes BFS layers equal "distance to nearest zero". Each cell is pushed once: $O(M \times N)$.
+
+**E3 — reference solution**
+
+```cpp
+void sink(vector<vector<int>>& g, int r, int c) {
+    if (r < 0 || r >= g.size() || c < 0 || c >= g[0].size() || g[r][c] == 0) return;
+    g[r][c] = 0;
+    sink(g, r + 1, c); sink(g, r - 1, c); sink(g, r, c + 1); sink(g, r, c - 1);
+}
+
+int numEnclaves(vector<vector<int>>& grid) {
+    int R = grid.size(), C = grid[0].size();
+    for (int r = 0; r < R; r++) { sink(grid, r, 0); sink(grid, r, C - 1); }
+    for (int c = 0; c < C; c++) { sink(grid, 0, c); sink(grid, R - 1, c); }
+    int count = 0;
+    for (auto& row : grid)
+        for (int x : row) count += x;   // whatever land survives is enclosed
+    return count;
+}
+```
+
+Instead of asking "can this cell escape?" from every cell, sink everything reachable from the border, which is exactly the reverse trick of Pacific Atlantic. Time $O(M \times N)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

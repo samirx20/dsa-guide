@@ -390,6 +390,183 @@ int dijkstra(vector<vector<int>>& edges, int n, int src, int dst) {
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+Q1 and Q2 use the chapter's A–F graph with **one change: `D → E` now costs 8 instead of 5**. Number the nodes `A=0, B=1, C=2, D=3, E=4, F=5`:
+
+```cpp
+vector<vector<int>> edges = {{0,1,4}, {0,3,1}, {1,2,2}, {1,4,7}, {2,5,3}, {3,4,8}, {4,5,1}};
+```
+
+**Q1.** Run `dijkstraAll(6, edges, 0)`. In what order are nodes popped (ignoring stale entries), and what is the final `distances` array? When E and F are both in the heap with distance 9, which one is popped first, and why?
+
+**Q2.** Run `dijkstraWithPath(6, edges, 0, 5)`. What is the `parent` array when the loop ends, and what path is returned? Compare with the original chapter graph, where the path to F was `A → D → E → F`.
+
+**Q3.** Run `dijkstraAll` from node 0 on `{{0,1,10}, {0,2,1}, {2,1,2}, {1,3,1}}`. How many times is something popped from the heap in total, how many of those pops are skipped by `if (currDist > distances[currNode]) continue;`, and what is the final `distances` array?
+
+**Q4.** The constraint section says Dijkstra fails on negative weights. Run the target version `dijkstra(3, edges, 0, 1)` with `edges = {{0,1,2}, {0,2,5}, {2,1,-4}}`. What does it return, and what is the true shortest distance?
+
+**Q5.** In `dijkstraWithPath`, suppose `targetNode` is unreachable from `startNode = 0` (say target `3` and nothing ever points to it). What does `path` contain right after the `reverse`, and what does the function return? What does it return when `targetNode == startNode`?
+
+### Coding Exercises
+
+**E1 (Easy).** Count how many nodes (including `src`) can be reached with total cost `<= budget` on a directed graph with non-negative weights.
+
+```cpp
+int reachableWithin(int n, vector<vector<int>>& edges, int src, int budget);
+// The chapter's original A–F graph (D→E = 5), src = 0:
+// budget = 5  ->  3   (A, D, B)
+// budget = 6  ->  5   (A, D, B, C, E)
+```
+
+**E2 (Easy–Medium).** Path with Maximum Probability: undirected edges, `succProb[i]` is the probability of traversing `edges[i]` successfully. Return the maximum probability of reaching `end` from `start` (`0.0` if unreachable).
+
+```cpp
+double maxProbability(int n, vector<vector<int>>& edges, vector<double>& succProb, int start, int end);
+// n = 3, edges = [[0,1],[1,2],[0,2]], succProb = [0.5,0.5,0.2], start = 0, end = 2  ->  0.25
+// same, succProb = [0.5,0.5,0.3]                                                    ->  0.3
+```
+
+**E3 (Medium).** Number of Ways to Arrive at Destination: undirected roads `[u, v, time]`. Return how many different shortest-time paths go from `0` to `n-1`, modulo $10^9 + 7$.
+
+```cpp
+int countPaths(int n, vector<vector<int>>& roads);
+// n = 7, roads = [[0,6,7],[0,1,2],[1,2,3],[1,3,3],[6,3,3],[3,5,1],[6,5,1],[2,5,1],[0,4,5],[4,6,2]]  ->  4
+// n = 2, roads = [[1,0,10]]  ->  1
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Pop order **A, D, B, C, E, F**. Final `distances = [0, 4, 6, 1, 9, 9]`.
+
+| Pop | Relaxations | Heap after |
+|-----|-------------|------------|
+| A (0) | B = 4, D = 1 | (1,D), (4,B) |
+| D (1) | E = 1 + 8 = 9 | (4,B), (9,E) |
+| B (4) | C = 6; E: 4 + 7 = 11 < 9? no | (6,C), (9,E) |
+| C (6) | F = 6 + 3 = 9 | (9,E), (9,F) |
+| E (9) | F: 9 + 1 = 10 < 9? no | (9,F) |
+| F (9) | — | empty |
+
+Tie at distance 9: `pair` compares the second field when the first is equal, so `(9, 4)` (E) comes out before `(9, 5)` (F).
+
+**Q2.** `parent = [-1, 0, 1, 0, 3, 2]`. Path **`[0, 1, 2, 5]`**, i.e. `A → B → C → F` with cost 9. Backtrack: `5 → parent 2 → parent 1 → parent 0 → -1`, then reverse. Making `D → E` more expensive (8 instead of 5) means `A→D→E→F` now costs 10, so the route through C (cost 9) wins.
+
+**Q3.** **5** pops, **1** stale skip, `distances = [0, 3, 1, 4]`.
+
+| Pop | Fresh or stale | Action |
+|-----|----------------|--------|
+| (0, 0) | fresh | push (10, 1), (1, 2) |
+| (1, 2) | fresh | 1 + 2 = 3 < 10 → push (3, 1) |
+| (3, 1) | fresh | push (4, 3) |
+| (4, 3) | fresh | no neighbors |
+| (10, 1) | **stale** (10 > 3) | `continue` |
+
+The entry `(10, 1)` was never removed when node 1 improved. Lazy deletion leaves it in the heap and the stale check discards it.
+
+**Q4.** Returns **2**, but the true shortest distance is **1** (`0 → 2 → 1 = 5 + (-4)`). Pop 0 sets `dist[1] = 2` and `dist[2] = 5`. The heap's smallest entry is `(2, 1)`, which is the target, so the function returns early. Node 2 is never expanded, so the `-4` edge is never seen. Dijkstra assumes a popped node can't be improved later, and negative edges break that assumption.
+
+**Q5.** Unreachable target: `parent[3] = -1`, so the loop pushes only `3` and `path = [3]` after reversing. Since `path[0] = 3 != 0`, it returns **`{}`**. When `targetNode == startNode`, the first pop hits `break`, `parent[start] = -1`, and the path is **`[startNode]`**, matching Edge Case 1.
+
+**E1 — reference solution**
+
+```cpp
+int reachableWithin(int n, vector<vector<int>>& edges, int src, int budget) {
+    vector<vector<pair<int,int>>> adj(n);
+    for (auto& e : edges) adj[e[0]].push_back({e[1], e[2]});
+    vector<int> dist(n, INT_MAX);
+    dist[src] = 0;
+    priority_queue<pair<int,int>, vector<pair<int,int>>, greater<pair<int,int>>> pq;
+    pq.push({0, src});
+    int count = 0;
+    while (!pq.empty()) {
+        int d = pq.top().first, u = pq.top().second;
+        pq.pop();
+        if (d > dist[u]) continue;     // stale
+        if (d > budget) break;         // everything left is even farther
+        count++;                       // u is finalized and within budget
+        for (auto& [v, w] : adj[u]) {
+            if (d + w < dist[v]) { dist[v] = d + w; pq.push({dist[v], v}); }
+        }
+    }
+    return count;
+}
+```
+
+Nodes are finalized in increasing distance order, so the first popped distance over budget lets us stop early. Time $O(E \log V)$.
+
+**E2 — reference solution**
+
+```cpp
+double maxProbability(int n, vector<vector<int>>& edges, vector<double>& succProb,
+                      int start, int end) {
+    vector<vector<pair<int,double>>> adj(n);
+    for (int i = 0; i < edges.size(); i++) {
+        adj[edges[i][0]].push_back({edges[i][1], succProb[i]});
+        adj[edges[i][1]].push_back({edges[i][0], succProb[i]});
+    }
+    vector<double> best(n, 0.0);
+    best[start] = 1.0;
+    priority_queue<pair<double,int>> pq;          // MAX-heap: most probable first
+    pq.push({1.0, start});
+    while (!pq.empty()) {
+        double p = pq.top().first;
+        int u = pq.top().second;
+        pq.pop();
+        if (p < best[u]) continue;                // stale
+        if (u == end) return p;
+        for (auto& [v, q] : adj[u]) {
+            double np = p * q;                    // multiply instead of add
+            if (np > best[v]) { best[v] = np; pq.push({np, v}); }
+        }
+    }
+    return 0.0;
+}
+```
+
+Multiplying by probabilities in $[0, 1]$ can only shrink a value, the same way adding non-negative weights can only grow one. So Dijkstra's greedy argument still holds with a max-heap. $0.5 \times 0.5 = 0.25 > 0.2$, but $0.3 > 0.25$. Time $O(E \log V)$.
+
+**E3 — reference solution**
+
+```cpp
+int countPaths(int n, vector<vector<int>>& roads) {
+    const long long MOD = 1e9 + 7;
+    vector<vector<pair<int,long long>>> adj(n);
+    for (auto& r : roads) {
+        adj[r[0]].push_back({r[1], r[2]});
+        adj[r[1]].push_back({r[0], r[2]});
+    }
+    vector<long long> dist(n, LLONG_MAX), ways(n, 0);
+    dist[0] = 0; ways[0] = 1;
+    priority_queue<pair<long long,int>, vector<pair<long long,int>>,
+                   greater<pair<long long,int>>> pq;
+    pq.push({0, 0});
+    while (!pq.empty()) {
+        long long d = pq.top().first;
+        int u = pq.top().second;
+        pq.pop();
+        if (d > dist[u]) continue;
+        for (auto& [v, w] : adj[u]) {
+            long long nd = d + w;
+            if (nd < dist[v]) {                   // strictly better: reset count
+                dist[v] = nd;
+                ways[v] = ways[u];
+                pq.push({nd, v});
+            } else if (nd == dist[v]) {           // another equally short route
+                ways[v] = (ways[v] + ways[u]) % MOD;
+            }
+        }
+    }
+    return ways[n - 1];
+}
+```
+
+When `u` is popped (non-stale), `ways[u]` is final, because every shortest path into `u` comes from a node with a smaller distance, which was popped earlier. `long long` handles Edge Case 5's overflow risk. Time $O(E \log V)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
