@@ -571,7 +571,7 @@ string longestWord(vector<string>& words) {
 
 **Q3. Map Sum overwrite.** Using Problem 5's `MapSum`: `insert("apple", 3)`, `insert("app", 2)`, then `sum("ap")`. Next `insert("apple", 7)` (same key again), then `sum("ap")`, `sum("apple")`, and `sum("b")`. Give all four sums.
 
-**Q4. Longest Word, checked against the code.** Run Problem 6's `longestWord` on the walkthrough's second example, `["a", "banana", "app", "appl", "apply", "application"]`. What does the code *actually* return, and why? Then run it on `["a", "ap", "app", "appl", "apple", "apply"]`: which of the two length-5 words wins, and which line decides the tie?
+**Q4. Longest Word, traced through the code.** Run Problem 6's `longestWord` on the walkthrough's second example, `["a", "banana", "app", "appl", "apply", "application"]`. What does the code return, and why is it not `"apply"`? Then run it on `["a", "ap", "app", "appl", "apple", "apply"]`: which of the two length-5 words wins, and which line decides the tie?
 
 **Q5. Word Search II on a small board.** Run Problem 3's `findWords` on
 

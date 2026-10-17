@@ -551,7 +551,7 @@ what is `Fan(fan_speed_pct=v).fan_speed_pct` for each `v` in `[0, "35", 12, 105,
 The loop only shows `errors()[0]`, so it hides two of the three problems. Log all of them when debugging LLM output.
 
 **Q3.** Only `"TC-042"` matches.
-- `"T-001"`: one letter, not two. The chapter's own `SensorConfig(sensor_id="T-001", ...)` example would be rejected by this pattern for the same reason.
+- `"T-001"`: one letter, not two. That is why the chapter's valid `SensorConfig` example uses `"TC-001"`.
 - `"TCX-042"`: three letters. `^` prevents matching from the second letter onwards.
 - `"TC-0420"`: four digits. `$` prevents a partial match.
 - `"tc-042"`: lowercase letters are not in `[A-Z]`.

@@ -537,7 +537,16 @@ print(keys[0] == keys[1], keys[0] == keys[2])
 
 What does this print, and why?
 
-**Q3. Spot the crash.** Run the first `get_embedding` function from Section 4 ("Caching Embeddings") exactly as printed. What happens on the very first call, which line is responsible, and what is the one-word fix?
+**Q3. Spot the crash.** A common slip when typing the Section 4 ("Caching Embeddings") cache is this first half of `get_embedding`. What happens on the very first call, which line is responsible, and what is the one-word fix?
+
+```python
+def get_embedding(text, model="text-embedding-3-small"):
+    encoded_text = text.encode()
+    cache_key = hashlib.sha256(encoded_key).hexdigest()
+    if cache_key in embedding_cache:
+        return embedding_cache[cache_key]
+    ...
+```
 
 **Q4. Cosine by hand.** Using the chapter's `cosine_sim(a, b)` on tiny 3-D "embeddings":
 
@@ -585,7 +594,7 @@ Compute all three values by hand. If `embedding_diagnostics` saw the `v1`/`v2` s
 
 **Q2.** Prints `True False`. `strip().lower()` turns both `"Pump maintenance"` and `" pump maintenance "` into `"pump maintenance"`, so the hashes match. `"PUMP  maintenance"` becomes `"pump  maintenance"` with **two** inner spaces. `strip()` only trims the ends, so that string, and therefore its hash, is different. To also merge it, normalize internal whitespace with `" ".join(text.split()).lower()`.
 
-**Q3.** It raises `NameError: name 'encoded_key' is not defined` on the line `cache_key = hashlib.sha256(encoded_key).hexdigest()`. The variable created on the line above is `encoded_text`, so the fix is to write `hashlib.sha256(encoded_text)`. The "What's happening" breakdown below the function already shows the correct spelling.
+**Q3.** It raises `NameError: name 'encoded_key' is not defined` on the line `cache_key = hashlib.sha256(encoded_key).hexdigest()`. The variable created on the line above is `encoded_text`, so the fix is to write `hashlib.sha256(encoded_text)`, exactly as the chapter's version does. The error appears before the cache or the API is touched, so it fires on every call.
 
 **Q4.** Here $\|v_1\| = \sqrt{1+4+4} = 3$.
 

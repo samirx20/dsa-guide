@@ -440,7 +440,7 @@ int naiveFind(const string& text, const string& pattern);
 - `text = "hello", pattern = "ll"` → `2`
 - `text = "aaaaa", pattern = "bba"` → `-1`
 
-**E2 (Easy–Medium).** *String rotation with KMP.* The chapter's `isRotation` calls an undefined `kmpSearchReturnBool`. Write it using `computeLPS`, then use it to decide whether `s2` is a rotation of `s1`.
+**E2 (Easy–Medium).** *String rotation with KMP.* The chapter's `isRotation` reuses `findAllOccurrences`, which collects every match. Write a leaner `kmpSearchReturnBool` using `computeLPS` that stops at the first match, then use it to decide whether `s2` is a rotation of `s1`.
 
 ```cpp
 bool kmpSearchReturnBool(const string& text, const string& pattern);

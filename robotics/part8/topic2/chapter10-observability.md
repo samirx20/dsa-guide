@@ -401,6 +401,7 @@ def pipeline_trace(query: str, run_id: str):
     except Exception as e:
         errors.append(str(e))
         logger.log("pipeline_error", run_id=run_id, error=str(e))
+        raise  # re-raise: the trace records the failure, the caller still sees it
     finally:
         elapsed = round((time.perf_counter() - start) * 1000, 2)
         logger.log("pipeline_end", run_id=run_id,
@@ -416,6 +417,7 @@ Line 10:  yield errors                     -> Pause here; code in 'with' block r
 Line 11:  except Exception as e:           -> Catch any unhandled exception
 Line 12:  errors.append(str(e))            -> Store error message in shared list
 Line 13:  logger.log("pipeline_error",...) -> Log the error with run_id
+Line 14:  raise                            -> Re-raise; tracing must not hide the failure
 Line 15:  finally:                          -> Always runs: success or failure
 Line 16:  elapsed = ...                    -> Calculate total pipeline duration
 Line 17:  logger.log("pipeline_end",...)   -> Log completion with timing + error count
@@ -743,7 +745,7 @@ logs = [
 | `redact("abcd")` | 4 ≤ 4 | `"****"` (fully hidden) |
 | `redact("abcde")` | 5 | `"*bcde"` |
 
-`"sk-1234567890abcdef"` has 19 characters, so the stars number $19 - 4 = 15$. The comment in the chapter shows 12. Notice that `redact("abcde")` reveals 4 of 5 characters, so very short secrets need a different rule, such as always masking at least half.
+`"sk-1234567890abcdef"` has 19 characters, so the stars number $19 - 4 = 15$, matching the chapter's output comment (a quick eyeball count often gives 12). Notice that `redact("abcde")` reveals 4 of 5 characters, so very short secrets need a different rule, such as always masking at least half.
 
 **Q2.** With `n = 10`:
 
@@ -778,15 +780,15 @@ The total is $0.0477$.
 
 $0.0477 / 0.05 = 95.4\% > 80\%$, so `alert` is `True`. An unknown model like `"llama-3"` falls back to `{"input": 0.003, "output": 0.015}`.
 
-**Q5.** The exception does **not** escape, and `"after with"` **is printed**. When the `with` body raises, the exception is thrown into the generator at `yield`. The `except Exception` there catches it and does not re-raise, so the context manager swallows it. The logged events, in order:
+**Q5.** The exception **does** escape, and `"after with"` is **not** printed. When the `with` body raises, the exception is thrown into the generator at `yield`. The `except Exception` there records and logs it, then the bare `raise` re-raises it, so the `ValueError` propagates out of the `with` statement. The logged events, in order:
 
 1. `pipeline_start`
 2. `pipeline_error` with `error="sensor offline"`
 3. `pipeline_end` with `error_count=2`, counting `"pre-check failed"` and `"sensor offline"`
 
-This is useful for tracing, but dangerous if callers expect the exception. Add `raise` after logging to propagate it.
+The `finally` block runs before the exception leaves, so `pipeline_end` is still logged. Without the `raise`, the context manager would swallow the exception and `"after with"` would print, hiding the failure from the caller.
 
-Bonus: the input never changes between attempts, so every attempt finds the same 2 errors. That gives **3** `validation_attempt` logs, `all_errors` of length **6**, and the original `results` returned. The "attempt 1: errors []" example in the chapter can only happen if something, such as an LLM correction, changes the data between attempts.
+Bonus: the input never changes between attempts, so every attempt finds the same 2 errors. That gives **3** `validation_attempt` logs, `all_errors` of length **6**, and the original `results` returned. That is exactly what the chapter's log example shows: a retry can only pass if something, such as an LLM correction, changes the data between attempts.
 
 **E1 — reference solution**
 

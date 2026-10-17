@@ -631,7 +631,7 @@ summarize_old_messages(messages, keep_recent=0)   # (c)  careful: think about [-
 (a) What is the cost of a call with 40,000 input tokens and 800 output tokens?
 (b) Does `cost_aware_chat(messages, max_cost=0.10)` send a 40,000-token prompt? It assumes 500 output tokens. If it does not send, what is the error string?
 
-**Q4. The 90% guard on a smaller model.** Re-run the chapter's "exceed the context" loop with `model_limit = 16384`. The system prompt is 6 tokens, and pretend every padded message is exactly 1,000 tokens. What does the warning line print, and what is the final message count?
+**Q4. The 90% guard on a smaller model.** Re-run the chapter's "exceed the context" loop with `model_limit = 16385` (GPT-3.5-turbo). The system prompt is 6 tokens, and pretend every padded message is exactly 1,000 tokens. What does the warning line print, and what is the final message count?
 
 ### Coding Exercises
 
@@ -682,14 +682,14 @@ conv = [
 (a) $\frac{40000}{1000} \times 0.0025 + \frac{800}{1000} \times 0.01 = 0.100 + 0.008 = \$0.108$.
 (b) Estimate $= 0.100 + \frac{500}{1000} \times 0.01 = 0.100 + 0.005 = 0.105 > 0.10$, so it is **not sent**. It returns `success=False` with `"Cost $0.1050 exceeds budget $0.10"` (and `input_tokens: 40000`).
 
-**Q4.** The threshold is $0.9 \times 16384 = 14745.6$. After processing loop index $i$, the total is $6 + 1000(i+1)$.
+**Q4.** The threshold is $0.9 \times 16385 = 14746.5$. After processing loop index $i$, the total is $6 + 1000(i+1)$.
 
-| `i` | total | > 14745.6? |
+| `i` | total | > 14746.5? |
 |---|---|---|
 | 13 | 14006 | no (appended) |
 | 14 | 15006 | **yes**, so break |
 
-It prints `Warning at message 14: 15006 tokens (91.6% of limit)` (since $15006 / 16384 = 0.9159$), then `Final message count: 15`: the system message plus 14 appended messages for $i = 0$ to $13$.
+It prints `Warning at message 14: 15006 tokens (91.6% of limit)` (since $15006 / 16385 = 0.9158$), then `Final message count: 15`: the system message plus 14 appended messages for $i = 0$ to $13$.
 
 **E1 — reference solution**
 

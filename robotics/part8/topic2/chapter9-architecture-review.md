@@ -540,7 +540,7 @@ results = [
 ]
 ```
 
-**Q3. A hallucinated tool in production.** The planner returns `[ToolCall(tool_name="get_machine_temp", arguments={"serial": "MCH-0042"})]`, a tool that is not in `TOOL_REGISTRY`. Run `ProductionPipeline.run` with the Q1 documents. What are `state.errors`, `state.final_answer`, `state.context`, and `state.metadata`? Is anything about `metadata` suspicious even on a fully successful run?
+**Q3. A hallucinated tool in production.** The planner returns `[ToolCall(tool_name="get_machine_temp", arguments={"serial": "MCH-0042"})]`, a tool that is not in `TOOL_REGISTRY`. Run `ProductionPipeline.run` with the Q1 documents. What are `state.errors`, `state.final_answer`, `state.context`, and `state.metadata`? What does `metadata` report on a fully successful run with the normal planner?
 
 **Q4. Missing argument.** What exception and message does this raise?
 
@@ -567,16 +567,17 @@ print(b.errors, a.errors)
 
 - `[status call, get_machine_temp, get_recent_alerts without hours]` → 1 result, then `{"tool": "get_machine_temp", "error": "Unknown tool: get_machine_temp"}`, then `{"tool": "get_recent_alerts", "error": "TypeError: <lambda>() missing 1 required positional argument: 'hours'"}`
 
-**E3 (Medium).** Fix the `stages_completed` reporting. Write `run_with_status(stages, state)` where `stages` is a list of `(name, fn)` and each `fn(state)` mutates the state. Record `"ok"`, `"failed"` or `"skipped"` per stage: once a stage fails, the rest are skipped. Append `"<stage>: <ExceptionType>: <message>"` to `state.errors`, and set `state.metadata = {"stage_status": ..., "stages_completed": <count of ok>}`.
+**E3 (Medium).** `ProductionPipeline` only records the stages that ran: after a failure, the remaining stages are simply missing from `stage_status`. Make that explicit. Write `run_with_status(stages, state)` where `stages` is a list of `(name, fn)` and each `fn(state)` mutates the state. Record `"ok"`, `"failed"` or `"skipped"` per stage: once a stage fails, the rest are skipped. Append `"<stage>: <ExceptionType>: <message>"` to `state.errors`, and set `state.metadata = {"stage_status": ..., "stages_completed": <count of ok>}`.
 
-- With the hallucinated-tool planner → `{"retriever": "ok", "planner": "ok", "executor": "failed", "validator": "skipped", "synthesizer": "skipped"}`, `stages_completed == 2`, errors `["executor: KeyError: 'get_machine_temp'"]`
+- With the hallucinated-tool planner → `{"planner": "ok", "retriever": "ok", "executor": "failed", "validator": "skipped", "synthesizer": "skipped"}`, `stages_completed == 2`, errors `["executor: KeyError: 'get_machine_temp'"]`
 
 #### Dry-Run: Answers
 
 **Q1.**
 
+- **Planner.** It returns the 2 hard-coded calls.
 - **Retriever.** D1 matches, D2 does not, and D3 matches because its list contains the serial. D4 has no key, so `.get` returns `[]` and it does not match. D5 matches, and D6 matches but is cut by `[:3]`. That gives `context == ["D1", "D3", "D5"]`.
-- **Planner and executor.** The planner returns the 2 hard-coded calls, and the executor runs both.
+- **Executor.** It runs both planned calls.
 - **Validator.** $87.3 \le 95$, $142.1 \le 200$ and $4.2 \le 7$, so `errors == []`. The alerts result is a list and is skipped by the `isinstance(data, dict)` check. Both items are kept, so `len(validated_results) == 2`.
 - **Metadata.** `metadata == {"stages_completed": 5, "total_tool_calls": 2}`.
 - **Synthesizer.** The last line of `final_answer` is **`No violations detected.`**
@@ -593,14 +594,14 @@ The vibration check is `7.0 > 7.0`, which is `False` because the limit is strict
 
 **Q3.**
 
-- **Retriever.** It succeeds, so `context == ["D1", "D3", "D5"]`.
 - **Planner.** It returns the bad call, so `state.tool_calls` has 1 item.
+- **Retriever.** It succeeds, so `context == ["D1", "D3", "D5"]`.
 - **Executor.** `TOOL_REGISTRY["get_machine_temp"]` raises `KeyError('get_machine_temp')`. `_safe_stage` logs and re-raises it, and the outer `except` catches it. `str(KeyError('x'))` includes the quotes, so:
   - `errors == ["Pipeline failed: 'get_machine_temp'"]`
   - `final_answer == "Error: 'get_machine_temp'"`
-- **Metadata.** `{"stages_completed": 0, "stage_status": {}, "total_tool_calls": 1, "error_count": 1}`.
+- **Metadata.** `{"stages_completed": 2, "stage_status": {"planner": "ok", "retriever": "ok", "executor": "failed"}, "total_tool_calls": 1, "error_count": 1}`. `_safe_stage` records `"failed"` before re-raising, and the validator and synthesizer never run, so they do not appear at all.
 
-The suspicious part: **`stage_status` is never written to**, so `stages_completed` is `0` even on a fully successful run. A successful run with the default planner reports `{"stages_completed": 0, "stage_status": {}, "total_tool_calls": 2, "error_count": 0}`. E3 fixes this.
+A successful run with the default planner reports `{"stages_completed": 5, "stage_status": {"planner": "ok", "retriever": "ok", "executor": "ok", "validator": "ok", "synthesizer": "ok"}, "total_tool_calls": 2, "error_count": 0}`. A common bug is to declare `stage_status` but never write to it inside `_safe_stage`; then `stages_completed` is `0` even on a fully successful run.
 
 **Q4.** `TypeError: <lambda>() missing 1 required positional argument: 'hours'`. `func(**call.arguments)` becomes `lambda serial, hours: ...` called with only `serial=`. Like the `KeyError` in Q3, this crashes the whole stage in the unsafe executor.
 
@@ -683,18 +684,18 @@ def make_stages(planner):
         s.validated_results, errs = validator_stage(s.tool_results)
         s.errors.extend(errs)
     def s_synth(s): s.final_answer = synthesizer_stage(s.query, s.context, s.validated_results, s.errors)
-    return [("retriever", s_retrieve), ("planner", s_plan), ("executor", s_execute),
+    return [("planner", s_plan), ("retriever", s_retrieve), ("executor", s_execute),
             ("validator", s_validate), ("synthesizer", s_synth)]
 
 bad_planner = lambda q, t: [ToolCall(tool_name="get_machine_temp", arguments={"serial": "MCH-0042"})]
 out = run_with_status(make_stages(bad_planner), PipelineState(query="Check MCH-0042"))
 print(out.metadata, out.errors)
-# {'stage_status': {'retriever': 'ok', 'planner': 'ok', 'executor': 'failed',
+# {'stage_status': {'planner': 'ok', 'retriever': 'ok', 'executor': 'failed',
 #   'validator': 'skipped', 'synthesizer': 'skipped'}, 'stages_completed': 2}
 # ["executor: KeyError: 'get_machine_temp'"]
 ```
 
-With the normal `planner_stage`, all five stages are `"ok"` and `stages_completed == 5`. The status map pinpoints the failing station on the assembly line. The orchestrator itself is $O(\text{stages})$.
+With the normal `planner_stage`, all five stages are `"ok"` and `stages_completed == 5`. Unlike `ProductionPipeline`'s map, this one lists every station, so the skipped ones are visible too. The orchestrator itself is $O(\text{stages})$.
 
 ---
 

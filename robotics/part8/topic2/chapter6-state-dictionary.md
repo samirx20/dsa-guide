@@ -508,8 +508,8 @@ while state["phase"] not in ("responding", "error"):
     elif state["phase"] == "analyzing":
         state = respond(state)
     else:
+        state["error_message"] = f"Unknown phase: {state['phase']}"  # before overwriting phase
         state["phase"] = "error"
-        state["error_message"] = f"Unknown phase: {state['phase']}"
 ```
 
 ### Quick Reference Table
@@ -614,7 +614,7 @@ state = gather_input(fresh(), "Pump P101 has high vibration")
 state = respond(state)          # analyze() was skipped
 ```
 
-**Q3. Mistake 1, run for real.** The chapter says the broken function leaves the phase "Still idle". Actually run it: what happens on the `print` line?
+**Q3. Mistake 1, run for real.** A common guess is that the broken function just leaves the phase "Still idle". Run it: what happens on the `print` line?
 
 ```python
 state = fresh()
@@ -622,7 +622,7 @@ state = gather_input_broken(state, "Pump issue")   # no return statement
 print(state["phase"])
 ```
 
-**Q4. The unknown-phase message.** Using the loop from `run_diagnostic`, what is `state["error_message"]` after this?
+**Q4. The unknown-phase message.** This loop is like the one in `run_diagnostic`, but its `else` branch writes the two lines in the opposite order. What is `state["error_message"]` after this?
 
 ```python
 state = fresh()
@@ -689,9 +689,9 @@ ALLOWED = {"idle": {"gathering"}, "gathering": {"analyzing", "error"},
 
 **Q2.** `phase` is **`"gathering"`** and the response is **`''`**. `respond` checks `if state["phase"] != "analyzing": return state`, so it hands back the state untouched. The guard does not raise; it silently does nothing. E1 shows how to make this kind of mistake loud.
 
-**Q3.** It raises **`TypeError: 'NoneType' object is not subscriptable`**. A function with no `return` returns `None`, so `state = gather_input_broken(...)` rebinds `state` to `None`, and `None["phase"]` fails. The original dict was mutated to `"gathering"`, but the name `state` no longer points at it. The phase is not "still idle"; the reference to the dict is lost.
+**Q3.** It raises **`TypeError: 'NoneType' object is not subscriptable`**. A function with no `return` returns `None`, so `state = gather_input_broken(...)` rebinds `state` to `None`, and `None["phase"]` fails. The original dict was mutated to `"gathering"`, but the name `state` no longer points at it. So the guess "still idle" is wrong twice over: the dict did change, and the reference to it is lost.
 
-**Q4.** It prints **`Unknown phase: error`**. The `else` branch overwrites `state["phase"] = "error"` **before** building the f-string, so the message reports the new value rather than `"paused"`. The fix is to capture the old phase first: `bad = state["phase"]; state["phase"] = "error"; state["error_message"] = f"Unknown phase: {bad}"`.
+**Q4.** It prints **`Unknown phase: error`**. The `else` branch overwrites `state["phase"] = "error"` **before** building the f-string, so the message reports the new value rather than `"paused"`. The fix, used in the chapter's `run_diagnostic` loops, is to build the message first and only then set `state["phase"] = "error"` (or capture the old phase first: `bad = state["phase"]`). Then the message is `Unknown phase: paused`.
 
 **Q5.**
 

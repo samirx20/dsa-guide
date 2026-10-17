@@ -170,6 +170,9 @@ def function_to_tool(func) -> dict:
         annotation = hints.get(name, str)
 
         # Determine the JSON type
+        # NOTE: deliberately simple. Any generic (anything with __origin__) is treated
+        # as a list, so Literal[...] and Optional[...] would also become "array".
+        # Section 4 handles those types properly.
         if hasattr(annotation, "__origin__"):
             prop["type"] = "array"
         elif annotation in (str, int, float, bool):
@@ -347,7 +350,7 @@ Output:
 |------------|-------------------|--------------|
 | `Literal["a","b"]` | `{"type":"string","enum":["a","b"]}` | Picks from exact list |
 | `list[str]` | `{"type":"array","items":{"type":"string"}}` | Generates array of strings |
-| `Optional[float]` | `{"type":"number"}` | Can omit or provide number |
+| `Optional[float]` | `{"type":"number"}` (target; `advanced_type_to_schema` above falls back to `{"type":"string"}`) | Can omit or provide number |
 | `dict` | `{"type":"object"}` | Generates key-value object |
 | `str` | `{"type":"string"}` | Free-form text |
 
@@ -447,7 +450,7 @@ def ping(host, retries: int = 3):        # host has no annotation, and there is 
     return True
 ```
 
-**Q4. `advanced_type_to_schema` as written.** Predict each result. Compare (a) with the chapter's printed output for `Optional[float]`.
+**Q4. `advanced_type_to_schema` as written.** Predict each result. Compare (a) with the `Optional[float]` row of the Type Handling Comparison table.
 
 ```python
 advanced_type_to_schema(Optional[float])           # (a)
@@ -521,7 +524,7 @@ class SetAlarmArgs(BaseModel):
  "required": ["joint", "angle_deg"]}
 ```
 
-`description` is `"Move one robot joint to an absolute angle."`, **with** the trailing period, because `func.__doc__` is used verbatim. (The chapter's printed JSON drops the period, but the code keeps it.) Python `False` becomes JSON `false`.
+`description` is `"Move one robot joint to an absolute angle."`, **with** the trailing period, because `func.__doc__` is used verbatim, as in the chapter's printed JSON. Python `False` becomes JSON `false`.
 
 **Q3.**
 - `set_mode`: `properties = {"pump_id": {"type": "string"}, "mode": {"type": "array", "default": "stop"}}`, `required = ["pump_id"]`. `Literal[...]` has an `__origin__`, and the first branch maps *anything* with `__origin__` to `"array"`. The LLM is told `mode` is an array whose default is a string, which is self-contradictory.
@@ -531,7 +534,7 @@ class SetAlarmArgs(BaseModel):
 
 | Call | Result | Why |
 |---|---|---|
-| (a) | `{'type': 'string'}` | `Optional[float]` is `Union[float, None]`. Its origin is `Union`, which is neither `Literal` nor `list`, and the union itself is not in the primitive tuple, so it hits the fallback. The chapter's printed `{'type': 'number'}` is **not** what this code produces. E1 fixes it. |
+| (a) | `{'type': 'string'}` | `Optional[float]` is `Union[float, None]`. Its origin is `Union`, which is neither `Literal` nor `list`, and the union itself is not in the primitive tuple, so it hits the fallback, matching the chapter's printed output. The table's `{"type":"number"}` is the target schema, which this code does not produce. E1 fixes it. |
 | (b) | `{'type': 'array', 'items': {'type': 'string', 'enum': ['a', 'b']}}` | the list branch recurses into the Literal branch |
 | (c) | `{'type': 'string'}` | bare `list` has no `__origin__` and is not in `(str, int, float, bool)` |
 | (d) | `{'type': 'string', 'enum': [1, 2, 3]}` | the type is hard-coded `"string"` even though the enum values are ints, which is an inconsistent schema |

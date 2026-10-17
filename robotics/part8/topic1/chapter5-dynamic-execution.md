@@ -436,7 +436,10 @@ class SafeRouter(FunctionRouter):
     def execute(self, name: str, arguments: str) -> dict:
         # Check against an explicit allowlist
         if name not in self._allowed:
-            return {"status": "rejected", "error": f"Function '{name}' is not in the allowed set"}
+            entry = {"function": name, "arguments": arguments, "status": "rejected",
+                     "error": f"Function '{name}' is not in the allowed set"}
+            self._log.append(entry)  # Blocked attempts are audited too
+            return entry
         return super().execute(name, arguments)
 
 safe = SafeRouter({"read_cpu", "read_memory"})
@@ -460,16 +463,19 @@ class SafeRouter(FunctionRouter):
 
     def execute(self, name: str, arguments: str) -> dict:
         if name not in self._allowed:
-            return {"status": "rejected", ...}
-            #  ^^^^^^^^^
+            entry = {..., "status": "rejected", ...}
+            self._log.append(entry)
+            return entry
+            #  ^^^^^
             #  └── Double protection: registry check + allowlist check
+            #      The rejection is still written to the audit log
         return super().execute(name, arguments)
 ```
 
 Output:
 ```
 {'function': 'read_cpu', 'arguments': '{}', 'status': 'ok', 'result': {'cpu': 45}}
-{'status': 'rejected', 'error': "Function 'delete_all' is not in the allowed set"}
+{'function': 'delete_all', 'arguments': '{}', 'status': 'rejected', 'error': "Function 'delete_all' is not in the allowed set"}
 ```
 
 The allowlist prevents the LLM from calling dangerous functions even if it generates their names.
@@ -568,18 +574,18 @@ def read_cpu() -> dict: ...
 | (c) | valid JSON, but it is a **list**, and `func(**[...])` raises `TypeError` | `{'error': 'Argument mismatch: ... argument after ** must be a mapping, not list'}` |
 | (d) | single quotes are not JSON | `{'error': 'Invalid JSON arguments: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)'}` |
 
-(a) The result key is the *value* of `metric`, which defaults to `"temperature"`, not the literal string `'metric'`. The chapter's printed `{'sensor_id': 'T-01', 'metric': 72.5}` does not match what the code does. Similarly, the humidity call returns `{'sensor_id': 'T-01', 'humidity': 72.5}`.
+(a) The result key is the *value* of `metric`, which defaults to `"temperature"`, not the literal string `'metric'`, because `{..., metric: 72.5}` uses the variable as the key. This matches the first line of the chapter's printed output. Similarly, the humidity call returns `{'sensor_id': 'T-01', 'humidity': 72.5}`.
 (c) The exact prefix of the `TypeError` (for example `__main__.read_sensor()`) depends on the Python version. Note that (b) and (c) are both reported as "Argument mismatch", which is why E2 checks the argument shape explicitly.
 
 **Q2.** `{'function': 'list_processes', 'arguments': '{"limit": 5}', 'status': 'error', 'error': "<lambda>() got an unexpected keyword argument 'limit'"}`. The JSON parses fine, but the zero-argument lambda rejects `limit=5`. The `except Exception` branch records `str(e)`. The function name in the message is `<lambda>`, which is unhelpful in logs: prefer named `def` functions for tools.
 
 **Q3.**
-(a) `{'status': 'rejected', 'error': "Function 'delete_all' is not in the allowed set"}`. Registered, but not allowed.
+(a) `{'function': 'delete_all', 'arguments': '{}', 'status': 'rejected', 'error': "Function 'delete_all' is not in the allowed set"}`. Registered, but not allowed.
 (b) `{'function': 'read_disk', 'arguments': '{}', 'status': 'error', 'error': 'Unknown function: read_disk'}`. Allowed, but never registered, so it falls through to the parent's unknown-function branch.
 (c) `{'function': 'read_cpu', 'arguments': '{}', 'status': 'ok', 'result': {'cpu': 45}}`
-(d) `2 ['read_disk', 'read_cpu']`. The allowlist rejection returns **before** `super().execute`, so it is never written to the audit log. Blocked attempts are often the most important ones to audit. A fix is to append a log entry in `SafeRouter.execute` before returning.
+(d) `3 ['delete_all', 'read_disk', 'read_cpu']`. The allowlist rejection never reaches `super().execute`, but `SafeRouter.execute` appends its own entry before returning, so all three attempts are in the audit log. Blocked attempts are often the most important ones to audit; a version that just did `return {"status": "rejected", ...}` would log only 2.
 
-**Q4.** About **5 s**. `future.result(timeout=2)` raises after 2 s, and the code converts it into `TimeoutError`. But that exception then propagates out of the `with ThreadPoolExecutor(...)` block, whose `__exit__` calls `executor.shutdown(wait=True)`. That waits for the worker thread, which is still sleeping, to finish its full 5 s. Python threads cannot be killed, so the function keeps running. The `with` block just made the caller wait for it too. (Verified: with a 1 s limit around a 3 s sleep, the exception surfaces after about 3.0 s.)
+**Q4.** About **2 s**. `future.result(timeout=2)` raises after 2 s, and the code converts it into `TimeoutError`. The `finally` then calls `executor.shutdown(wait=False)`, which returns immediately, so the exception reaches the caller right away. Python threads cannot be killed, so `slow_function` keeps sleeping in the background for its remaining ~3 s (a short script still waits for it before the interpreter exits). A common mistake is to write `with ThreadPoolExecutor(max_workers=1) as executor:` instead: its `__exit__` calls `executor.shutdown(wait=True)`, which waits for the still-sleeping worker, so the timeout would only surface after the full **5 s**.
 
 **E1 — reference solution**
 

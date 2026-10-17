@@ -592,7 +592,7 @@ bool equationsPossible(vector<string>& equations);
 
 The same inputs give a star of height 1 instead of a chain of height 4.
 
-**Q2.** `parent = [0, 0, 0, 0, 0]`. The table leaves `parent[3] = 2`, but `find` compresses it.
+**Q2.** `parent = [0, 0, 0, 0, 0]`, matching the table's last row: on the way back up, `find` rewrites `parent[3]` from 2 to the root 0.
 
 | Call | parent[i] == i? | Effect |
 |------|-----------------|--------|

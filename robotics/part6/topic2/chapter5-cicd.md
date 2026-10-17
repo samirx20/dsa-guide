@@ -432,7 +432,7 @@ jobs:
 
 **Q3. Version bumps (Section 8).** `package.json` is at `1.4.9`. You run `npm version patch`, `npm version patch`, `npm version minor`, `npm version patch`, and `npm version major` in sequence. What version and git tag does each command produce? Then you run only `git push`. Does `publish.yml` run?
 
-**Q4. What does `cache: 'npm'` really cache?** The comment in Section 4 says "uses cached node_modules". What does `actions/setup-node` with `cache: 'npm'` actually store and restore, what is the cache keyed on, and what does `npm ci` do to `node_modules` every time?
+**Q4. What does `cache: 'npm'` really cache?** A common belief is that it caches `node_modules`. What does `actions/setup-node` with `cache: 'npm'` actually store and restore, what is the cache keyed on, and what does `npm ci` do to `node_modules` every time?
 
 **Q5. Secrets on forks.** An outside contributor opens a PR **from a fork**, and the workflow is triggered by `pull_request`. A step runs `echo "Deploying..."` with `STRIPE_KEY: ${{ secrets.STRIPE_SECRET_KEY }}` (Section 7). What value does `STRIPE_KEY` have? In a run where the secret *is* available, what appears in the log if a step accidentally runs `echo $STRIPE_KEY`?
 

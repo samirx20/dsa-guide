@@ -517,7 +517,7 @@ Note that `"([)]"` has balanced counts of every bracket type, which is exactly w
 
 **Q2.**
 - (a) **42**. Skips 3 spaces, reads `'+'` at index 3, digits `0,0,4,2` at indices 4–7 (result 0 → 0 → 4 → 42), stops at `'a'` (index 8). The trailing `7` is never reached.
-- (b) **-2147483648** (`INT_MIN`). Results grow 9, 91, …, 912834723 (9 digits, still above `INT_MIN` after the sign); the 10th digit (index 10) makes `result = 9128347233`, so `result * sign <= INT_MIN` → return immediately. (This assumes `long` is 64-bit, as on Linux/macOS. On Windows `long` is 32-bit and `9128347233` would itself overflow, so `long long` is the portable choice.)
+- (b) **-2147483648** (`INT_MIN`). Results grow 9, 91, …, 912834723 (9 digits, still above `INT_MIN` after the sign); the 10th digit (index 10) makes `result = 9128347233`, so `result * sign <= INT_MIN` → return immediately. (This is why `result` is a `long long`: `9128347233` does not fit in 32 bits, and plain `long` is only 32-bit on Windows, so it would itself overflow there.)
 - (c) **0**. `'+'` is consumed as the sign at index 2; index 3 is `'-'`, which is not a digit, so the digit loop never runs.
 - (d) **0**. After skipping zero spaces, `s[0] = 'w'` is neither a sign nor a digit; nothing is read.
 

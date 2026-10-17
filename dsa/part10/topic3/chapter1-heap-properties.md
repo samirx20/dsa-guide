@@ -483,7 +483,7 @@ bool isMaxHeap(const vector<int>& a);
 // [9, 8, 7, 5, 10]        -> false  (index 4 holds 10, its parent index 1 holds 8)
 ```
 
-**E2 (Easy–Medium).** The chapter's `heapSort` calls `make_heap` on the shrinking prefix every iteration. Write an in-place heap sort that instead builds the heap once and then repeatedly swaps the root to the end and sifts down **within the shrinking size**. Then state the complexity of the chapter's version.
+**E2 (Easy–Medium).** The chapter's `heapSort` relies on `std::make_heap` and `std::pop_heap`. Write an in-place heap sort without the `<algorithm>` heap functions: build the heap once, then repeatedly swap the root to the end and sift down **within the shrinking size**. Then state the complexity of a common mistake: calling `make_heap` on the shrinking prefix every iteration instead of one `pop_heap`/sift-down.
 
 ```cpp
 void heapSort(vector<int>& nums);
@@ -585,7 +585,7 @@ void heapSort(vector<int>& nums) {
 }
 ```
 
-Time $O(N \log N)$, space $O(1)$. The chapter's loop calls `make_heap` on $i$ elements for $i = N-1, \dots, 1$, and each call is $O(i)$, so it totals $O(N^2)$. It gives the right answer but is slower than heap sort should be. (`std::pop_heap(nums.begin(), nums.begin() + i + 1)` is the $O(\log N)$ library replacement.)
+Time $O(N \log N)$, space $O(1)$. The `make_heap`-every-iteration mistake calls `make_heap` on $i$ elements for $i = N-1, \dots, 1$, and each call is $O(i)$, so it totals $O(N^2)$. It gives the right answer but is slower than heap sort should be. That is why the chapter uses `std::pop_heap(nums.begin(), nums.begin() + i + 1)`, which does the swap plus one $O(\log N)$ sift-down, exactly like the loop above.
 
 **E3 — reference solution**
 

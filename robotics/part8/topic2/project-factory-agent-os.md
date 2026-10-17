@@ -115,7 +115,7 @@ def validator_stage(results):
 
 #### 6. Synthesizer and Pipeline Orchestrator
 
-Wire all stages together. Include a self-correction loop that retries validation up to 3 times.
+Wire all stages together. Include a self-correction loop that re-executes the tools and re-validates up to 3 times.
 
 ```python
 def synthesizer_stage(query, context, results, errors):
@@ -133,6 +133,8 @@ def run_pipeline(query, serial, documents):
     retries = 0
     while errors and retries < 3:
         retries += 1
+        # Re-read the sensors: re-validating the same tool_results could never change the result
+        tool_results = executor_stage(planner_stage(query), serial)
         validated, errors = validator_stage(tool_results)
     elapsed = round((time.perf_counter()-start)*1000, 2)
     return DiagnosticResponse(run_id=run_id,
@@ -148,7 +150,7 @@ def run_pipeline(query, serial, documents):
 - [ ] All registered tools execute with timing logs
 - [ ] Validator catches readings exceeding physics limits
 - [ ] Synthesizer generates a readable report with findings and safety checks
-- [ ] Self-correction loop retries validation up to 3 times
+- [ ] Self-correction loop re-executes the tools and re-validates up to 3 times
 - [ ] Response includes `run_id`, `answer`, `tool_calls_made`, `validation_errors`, `total_elapsed_ms`
 - [ ] Pipeline runs end-to-end with no external dependencies or API keys
 
@@ -156,7 +158,7 @@ def run_pipeline(query, serial, documents):
 
 The requirement snippets work, but three of their shortcuts would hurt in production. The skeleton fixes each one without changing any stage's job:
 
-- **The self-correction loop re-executes the tools.** In Requirement 6, the loop calls `validator_stage(tool_results)` on the *same* data three times, so it can never change the outcome (see Practice Q2). Re-reading the sensors can, because transient spikes are common on real machines.
+- **The self-correction loop gets fresh readings.** Requirement 6's loop re-executes the tools before re-validating, because re-validating the *same* `tool_results` could never change the outcome (see Practice Q2). But the Requirement 4 tools return hard-coded values, so every re-read there is identical. In the skeleton the re-read hits real (injected) telemetry, so a transient spike, common on real machines, can clear.
 - **Telemetry is injected.** The tools read from a `TelemetrySource` that FastAPI provides through `Depends(get_telemetry)`, so tests can script "spike, then normal" or "always overheating" with `app.dependency_overrides`.
 - **Observability uses Chapter 10's structured events.** Every stage emits a `stage_end` JSON event carrying the `run_id`, and `GET /runs/{run_id}/trace` returns them. `@timed` logs through `logging`, as the evaluation checklist requires, instead of `print`.
 
@@ -671,7 +673,7 @@ def test_trace_endpoint_returns_every_stage(logger: StructuredLogger) -> None:
 
 **Q1 (predict the output).** In the first sample response, the question is about *overheating*, yet `pump-manual-5.1` (vibration) outranks `pump-manual-3.2` (temperature). Which exact words does each document share with the query under `simple_embed`?
 
-**Q2 (predict the output).** Suppose you keep Requirement 6's original loop, which re-runs `validator_stage(tool_results)` without re-executing the tools. What do the `COMP-007` and `HX-900` responses report for `validation_errors`?
+**Q2 (predict the output).** Suppose you drop the `executor_stage` call from Requirement 6's loop, so it only re-runs `validator_stage(tool_results)` on the same data without re-executing the tools. What do the `COMP-007` and `HX-900` responses report for `validation_errors`?
 
 **Q3 (predict the output).** For `{"query": "Show recent alerts", "serial_number": "PUMP-042"}`, what are `tool_calls_made`, `validation_errors`, and the FINDINGS lines? Is the `high_temp` alert with value `92.1` ever checked against `LIMITS`?
 

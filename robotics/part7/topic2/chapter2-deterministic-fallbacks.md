@@ -372,9 +372,12 @@ class ThermalGuard:
         self.decisions = []
 
     def check(self, equipment_type: str, command: dict) -> dict:
-        # Step 1: Reject if we don't recognize the equipment
+        # Step 1: Reject if we don't recognize the equipment (and audit that too)
         if equipment_type not in self.limits:
-            return {"decision": "rejected", "reason": f"Unknown equipment: {equipment_type}"}
+            decision = {"decision": "rejected", "reason": f"Unknown equipment: {equipment_type}"}
+            decision["equipment"] = equipment_type
+            self.decisions.append(decision)
+            return decision
 
         equip_limits = self.limits[equipment_type]
         temp = command.get("temperature")
@@ -555,7 +558,7 @@ Register the chapter's three rules and feed it the chapter's four commands plus 
 | (b) | `ctx.get("ai_suggestion")` is `None`, so continue | `min(100, 30) = 30` | `{'source': 'physics_rule', 'value': 30}` |
 | (c) | `0` is not `None`, so stop here | (never runs) | `{'source': 'ai_recommendation', 'value': 0}` |
 
-The chain accepts the **first non-`None`** answer. Because the AI step is first and returns any value it has, the physics clamp only runs when the AI said nothing. That is why (a) returns the unsafe `500`. The `physics_rule` line in the chapter's printed output is not produced by this code. To make the clamp bind, the AI step must itself return `None` when the value is unsafe, or the clamp must wrap the AI value (see E1). (c) shows why the chain tests `is not None` rather than truthiness: `0` is a legitimate setpoint.
+The chain accepts the **first non-`None`** answer. Because the AI step is first and returns any value it has, the physics clamp only runs when the AI said nothing. That is why (a) returns the unsafe `500`, exactly as in the chapter's printed output. To make the clamp bind, the AI step must itself return `None` when the value is unsafe, or the clamp must wrap the AI value (see E1). (c) shows why the chain tests `is not None` rather than truthiness: `0` is a legitimate setpoint.
 
 **Q2.**
 (a) `{'status': 'overridden', 'original': 150.01, 'clamped_to': 150.0, 'reason': 'Temperature 150.01C exceeds limit 150.0C'}`. Any value strictly above the limit is overridden.
@@ -581,7 +584,7 @@ In (a) the command violates all three rules, but only the first match is reporte
 | server_rack, `{}` | `accepted` | `temp is None`, so both branches are skipped and it falls to `else`. A missing reading slips through. |
 | `"Oven"` | `rejected` | `Unknown equipment: Oven`. Dictionary lookup is case-sensitive. |
 
-`len(guard.decisions) == 4`. The unknown-equipment branch returns early, *before* `self.decisions.append(...)`, so that rejection is never audited. Also, by this code the chapter's own `("freezer", {"temperature": -10})` is **accepted**, not rejected.
+`len(guard.decisions) == 5`. Every path appends to the audit log, including the unknown-equipment rejection, which logs its decision before its early `return`. A common mistake is to write that branch as a bare `return {"decision": "rejected", ...}`: the rejection still reaches the caller, but it never lands in `self.decisions`, so the audit trail would show only 4 entries.
 
 **E1 — reference solution**
 

@@ -407,7 +407,17 @@ With Redis Pub/Sub:
 
 **Q2. Polling cost (Section 1).** A dashboard polls `GET /messages` every 2 s for one hour, and exactly 3 new messages arrive during that hour. How many requests are sent, and what percentage return nothing? On average, how long after a message arrives does the client see it, and what is the worst case? What is the answer for a WebSocket?
 
-**Q3. Spot the bug (Section 8).** The servers use the Section 5 `rooms` map, keyed by `roomId` such as `'general'`. Server B runs the Section 8 subscriber code. User 1 on server A triggers `broadcastToRoom('general', {...})`. Does user 2 on server B receive it? Trace the channel name through `publish`, `subscribe`, and `rooms.get(channel)`.
+**Q3. Spot the bug (Section 8).** The servers use the Section 5 `rooms` map, keyed by `roomId` such as `'general'`. A teammate writes server B's subscriber handler without the prefix stripping that Section 8 uses:
+
+```typescript
+sub.on('message', (channel, message) => {
+    for (const client of rooms.get(channel) || []) {
+        client.send(message)
+    }
+})
+```
+
+User 1 on server A triggers `broadcastToRoom('general', {...})`. Does user 2 on server B receive it? Trace the channel name through `publish`, `subscribe`, and `rooms.get(channel)`.
 
 **Q4. Reconnect timing (Section 6 client).** The server goes down at $t = 0$ and comes back at $t = 9$ s. Assume a refused connection fails instantly and fires `onclose` exactly once. At what times does the client try to reconnect, how many attempts fail, and when is it connected again? If 10,000 dashboards were connected, what would the server see at each of those instants?
 
@@ -443,7 +453,7 @@ In total, X receives **4** messages, Y receives **2**, and Z receives **1**. The
 
 **Q2.** $3600 / 2 = 1800$ requests, of which $1800 - 3 = 1797$ are empty: $\frac{1797}{1800} \approx 99.8\%$. A message arrives at a uniformly random point in a 2 s gap, so the **average** delay is about $1$ s and the worst case about $2$ s (plus request latency). With a WebSocket there is 1 handshake for the whole hour, 3 pushes, and the delay is roughly one network trip.
 
-**Q3.** **No.** Server A publishes to the channel `room:general`, and server B subscribes to `room:general`, so the Redis part works. But the handler does `rooms.get(channel)` with `channel === 'room:general'`, while the map key is `'general'`. The lookup returns `undefined`, so the loop runs over `[]` and **nobody** gets the message. Fix it by stripping the prefix (`rooms.get(channel.slice('room:'.length))`) or by keying the map with the prefixed name. In practice you would also `psubscribe('room:*')` (and handle `pmessage`) instead of subscribing to one hard-coded room.
+**Q3.** **No.** Server A publishes to the channel `room:general`, and server B subscribes to `room:general`, so the Redis part works. But the handler does `rooms.get(channel)` with `channel === 'room:general'`, while the map key is `'general'`. The lookup returns `undefined`, so the loop runs over `[]` and **nobody** gets the message. Fix it by stripping the prefix, as Section 8 does with `rooms.get(channel.replace('room:', ''))` (or `channel.slice('room:'.length)`), or by keying the map with the prefixed name. In practice you would also `psubscribe('room:*')` (and handle `pmessage`) instead of subscribing to one hard-coded room.
 
 **Q4.** Each failure schedules the next try 2 s later. Attempts at $t = 2, 4, 6, 8$ s all **fail** (4 failures). The attempt at $t = 10$ s **succeeds**, so the client is connected at about 10 s, 1 s after the server is back. With 10,000 clients that dropped at the same instant, the server sees 10,000 simultaneous connection attempts at every 2 s tick, including the moment it restarts. This is a self-inflicted load spike (a thundering herd). See E3.
 

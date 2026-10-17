@@ -492,7 +492,7 @@ With `n = 5`, node 5 has no incoming edge, so `dist[5] = 1e9` and the function r
 | (2, 2, 1) | (2,2) improves 3 → **2** |
 | (2, 2, 2) | destination, return 2 |
 
-The walkthrough stops at effort 3 because it pops `(2,2)` while `(2, 1, 0)` (effort 2) is still waiting in the heap. A min-heap never pops 3 before 2. (Its value `7` for cell (1,1) should also be $\max(1, 6) = 6$.)
+A common mistake is to stop at effort 3 the moment `(2,2)` is first assigned a value. That value is not final: `(2, 1, 0)` (effort 2) is still waiting in the heap, and a min-heap never pops 3 before 2. The answer is only final when `(2,2)` itself is popped, which matches the walkthrough's result of 2.
 
 **Q3.** `k = 2` → **400** (`0→1→2→3`: 100 + 100 + 200). A third iteration, starting from `prices = [0, 100, 200, 700]`, relaxes `2→3` to $200 + 200 = 400$. `k = 0` → **-1**, since there is no direct `0→3` flight. Without `tempPrices`, for `k = 0` a single pass updates `prices[1] = 100`, then `prices[2] = 200`, `prices[3] = 700`, then `prices[3] = 400`. It returns **400**, which uses 3 flights while 0 stops were allowed.
 

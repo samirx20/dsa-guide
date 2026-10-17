@@ -473,7 +473,17 @@ int f(int n) {
 }
 ```
 
-**Q5. Read `badCode` very carefully.** Look again at the loop condition in Section 6's `badCode` with `arr = {1, 2, 3}`. Track `i` and `arr.size()` at the start of each iteration. How many iterations does the loop actually run?
+**Q5. A loop bound that moves.** Section 6's `badCode` saves `n = arr.size()` before the loop. A common mistake is to compare against the live size instead:
+
+```cpp
+void badCodeBuggy(vector<int>& arr) {
+    for (int i = 0; i < arr.size(); i++) {
+        arr.insert(arr.begin(), 99);
+    }
+}
+```
+
+Call it with `arr = {1, 2, 3}`. Track `i` and `arr.size()` at the start of each iteration. How many iterations does the loop actually run?
 
 ### Coding Exercises
 
@@ -537,7 +547,7 @@ Both are about $\log_2 100 \approx 6.64$, i.e. $O(\log N)$. Doubling runs $\lcei
 | 3 | 2 | 5 | yes | size 6 |
 | $k$ | $k - 1$ | $k + 2$ | yes | size $k + 3$ |
 
-Each iteration increases `i` by 1 **and** `arr.size()` by 1, so the gap of 3 never closes. The $O(N^2)$ analysis describes the shifting cost of $N$ front-inserts; to actually perform exactly $N$ of them, save `int n = arr.size();` before the loop and loop to `n`. (Better still, avoid front-inserts entirely.)
+Each iteration increases `i` by 1 **and** `arr.size()` by 1, so the gap of 3 never closes. Section 6's `badCode` avoids this by saving `n = arr.size()` before the loop and looping to `n`, so it performs exactly $N$ front-inserts at $O(N^2)$ total cost. (Better still, avoid front-inserts entirely.)
 
 **E1 — reference solution**
 

@@ -143,7 +143,7 @@ dq.pop_front() removes 10:
 
 **Why deque over queue?**
 ```cpp
-// queue only has push/pop/front
+// queue only has push/pop/front/back (plus empty/size)
 // deque has ALL of these:
 dq.push_back(val);    // O(1)
 dq.push_front(val);   // O(1)  <- queue can't do this
@@ -373,7 +373,7 @@ if (i >= k - 1) {
 | Pop front | `q.pop()` | `dq.pop_front()` | O(1) |
 | Pop back | Not supported | `dq.pop_back()` | O(1) |
 | Front | `q.front()` | `dq.front()` | O(1) |
-| Back | Not supported | `dq.back()` | O(1) |
+| Back | `q.back()` | `dq.back()` | O(1) |
 | Access [i] | Not supported | `dq[i]` | O(1) |
 | Empty | `q.empty()` | `dq.empty()` | O(1) |
 | Size | `q.size()` | `dq.size()` | O(1) |

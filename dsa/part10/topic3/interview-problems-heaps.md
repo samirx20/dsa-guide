@@ -598,7 +598,7 @@ int kthSmallest(vector<vector<int>>& matrix, int k);
 | 6 | idle | - | yes, (1,6) → heap | [] | [1] |
 | 7 | A (1 → 0) | - | no | [] | [] |
 
-Note that a count pushed back at time 3 or 6 runs at the *next* step, which is exactly the cooldown: A runs at 1, 4, 7 (gap of $n = 2$ between runs). Check with the formula $\max(N, (f_{\max} - 1)(n + 1) + \#\text{tasks with } f_{\max}) = \max(5, 2 \cdot 3 + 1) = 7$. By the same rules, the walkthrough's `[A,A,A,B,B,B]`, `n = 2` example returns **8** when the code is run step by step (`A B idle A B idle A B`), matching the formula $2 \cdot 3 + 2 = 8$.
+Note that a count pushed back at time 3 or 6 runs at the *next* step, which is exactly the cooldown: A runs at 1, 4, 7 (gap of $n = 2$ between runs). Check with the formula $\max(N, (f_{\max} - 1)(n + 1) + \#\text{tasks with } f_{\max}) = \max(5, 2 \cdot 3 + 1) = 7$. The same rules give the walkthrough's `[A,A,A,B,B,B]`, `n = 2` result of **8** (`A B idle A B idle A B`), matching the formula $2 \cdot 3 + 2 = 8$.
 
 **Q4.** Output `1 → 2 → 3 → 4 → 5 → 8`. The heap never holds more than **3** entries ($K$).
 

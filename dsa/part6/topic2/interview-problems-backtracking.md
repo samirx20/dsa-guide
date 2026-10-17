@@ -490,7 +490,7 @@ A D E E
 
 **Q3. N-Queens bitmask.** In Problem 5's bitmask version with $n = 4$, suppose row 0 places its queen in column 1 (`col = 0b0010`). The call for row 1 receives `cols`, `diag1`, `diag2`. Compute those three masks and `available` in binary. Which column(s) can row 1 use?
 
-**Q4. Spot the error in a dry-run.** Problem 5's "Dry-Run for N=4" table claims that after queens at (0,0) and (1,2), the placement (2,3) is valid. Using the code's own `diag2[row - col + n - 1]` index, check that claim. Which existing queen attacks (2,3)? Is there *any* valid column for row 2?
+**Q4. Check a tempting placement.** In Problem 5's "Dry-Run for N=4", after queens at (0,0) and (1,2), a common mistake is to place the next queen at (2,3), because it shares no row or column with either queen. Using the code's own `diag2[row - col + n - 1]` index, check that placement. Which existing queen attacks (2,3)? Is there *any* valid column for row 2?
 
 ### Coding Exercises
 
@@ -561,7 +561,7 @@ vector<string> restoreIpAddresses(const string& s);
 
 Only **column 3** is available — matching the 4-Queens solution `.Q.. / ...Q / Q... / ..Q.`. Column 1 is blocked vertically, columns 0 and 2 diagonally.
 
-**Q4.** The claim is **wrong**. With $n = 4$: queen (1,2) has `diag2 = 1 - 2 + 3 = 2`, and (2,3) has `diag2 = 2 - 3 + 3 = 2` — the same "\" diagonal, so (1,2) attacks (2,3). Row 2 has **no** valid column:
+**Q4.** (2,3) is **not** valid. With $n = 4$: queen (1,2) has `diag2 = 1 - 2 + 3 = 2`, and (2,3) has `diag2 = 2 - 3 + 3 = 2` — the same "\" diagonal, so (1,2) attacks (2,3). Row 2 has **no** valid column:
 
 | (2,col) | Blocked by |
 |---------|-----------|
@@ -570,7 +570,7 @@ Only **column 3** is available — matching the 4-Queens solution `.Q.. / ...Q /
 | (2,2) | column of (1,2) |
 | (2,3) | `diag2` = 2, shared with (1,2) |
 
-So the code backtracks at row 2 (not row 3): it un-places (1,2), tries (1,3), and only then reaches a further row.
+So the code backtracks at row 2 (not row 3): it un-places (1,2), tries (1,3), and only then reaches a further row. This is exactly what the chapter's dry-run table shows.
 
 **E1 — reference solution**
 

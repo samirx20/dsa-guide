@@ -700,7 +700,21 @@ Before tracing, classify each question using the Decision Guide: *does order mat
 
 **Q4. Combinations with Target Sum.** Using the "Variation: Combinations with Target Sum" code on `nums = [1, 2, 3, 4, 5]`: what is pushed for (a) $k = 2$, `target = 6`, and (b) $k = 3$, `target = 9`?
 
-**Q5. A missing guard.** The "Common Variations → Combination Sum (reuse allowed)" snippet has only the base case `if (target == 0)`. What happens when you call it with `nums = [2, 3]` and `target = 1`? What one-line fix makes it terminate?
+**Q5. A missing guard.** The "Common Variations → Combination Sum (reuse allowed)" snippet starts with `if (target < 0) return;`. A common mistake is to leave that line out and keep only the base case:
+
+```cpp
+void combinationSum(vector<int>& nums, int target, int index,
+                    vector<int>& current, vector<vector<int>>& result) {
+    if (target == 0) { result.push_back(current); return; }
+    for (int i = index; i < nums.size(); i++) {
+        current.push_back(nums[i]);
+        combinationSum(nums, target - nums[i], i, current, result);
+        current.pop_back();
+    }
+}
+```
+
+What happens when you call this version with `nums = [2, 3]` and `target = 1`? What one-line fix makes it terminate?
 
 ### Coding Exercises
 
@@ -754,7 +768,7 @@ Swapping index 1 with index 3 moves `4` forward but also moves `2` to the back, 
 
 **Q4.** (a) **`[1,5]`, `[2,4]`** — `[3,3]` is impossible because recursion passes `i + 1` (no reuse). (b) **`[1,3,5]`, `[2,3,4]`**. Check (b) exhaustively by first element: starting with 1 needs two distinct numbers from {2..5} summing to 8 → only `3 + 5`; starting with 2 needs 7 from {3..5} → only `3 + 4`; starting with 3 needs 6 from {4, 5} → impossible.
 
-**Q5.** **Infinite recursion → stack overflow.** `target` goes `1 → -1 → -3 → -5 → …` because the call passes `i` (so `2` is reused forever) and nothing ever returns for a negative target. Fix: add `if (target < 0) return;` right after the base case (or sort and `break` when `nums[i] > target`, as in Chapter 2).
+**Q5.** **Infinite recursion → stack overflow.** `target` goes `1 → -1 → -3 → -5 → …` because the call passes `i` (so `2` is reused forever) and nothing ever returns for a negative target. Fix: add `if (target < 0) return;` (the chapter's snippet puts it first, before the base case; either position works) (or sort and `break` when `nums[i] > target`, as in Chapter 2).
 
 | Call | target | Next call |
 |------|--------|-----------|

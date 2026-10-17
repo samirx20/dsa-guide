@@ -758,6 +758,7 @@ Line 20-21:     Print truncated messages
 
 ```python
 import json
+import time
 
 class ConversationManager:
     def __init__(self, max_turns=10, summary_threshold=20):
@@ -806,6 +807,9 @@ class ConversationManager:
                 facts.append(f"User said: {msg['content'][:50]}...")
             elif msg["role"] == "assistant":
                 facts.append(f"Assistant noted: {msg['content'][:50]}...")
+            elif msg["role"] == "system":
+                # Carry an earlier summary forward instead of dropping it
+                facts.append(msg["content"].removeprefix("Summary: "))
         return "; ".join(facts)
 
     def get_context(self, state):
@@ -835,18 +839,19 @@ print(f"Context has {len(context)} messages")
 **What's happening in the code above:**
 
 ```
-Line 6-8:       Initialize with max turns and summary threshold
-Line 10-20:     add_message() with automatic summarization
+Line 5-7:       Initialize with max turns and summary threshold
+Line 9-21:      add_message() with automatic summarization
 Line 18-19:     Check if messages exceed threshold
-Line 21-36:     _summarize_old_messages() compresses old messages
-Line 24:        Calculate cutoff at half of messages
-Line 27-28:     Extract key facts from old messages
-Line 31-35:     Replace old messages with summary
-Line 38-46:     _create_summary() extracts key information
-Line 48-54:     get_context() returns messages within max_turns
-Line 57-58:     Create manager with limits
-Line 61-63:     Add 15 message pairs to trigger summarization
-Line 66-67:     Get context window (should be <= max_turns)
+Line 23-41:     _summarize_old_messages() compresses old messages
+Line 26:        Calculate cutoff at half of messages
+Line 29-30:     Extract key facts from old messages
+Line 33-36:     Replace old messages with summary
+Line 43-54:     _create_summary() extracts key information
+Line 51-53:     An earlier "system" summary is carried into the new one
+Line 56-64:     get_context() returns messages within max_turns
+Line 67-68:     Create manager with limits
+Line 71-73:     Add 15 message pairs to trigger summarization
+Line 76-77:     Get context window (should be <= max_turns)
 ```
 
 **Error Scenario - Token Limit Exceeded:**
@@ -1317,7 +1322,7 @@ Now replay with an `update` at $t = 55$: `create` at 0, `get` at 50, `update(sid
 | 27 | 7 (summarized) |
 | 28–30 | 8, 9, 10 |
 
-A subtle loss: `_create_summary` only includes `user`/`assistant` roles. Each earlier `"system"` summary is therefore **dropped** from the next summary, and only `full_history` still has it.
+From the second summarization on, the oldest message being summarized is the previous `"system"` summary. `_create_summary` has an `elif msg["role"] == "system"` branch that carries its text forward, so earlier facts are not lost from the context. Without that branch only `user`/`assistant` messages would be summarized, and each earlier summary would silently drop out (only `full_history` would still have the originals).
 
 **Q2.** Token counts are `[6, 3, 2, 5]` because `int(5*1.3)=6`, `int(3*1.3)=3`, `int(2*1.3)=2` and `int(4*1.3)=5`. Walking newest to oldest:
 

@@ -526,7 +526,7 @@ int main() {
             auto [tx, ty] = path->world_xy_m[wp_idx];
             double dx = tx - state.x_m, dy = ty - state.y_m;
             if ( std::hypot(dx, dy) < 0.25 && wp_idx + 1 < path->world_xy_m.size() ) {
-                ++wp_idx;
+                ++wp_idx;  // dx, dy still point at the old waypoint, so the new one steers from the next tick (one-tick lag)
             }
             auto [gx, gy] = path->world_xy_m.back();
             goal_dist = static_cast<float>(std::hypot(gx - state.x_m, gy - state.y_m));

@@ -33,7 +33,7 @@ Prove you can set up a typed Python project from scratch, handle CLI arguments, 
 
 #### 5. Error Handling
 - If the file does not exist, print a clear error message and exit with code 1.
-- If no file argument is provided, print usage information and exit with a non-zero code (`argparse` does this for you, using code 2).
+- If no file argument is provided, print usage information and exit with code 1. (A plain `argparse.ArgumentParser` exits with code 2 on usage errors, so override its `error()` method, as the starter code's `StrictArgumentParser` does.)
 - Use `try/except` blocks with your custom exception types or Pydantic `ValidationError`.
 
 ### Evaluation Checklist

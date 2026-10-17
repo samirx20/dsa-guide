@@ -248,7 +248,7 @@ def top_k_with_threshold(query_vec, documents, top_k=5, min_score=0.7):
     for doc in documents:
         score = cosine_similarity(query_vec, doc["vector"])
         if score >= min_score:
-            scored.append({"text": doc["text"], "score": score, "metadata": doc["metadata"]})
+            scored.append({"text": doc["text"], "score": score, "metadata": doc.get("metadata", {})})
     
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored[:top_k]
@@ -517,7 +517,7 @@ Cosine similarity measures the angle between vectors, making it ideal for text c
 
 **Q3. Trace `argsort`.** In the batch-similarity code, suppose `similarities = np.array([0.42, 0.91, 0.13, 0.77])`. What are `np.argsort(similarities)`, `np.argsort(similarities)[::-1]`, and `top_k_indices` (first 3)?
 
-**Q4. Threshold filtering.** Take the chapter's Section 3 `query` and four `documents` (assume each doc also carries a `"metadata": {}` key). (a) Fill in each score to 4 decimals. (b) What does `top_k_with_threshold(query, documents, top_k=5, min_score=0.7)` return (ids in order)? (c) What does it return with `min_score=0.9995`?
+**Q4. Threshold filtering.** Take the chapter's Section 3 `query` and four `documents`. (a) Fill in each score to 4 decimals. (b) Which documents does `top_k_with_threshold(query, documents, top_k=5, min_score=0.7)` return, in order? (The returned dicts carry `text`, not `id`; name them by id.) (c) What does it return with `min_score=0.9995`?
 
 **Q5. Zero vector without a guard.** What does this print, and what does `safe_cosine_similarity` return for the same input?
 
@@ -575,7 +575,7 @@ Top-2 is **D (1.0), A (0.96)**. D is five times longer than A but still wins bec
 
 (b) Only scores `>= 0.7` survive, sorted descending: **`[doc3, doc1]`**. Only 2 results come back even though `top_k=5`, and that is the point of the threshold.
 
-(c) `0.9990` and `0.9994` are both below `0.9995`, so the result is **`[]`**. Note that the printed `top_k_with_threshold` reads `doc["metadata"]`. The chapter's `documents` list has no such key, so without the assumption in the question every passing doc would raise `KeyError: 'metadata'`.
+(c) `0.9990` and `0.9994` are both below `0.9995`, so the result is **`[]`**. The chapter's `documents` carry no `"metadata"` key; `top_k_with_threshold` reads it with `doc.get("metadata", {})`, so each result just gets an empty `metadata` dict. Indexing with `doc["metadata"]` instead would raise `KeyError: 'metadata'` on the first passing doc.
 
 **Q5.** `norm(z) = 0`, so the expression is $0 / 0$. NumPy prints **`nan`**, along with a `RuntimeWarning: invalid value encountered`, and does not raise `ZeroDivisionError`. Any later comparison with `nan` is `False`, so the document silently drops out of rankings. `safe_cosine_similarity(z, x)` returns **`0.0`** because of its `norm_a == 0` guard.
 

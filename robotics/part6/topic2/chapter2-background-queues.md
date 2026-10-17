@@ -251,7 +251,7 @@ await videoQueue.add('normal-task', { videoId }, { priority: 5 })
 
 ### Predict the Output / Trace by Hand
 
-**Q1. Retries and backoff (Section 6).** A job is added with `{ attempts: 3, backoff: { type: 'exponential', delay: 1000 } }`, and `processVideo` throws **every** time. How many times does the processor run? How long does BullMQ wait before each retry? (BullMQ's exponential backoff waits $\text{delay} \cdot 2^{\,\text{attemptsMade} - 1}$.) Which worker event fires, and how often? Compare your answer with the comment `// 1s, 2s, 4s` in the chapter.
+**Q1. Retries and backoff (Section 6).** A job is added with `{ attempts: 3, backoff: { type: 'exponential', delay: 1000 } }`, and `processVideo` throws **every** time. How many times does the processor run? How long does BullMQ wait before each retry? (BullMQ's exponential backoff waits $\text{delay} \cdot 2^{\,\text{attemptsMade} - 1}$.) Which worker event fires, and how often? How many attempts would you need to get three waits of 1 s, 2 s and 4 s?
 
 **Q2. Priority order.** With **no worker running**, the API adds these jobs in this order. Then one worker with concurrency 1 starts. In what order are they processed?
 
@@ -309,7 +309,7 @@ async function runWithRetry(
 | 2 | throws | 2 | $1000 \cdot 2^1 = 2000$ ms |
 | 3 | throws | 3 | — (no attempts left) |
 
-There are only **two** waits (1 s, 2 s), so the chapter's `1s, 2s, 4s` would need `attempts: 4`. The worker's `'failed'` event fires on **every** failed attempt (3 times, with `attemptsMade` 1, 2, 3). After the third, the job moves to the *failed* set for good, and `'completed'` never fires.
+There are only **two** waits (1 s, 2 s), which is what the chapter's comment `// 1s, 2s (3 attempts = 2 retries)` says. A third wait of 4 s would need `attempts: 4`. The worker's `'failed'` event fires on **every** failed attempt (3 times, with `attemptsMade` 1, 2, 3). After the third, the job moves to the *failed* set for good, and `'completed'` never fires.
 
 **Q2.** **D, B, A, C.** In BullMQ, a job **without** a priority goes to the normal wait list and is picked before any prioritized job. Among prioritized jobs, a lower number means more urgent ($1$ before $5$). Equal priorities keep insertion order, so A comes before C.
 

@@ -547,7 +547,7 @@ robust_sentence_split("See Fig. 3 for wiring. Mr. Lee approved it. Done.")
 | 4 | `[6000:8000]` | 0 | 0 | 2000 | 2000 |
 | 5 | `[7500:9000]` | 0 | 0 | 1500 | 1500 |
 
-The A block covers indices 0–2999, so chunk 0 is **pure A**, not "mixed A and B". Chunk 1 is the one that mixes A and B, and chunk 2 is pure B. The only mixed chunks are 1 (A/B) and 3 (B/C): exactly the chunks that straddle a boundary.
+The A block covers indices 0–2999, so chunk 0 is **pure A**. Chunk 1 is the one that mixes A and B, and chunk 2 is pure B, as the Section 2 comments say. A common mistake is to call chunk 0 "A+B" because it overlaps chunk 1; overlap shares characters between chunks, it does not change what a chunk contains. The only mixed chunks are 1 (A/B) and 3 (B/C): exactly the chunks that straddle a boundary.
 
 **Q3.** **3 chunks**:
 

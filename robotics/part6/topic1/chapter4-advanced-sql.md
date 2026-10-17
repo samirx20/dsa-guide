@@ -523,7 +523,7 @@ The moving window holds the current row and up to two before it. For example, at
 
 **Q3.** `(1, 'Latest', 2024-03-10)`, `(2, 'Arm Calib', 2024-03-05)`, `(3, 'Lidar', 2024-03-12)`. Dave has no posts, so he has no row in `posts` to number and does **not** appear.
 
-**Q4.** Counts per user: $\{1: 3,\ 2: 2,\ 3: 1\}$. The average is $\frac{3 + 2 + 1}{3} = 2$ (users without posts are not in the inner `GROUP BY`, so Dave does not pull the average down). Only `user_id = 1` (3 posts) is strictly greater than 2. Bob ties and does not qualify. (Joining `users` for the username is left out here, because the chapter's version selects `username` from a derived table that lacks that column.)
+**Q4.** Counts per user: $\{1: 3,\ 2: 2,\ 3: 1\}$. The average is $\frac{3 + 2 + 1}{3} = 2$ (users without posts are not in the inner `GROUP BY`, so Dave does not pull the average down). Only `user_id = 1` (3 posts) is strictly greater than 2. Bob ties and does not qualify. (The chapter's version also joins `users` on `user_posts.user_id` to show each `username`. The derived table itself only has `user_id` and `post_count`.)
 
 **Q5.**
 

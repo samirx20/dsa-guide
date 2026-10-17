@@ -639,7 +639,7 @@ For each request, give the **status code** and the **JSON body** (or say "422" a
 
 **Q4. Response model filtering (Section 5).** `POST /readings` (the `response_model=ReadingResponse` version that returns a `ReadingInternal`) receives the body `{"sensor_id": "arm-02", "value": -100, "internal_note": "x"}`. What does the client receive? What if the body is just `{"sensor_id": "arm-02"}`?
 
-**Q5. Status codes (Section 6).** What do `DELETE /sensors/temp-01` and `DELETE /sensors/temp-02` return (status + body)? The chapter's "Common status codes" list has a comment `# 402 - Authenticated but not allowed` next to `status.HTTP_403_FORBIDDEN`. What number does that constant really hold?
+**Q5. Status codes (Section 6).** What do `DELETE /sensors/temp-01` and `DELETE /sensors/temp-02` return (status + body)? What number does `status.HTTP_403_FORBIDDEN` hold, and why is "Authenticated but not allowed" not written as `402`?
 
 ### Coding Exercises
 
@@ -682,7 +682,7 @@ For each request, give the **status code** and the **JSON body** (or say "422" a
 
 **Q4.** The first body gives `200 {"sensor_id": "arm-02", "value": -100.0, "unit": "celsius"}`. The incoming `internal_note` is **ignored** by `SensorReading` (extra fields are dropped by default). The `internal_note` that the handler sets is stripped by `response_model`. $-100$ passes because `ge=-100` is inclusive. The second body gives `422`, `"Field required"` at `["body", "value"]`, because `Field(...)` makes `value` required.
 
-**Q5.** `DELETE /sensors/temp-01` returns `403 {"detail": "Cannot delete primary sensor"}`. `DELETE /sensors/temp-02` returns `204` with an **empty** body (the handler returns `None`). `status.HTTP_403_FORBIDDEN == 403`. The `402` in that comment is a typo (402 is "Payment Required").
+**Q5.** `DELETE /sensors/temp-01` returns `403 {"detail": "Cannot delete primary sensor"}`. `DELETE /sensors/temp-02` returns `204` with an **empty** body (the handler returns `None`). `status.HTTP_403_FORBIDDEN == 403`, as the chapter's "Common status codes" comment says. `402` is a different code ("Payment Required"), so mixing up the two numbers is an easy typo to make.
 
 **E1 — reference solution**
 

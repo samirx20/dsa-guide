@@ -254,6 +254,8 @@ Step 1 — remove(2) rearranges elements:
  After:  {1, 3, 4, 5, 4, 2, 5}  ← garbage at the end
           ^
           iterator returned by remove()
+ (The tail values shown are what libstdc++/g++ leaves behind; the C++
+  standard leaves them unspecified, so never read past the returned iterator.)
 
 Step 2 — erase() chops off the garbage tail:
  After:  {1, 3, 4, 5}

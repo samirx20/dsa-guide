@@ -36,7 +36,7 @@ Prove you can use `httpx.AsyncClient` with `asyncio.gather()` to fetch data conc
 ### Evaluation Checklist
 
 - [ ] Does the script run without errors?
-- [ ] Does sequential fetching take roughly 3x longer than concurrent?
+- [ ] Does sequential fetching take roughly 3x longer than concurrent? (The exact ratio is $\sum d_i / \max d_i$, so it depends on the per-endpoint delays: about 2.5x with the mock's default delays.)
 - [ ] Does concurrent fetching handle a failing endpoint gracefully without crashing?
 - [ ] Is every function type-hinted?
 - [ ] Does the output clearly show the timing difference between sequential and concurrent?

@@ -558,7 +558,7 @@ int cycleLength(ListNode* head) {
 }
 ```
 
-$O(N)$ time, $O(1)$ space. For the chapter's `1 → … → 6 → (4)` list, the cycle is `4 → 5 → 6 → 4`, so the walk counts 3 nodes.
+$O(N)$ time, $O(1)$ space. For the example `1 → … → 6 → (4)` list, the cycle is `4 → 5 → 6 → 4`, so the walk counts 3 nodes. (The chapter's dry-run list `1 → … → 6 → 7 → (4)` has the cycle `4 → 5 → 6 → 7 → 4`, so it would return 4.)
 
 ---
 

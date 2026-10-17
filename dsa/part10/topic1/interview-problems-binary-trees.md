@@ -550,7 +550,16 @@ private:
 
 **Q3. Path Sum trace.** Use the Problem 5 tree (`5, 4, 8, 11, 13, 4, 7, 2, 1`) with `targetSum = 26`. Does `hasPathSum` return `true` or `false`? In what order are the *leaf* checks performed before the answer is known, and is `hasPathSum(1, ...)` ever called?
 
-**Q4. Spot the bug in Serialize.** Look carefully at the Problem 9 `serialize`: it returns `to_string(root->val) + "," + serialize(root->left) + "," + serialize(root->right)`, and the null case returns `"N,"`. What string does it *actually* produce for a single-node tree `7`? What happens when that string is passed to `deserialize`, and what is the one-line fix?
+**Q4. Spot the bug in Serialize.** A common mistake is to add an extra separator between the two recursive calls:
+
+```cpp
+string serialize(TreeNode* root) {
+    if (root == nullptr) return "N,";
+    return to_string(root->val) + "," + serialize(root->left) + "," + serialize(root->right);
+}
+```
+
+What string does this version produce for a single-node tree `7`? What happens when that string is passed to Problem 9's `deserialize`, and how does Problem 9's `serialize` avoid the problem?
 
 **Q5. Symmetric Tree.** Does `isSymmetric` return `true` for the tree below? Name the first `isMirror` call that returns `false`, if any.
 
@@ -632,13 +641,13 @@ The problem says "no node with a *greater* value", so ties count as good; `>=` i
 
 Leaf checks happen in the order **7, 2, 13**. Because `||` short-circuits, `hasPathSum(4, 8)` on 8's right child is never made, so `hasPathSum(1, ...)` is **never called**.
 
-**Q4.** It produces **`"7,N,,N,"`** — note the empty field between the two `N`s. `serialize(7)` = `"7,"` + `"N,"` + `","` + `"N,"`. Splitting on commas gives tokens `"7"`, `"N"`, `""`, `"N"`. `buildTree` makes node 7, reads `"N"` for its left child, then reads `""` for its right child, which is not `"N"`, so it calls `stoi("")` and throws `std::invalid_argument`. Fix: drop the extra separators, because every recursive result already ends with a comma:
+**Q4.** It produces **`"7,N,,N,"`** — note the empty field between the two `N`s. `serialize(7)` = `"7,"` + `"N,"` + `","` + `"N,"`. Splitting on commas gives tokens `"7"`, `"N"`, `""`, `"N"`. `buildTree` makes node 7, reads `"N"` for its left child, then reads `""` for its right child, which is not `"N"`, so it calls `stoi("")` and throws `std::invalid_argument`. Problem 9's version drops the extra separator, because every recursive result already ends with a comma:
 
 ```cpp
 return to_string(root->val) + "," + serialize(root->left) + serialize(root->right);
 ```
 
-With the fix, single node 7 gives `"7,N,N,"`, and the Problem 9 tree gives `"1,2,N,N,3,4,N,N,5,N,N,"` (the dry-run table's string plus a trailing comma, which `getline` ignores).
+With that version, single node 7 gives `"7,N,N,"`, and the Problem 9 tree gives `"1,2,N,N,3,4,N,N,5,N,N,"` (the trailing comma is harmless: `getline` produces no extra token for it).
 
 **Q5.** **`false`**. `isSymmetric` calls `isMirror(2L, 2R)`: values match, so it calls `isMirror(2L->left, 2R->right)` = `isMirror(null, 3)`. Exactly one side is null, so that call returns **false** and `&&` short-circuits. (For a mirror, the right 2's 3 would have to be on its *left*.)
 

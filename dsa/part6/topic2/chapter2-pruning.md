@@ -376,7 +376,7 @@ With early termination: check sum > target at the top of the call, BEFORE the lo
 
 ### 5. Remaining Elements Pruning
 
-Another powerful pruning: check if the remaining elements can possibly reach the target.
+Another powerful pruning: check if the remaining elements can possibly reach the target. This is only safe when each element can be used **at most once** (recurse with `i + 1`, as below) and all numbers are positive. If elements may be reused (recursing with `i`, as in Combination Sum), the remaining elements can contribute without limit, so this check would wrongly cut valid branches.
 
 ```cpp
 void backtrack(vector<int>& nums, int target, int index,
@@ -399,7 +399,7 @@ void backtrack(vector<int>& nums, int target, int index,
 
     for (int i = index; i < nums.size(); i++) {
         current.push_back(nums[i]);
-        backtrack(nums, target, i, current, sum + nums[i], result);
+        backtrack(nums, target, i + 1, current, sum + nums[i], result); // i + 1: each element used at most once
         current.pop_back();
     }
 }
@@ -421,7 +421,7 @@ This catches cases where you have too FEW elements left to reach the target.
 | **Value too large** | `sum + nums[i] > target` | `break` (sorted) or `return` | Sum-based problems |
 | **Duplicate skip** | `i > index && nums[i] == nums[i-1]` | `continue` | Duplicate elements |
 | **Early termination** | `sum > target` | `return` immediately | Any bounded sum |
-| **Remaining check** | `sum + remaining < target` | `return` | When elements are positive |
+| **Remaining check** | `sum + remaining < target` | `return` | When elements are positive and each is used at most once |
 | **Visited check** | `visited[i] == true` | `continue` | Permutations, grids |
 | **Bounds check** | `r < 0 || r >= n` | `return` | Grid-based problems |
 
@@ -494,7 +494,19 @@ For each question, ask two things: *is this pruning **safe*** (it never cuts a b
 
 **Q4. `break` on unsorted input.** Someone keeps the `break` from the sorted Combination Sum code but forgets the `sort(...)` call. What does `combinationSum([2, 7, 3], 5)` return? What is the correct answer?
 
-**Q5. A pruning that is not safe here.** Section 5's "Remaining Elements Pruning" recurses with `i` (elements may be reused). What does it return for `nums = [2]`, target = 4? Is that correct? Under what condition is the `sum + remainingSum < target` check actually safe?
+**Q5. A pruning that is not safe here.** A common mistake is to paste Section 5's "Remaining Elements Pruning" into the reuse-allowed Combination Sum, which recurses with `i` instead of `i + 1`:
+
+```cpp
+// remainingSum = sum of nums[index..end]
+if (sum + remainingSum < target) return;
+for (int i = index; i < nums.size(); i++) {
+    current.push_back(nums[i]);
+    backtrack(nums, target, i, current, sum + nums[i], result); // reuse allowed
+    current.pop_back();
+}
+```
+
+What does this version return for `nums = [2]`, target = 4? Is that correct? Under what condition is the `sum + remainingSum < target` check actually safe?
 
 ### Coding Exercises
 
@@ -566,7 +578,7 @@ int minCountSum(vector<int> nums, int target);
 
 `break` assumes "everything after `i` is at least as big". On unsorted input that is false, so the pruning is **unsafe**. Either sort first or use `continue`.
 
-**Q5.** It returns **`[]`**, which is **wrong** — `[2, 2]` sums to 4. At the root, `sum = 0`, `remainingSum = 2`, and `0 + 2 < 4` returns immediately. The check assumes each remaining element can be taken at most once; with reuse allowed (recursing on `i`), the remaining elements can contribute unboundedly. It is safe only when the recursion passes `i + 1` (each element used at most once, e.g. Combination Sum II) and all numbers are non-negative.
+**Q5.** It returns **`[]`**, which is **wrong** — `[2, 2]` sums to 4. At the root, `sum = 0`, `remainingSum = 2`, and `0 + 2 < 4` returns immediately. The check assumes each remaining element can be taken at most once; with reuse allowed (recursing on `i`), the remaining elements can contribute unboundedly. It is safe only when the recursion passes `i + 1` (each element used at most once, as in Section 5 and Combination Sum II) and all numbers are non-negative.
 
 **E1 — reference solution**
 

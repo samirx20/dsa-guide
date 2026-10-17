@@ -266,9 +266,10 @@ import numpy as np
 
 embedding = np.random.rand(1536)
 
-# WRONG: str() on numpy array produces "array([...])"
+# WRONG: str() on a numpy array gives space-separated values, no commas
 embedding_str = str(embedding)
-# Result: "array([ 0.123,  0.456,  ...])" — PostgreSQL can't parse this!
+# Result: "[0.5488135  0.71518937 ... 0.7175595 ]" — no commas, and long arrays
+# are elided with "..." — PostgreSQL can't parse this! (repr() gives "array([...])")
 
 # RIGHT: Convert to list first, then to string
 embedding_list = embedding.tolist()  # [0.123, 0.456, ...]
@@ -563,7 +564,7 @@ Output:
 
 The `+ 1e-8` in the denominator makes the top score a hair under 1, but it still rounds to `1.0000`.
 
-**Q2.** The `WHERE` clause removes row 2 first, even though it has the smallest distance. The remaining rows sort ascending by distance: 3 (0.10), 1 (0.30), 4 (0.45). `LIMIT 2` keeps **row 3 with similarity $1 - 0.10 = 0.90$**, then **row 1 with similarity $1 - 0.30 = 0.70$**.
+**Q2.** The `WHERE` clause excludes row 2, even though it has the smallest distance. The remaining rows sort ascending by distance: 3 (0.10), 1 (0.30), 4 (0.45). `LIMIT 2` keeps **row 3 with similarity $1 - 0.10 = 0.90$**, then **row 1 with similarity $1 - 0.30 = 0.70$**. This assumes an exact scan, which is what a four-row table gets. With an `ivfflat` index, pgvector applies the `WHERE` filter after the approximate index scan, so on a large table a selective filter can return fewer than `LIMIT` rows.
 
 **Q3.** **v1, v4, v5.**
 

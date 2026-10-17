@@ -329,7 +329,7 @@ Is the input only lowercase English?
 
 ### Predict the Output / Trace by Hand
 
-**Q1. Expand from index 3 — carefully.** In `"abacaba"`, index 3 holds the character `'c'` (`a b a c a b a`). Trace `expandAroundCenter("abacaba", 3, 3)` step by step and give the returned length. Compare your answer with the dry-run table in section 1b.
+**Q1. Expand from index 3 — carefully.** In `"abacaba"`, index 3 holds the character `'c'` (`a b a c a b a`). Trace `expandAroundCenter("abacaba", 3, 3)` step by step and give the returned length. A common slip is to misread index 3 as `'a'` and conclude the answer is the 5-character `"bacab"`; check your trace against the dry-run table in section 1b.
 
 **Q2. Longest palindrome with an even center.** Trace `longestPalindrome("cbbd")`. For each `i`, give `len1`, `len2`, and whether `start` / `maxLen` change. What substring is returned?
 
@@ -380,7 +380,7 @@ vector<int> findAnagrams(const string& s, const string& p);
 | 4 | 0 | 6 | a | a | yes |
 | 5 | -1 | 7 | — | — | out of bounds → stop |
 
-Length = `right - left - 1` = 7 − (−1) − 1 = 7. The table in section 1b reads `s[3]` as `'a'` and `s[0]` as `'c'`; its length formula is right, but those characters are misread. (A center that really gives `"bacab"` does not exist in this string.)
+Length = `right - left - 1` = 7 − (−1) − 1 = 7. This matches the dry-run table in section 1b. Misreading `s[3]` as `'a'` (and `s[0]` as `'c'`) would wrongly stop at step 4 with length 5; no center in this string actually gives `"bacab"`.
 
 **Q2.** Returns **`"bb"`**.
 

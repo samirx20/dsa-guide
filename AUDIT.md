@@ -489,3 +489,24 @@ Re-checked in the follow-up pass and left unedited, with the reason:
 ### Suspected, ruled out
 None. Every suspected item in this section was confirmed and fixed (entries marked **[follow-up]** above).
 
+
+## Practice-section pass (merged after the audit)
+
+While writing the `Practice & Self-Check` sections, about 60 suspected errors were noted; after merging the audit branch, most were already fixed. This pass fixed the rest in place and made the practice questions and answers agree with the corrected chapter text (answers that quoted the old wrong text were reworded, usually into a self-contained "common mistake" snippet).
+
+Fixed in the chapter body in this pass:
+- `dsa/part1/topic1/chapter1-vector.md`: note that the tail values shown after `remove()` are libstdc++'s output and unspecified by the standard.
+- `dsa/part6/topic2/chapter2-pruning.md` §5: the remaining-elements check was paired with reuse (`i`); it now recurses with `i + 1`, and the text says the check is only safe without reuse and with positive numbers.
+- `dsa/part8/topic2/chapter1-queue-and-deque.md`: `std::queue` does have `back()` (comment and Quick Reference row).
+- `robotics/part0/topic2/project-strict-python-cli.md`: requirement 5 now asks for exit code 1 and explains overriding `argparse`'s default code 2, matching the starter code and tests.
+- `robotics/part4/topic2/project-cpp-autonomous-robot-daemon.md`: comment on the one-tick waypoint lag.
+- `robotics/part5/topic1/project-async-data-fetcher.md`: the "~3x" speedup note now gives the exact ratio $\sum d_i / \max d_i$.
+- `robotics/part7/topic2/chapter2-deterministic-fallbacks.md`: unknown-equipment rejections are recorded in `decisions`.
+- `robotics/part8/topic1/chapter4-json-schema-generation.md`: `function_to_tool` note on generic types; `Optional[float]` row clarified.
+- `robotics/part8/topic1/chapter5-dynamic-execution.md`: `SafeRouter` logs rejected calls.
+- `robotics/part8/topic2/chapter2-cosine-similarity.md`: `top_k_with_threshold` uses `doc.get("metadata", {})`.
+- `robotics/part8/topic2/chapter4-vector-databases.md`: `str(np_array)` vs `repr` comment.
+- `robotics/part8/topic2/chapter6-state-dictionary.md`: the Mistake 5 "RIGHT" loop had the same overwrite-order bug the audit fixed elsewhere.
+- `robotics/part8/topic2/chapter7-session-management.md`: `_create_summary` keeps earlier summaries; missing `import time`.
+- `robotics/part8/topic2/chapter10-observability.md`: `pipeline_trace` re-raises after logging.
+- `robotics/part8/topic2/project-factory-agent-os.md`: the Requirement 6 retry loop re-runs the tools before re-validating.

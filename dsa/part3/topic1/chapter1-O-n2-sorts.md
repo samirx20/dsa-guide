@@ -673,7 +673,7 @@ void insertionSortAdaptive(vector<int>& arr) {
 
 **Q4. Stability check.** Two equal keys are tagged `3a` and `3b` (same value 3). Run `selectionSort` on `[3a, 3b, 1]`. What is the final order of `3a` and `3b`? What does this prove about Selection Sort?
 
-**Q5. Read the counters carefully.** What exactly does the chapter's `insertionSortAdaptive` print for the nearly sorted array `[1, 2, 3, 5, 4, 6, 7, 8]`? Look closely at *where* `comparisons++` sits.
+**Q5. Read the counters carefully.** What exactly does the chapter's `insertionSortAdaptive` print for the nearly sorted array `[1, 2, 3, 5, 4, 6, 7, 8]`? Look closely at *where* the two `comparisons++` lines sit. Then consider a common mistake: deleting both of them and putting a single unconditional `comparisons++;` right after the `while` loop. What would that version print, and why is it wrong?
 
 ### Coding Exercises
 
@@ -742,11 +742,13 @@ Using strict `<` does not save stability; the swap itself is the culprit (exactl
 **Q5.** It prints:
 
 ```bash
-Comparisons: 7
+Comparisons: 8
 Shifts: 1
 ```
 
-`comparisons++` sits *after* the `while` loop, so it counts outer-loop iterations ($N - 1 = 7$), not the real number of `arr[j] > key` checks. The real count is 8: every `i` does 1 check, except `key = 4` which does 2 (`5 > 4` yes, `3 > 4` no). Shifts is 1 (only `5` moves).
+Every `i` does 1 `arr[j] > key` check (the one that stops the loop, counted by `if (j >= 0) comparisons++`), except `key = 4`, which does 2: `5 > 4` yes (counted inside the loop) and `3 > 4` no (counted after it). That is $7 + 1 = 8$. Shifts is 1 (only `5` moves). The `j >= 0` guard matters when a key slides all the way to index 0: the loop then stops on the bounds check, and no value comparison happened.
+
+The mistaken version with one unconditional `comparisons++` after the loop prints `Comparisons: 7`: it counts outer-loop iterations ($N - 1 = 7$), not the real number of `arr[j] > key` checks.
 
 **E1 — reference solution**
 

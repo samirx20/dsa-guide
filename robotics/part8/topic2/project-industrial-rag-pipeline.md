@@ -130,7 +130,7 @@ for r in retrieve("When should I change the oil?", store, machine_id="C201"):
 
 Two decisions shape the skeleton.
 
-1. **Section-aware chunking.** Each manual is first split on blank lines into sections. The section header decides `section_type`. Only then does the overlapping window from Requirement 1 run, and only inside a section, so no chunk ever mixes "Oil Change" text with "Safety" text. The window uses `chunk_size=400` and the 200-character overlap from the requirement prose, so every chunk stays under the 500-character limit.
+1. **Section-aware chunking.** Each manual is first split on blank lines into sections. The section header decides `section_type`. Only then does the overlapping window from Requirement 1 run, and only inside a section, so no chunk ever mixes "Oil Change" text with "Safety" text. The window uses `chunk_size=400` and the 200-character overlap from Requirement 1, so every chunk stays under the 500-character limit.
 2. **A pluggable embedder.** `HashingEmbedder` is a deterministic, offline stand-in (feature hashing, Chapter 1's `hashlib` cache). The tests and the sample output never need an API key. `OpenAIEmbedder` uses `text-embedding-3-small` behind the same `Embedder` protocol, so you change one flag, not the pipeline.
 
 ```text
