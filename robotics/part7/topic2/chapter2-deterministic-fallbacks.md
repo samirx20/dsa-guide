@@ -488,6 +488,185 @@ Deterministic fallbacks enforce hard limits that AI cannot override. The decisio
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Trace the FallbackChain exactly as written.** Using the chapter's `chain` (steps: `ai_recommendation`, then `physics_rule`, then `safe_default`), what does `chain.evaluate(ctx)` return for each context? Why does the first one *not* get clamped?
+
+```python
+chain.evaluate({"ai_suggestion": 500, "max_safe": 100})   # (a)
+chain.evaluate({"max_safe": 30})                          # (b)
+chain.evaluate({"ai_suggestion": 0})                      # (c)
+```
+
+**Q2. ThermalLimitRule edge cases.** With `rule = ThermalLimitRule(max_temp=150.0)`, what does each call return or raise?
+
+```python
+rule.apply({"temperature": 150.01})   # (a)
+rule.apply({})                        # (b)
+```
+
+**Q3. Hierarchy short-circuit.** Using the chapter's `engine` (temperature cap, negative-pressure physics rules, humidity safety rule), what is `engine.evaluate(cmd)["decision"]` and `["source"]` for each command?
+
+```python
+{"temperature": 200, "pressure": -1, "humidity": 99}   # (a)
+{"temperature": 150, "humidity": 95}                  # (b)
+{"humidity": 96}                                      # (c)
+```
+
+**Q4. ThermalGuard trace.** Using the chapter's `guard` (oven $[100, 500]$, freezer $[-40, 0]$, server_rack $[10, 45]$), fill in the `decision` for each call. After running only these five calls on a fresh guard, what is `len(guard.decisions)`?
+
+| Call | Decision |
+|---|---|
+| `check("freezer", {"temperature": -10})` | ? |
+| `check("freezer", {"temperature": -50})` | ? |
+| `check("oven", {"temperature": 100})` | ? |
+| `check("server_rack", {})` | ? |
+| `check("Oven", {"temperature": 200})` | ? |
+
+### Coding Exercises
+
+**E1 (Easy).** Rewrite the fallback logic as a single function `safe_setpoint(ctx: dict, default: float = 50.0) -> dict` that actually enforces the limit. Use the safe default if there is no AI suggestion, clamp to `max_safe` (default 100) if the AI exceeds it, and otherwise accept the AI value. Return `{"source": ..., "value": ...}`.
+
+- `{"ai_suggestion": 500, "max_safe": 100}` → `{'source': 'physics_rule', 'value': 100}`
+- `{}` → `{'source': 'safe_default', 'value': 50.0}`
+- `{"ai_suggestion": 0, "max_safe": 30}` → `{'source': 'ai_recommendation', 'value': 0}`
+
+**E2 (Easy–Medium).** Write `RateOfChangeRule(max_rate)` with `apply(current: float, target: float, dt: float) -> dict`. If $\lvert \text{target} - \text{current} \rvert \le \text{max\_rate} \cdot dt$, pass the target through. Otherwise override it to `current` $\pm$ `max_rate * dt`, moving in the direction of the target. Reject when $dt \le 0$.
+
+- `RateOfChangeRule(10.0).apply(100.0, 200.0, 2.0)` → `status='overridden'`, `clamped_to=120.0`
+- `RateOfChangeRule(10.0).apply(100.0, 40.0, 2.0)` → `status='overridden'`, `clamped_to=80.0`
+- `RateOfChangeRule(10.0).apply(100.0, 90.0, 2.0)` → `{'status': 'passed', 'value': 90.0}`
+
+**E3 (Medium).** Write `AuditedRuleEngine`, a `RuleEngine` that:
+1. appends every decision, plus the original command, to `self.log`;
+2. treats any exception raised by a rule as `{"decision": "rejected", "source": "engine_error", "detail": "<ExcName>: <msg>"}`, so the engine itself never crashes;
+3. has `summary() -> dict[str, int]`, which counts decisions.
+
+Register the chapter's three rules and feed it the chapter's four commands plus `{"temperature": "hot"}`. Then `summary()` → `{'accepted': 1, 'overridden': 1, 'rejected': 3}`.
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+| Context | Step 1 `ai_recommendation` | Step 2 `physics_rule` | Returned |
+|---|---|---|---|
+| (a) | `500` is not `None`, so stop here | (never runs) | `{'source': 'ai_recommendation', 'value': 500}` |
+| (b) | `ctx.get("ai_suggestion")` is `None`, so continue | `min(100, 30) = 30` | `{'source': 'physics_rule', 'value': 30}` |
+| (c) | `0` is not `None`, so stop here | (never runs) | `{'source': 'ai_recommendation', 'value': 0}` |
+
+The chain accepts the **first non-`None`** answer. Because the AI step is first and returns any value it has, the physics clamp only runs when the AI said nothing. That is why (a) returns the unsafe `500`. The `physics_rule` line in the chapter's printed output is not produced by this code. To make the clamp bind, the AI step must itself return `None` when the value is unsafe, or the clamp must wrap the AI value (see E1). (c) shows why the chain tests `is not None` rather than truthiness: `0` is a legitimate setpoint.
+
+**Q2.**
+(a) `{'status': 'overridden', 'original': 150.01, 'clamped_to': 150.0, 'reason': 'Temperature 150.01C exceeds limit 150.0C'}`. Any value strictly above the limit is overridden.
+(b) raises `KeyError: 'temperature'`. The guard `command.get("temperature", 0) > 150` is `0 > 150`, which is False. Execution then falls to the pass branch, which reads `command["temperature"]` with square brackets. A missing field should be an explicit rejection, not a crash.
+
+**Q3.**
+
+| Cmd | First rule that fires | `decision` | `source` |
+|---|---|---|---|
+| (a) | physics rule 1: $200 > 150$ | `overridden` | `physics` |
+| (b) | none: $150 > 150$ is False, pressure defaults to 1, $95 > 95$ is False | `accepted` | `ai` |
+| (c) | safety rule: $96 > 95$ | `rejected` | `safety` |
+
+In (a) the command violates all three rules, but only the first match is reported. The engine returns as soon as any physics rule fires.
+
+**Q4.**
+
+| Call | Decision | Why |
+|---|---|---|
+| freezer, -10 | `accepted` | $-40 \le -10 \le 0$ |
+| freezer, -50 | `rejected` | $-50 < -40$, so the message is `freezer min temp is -40C` |
+| oven, 100 | `accepted` | both checks are strict (`>` max, `<` min), so the boundary 100 passes |
+| server_rack, `{}` | `accepted` | `temp is None`, so both branches are skipped and it falls to `else`. A missing reading slips through. |
+| `"Oven"` | `rejected` | `Unknown equipment: Oven`. Dictionary lookup is case-sensitive. |
+
+`len(guard.decisions) == 4`. The unknown-equipment branch returns early, *before* `self.decisions.append(...)`, so that rejection is never audited. Also, by this code the chapter's own `("freezer", {"temperature": -10})` is **accepted**, not rejected.
+
+**E1 — reference solution**
+
+```python
+def safe_setpoint(ctx: dict, default: float = 50.0) -> dict:
+    ai = ctx.get("ai_suggestion")
+    max_safe = ctx.get("max_safe", 100)
+    if ai is None:                       # no AI output: last resort
+        return {"source": "safe_default", "value": default}
+    if ai > max_safe:                    # the hard rule wins over the AI
+        return {"source": "physics_rule", "value": max_safe}
+    return {"source": "ai_recommendation", "value": ai}
+```
+
+$O(1)$. The checks are ordered by **authority** (does input exist, is it physically allowed), not by "who answers first", so an AI value can never bypass the clamp.
+
+**E2 — reference solution**
+
+```python
+class RateOfChangeRule:
+    def __init__(self, max_rate: float):
+        self.max_rate = max_rate                     # e.g. degrees C per second
+
+    def apply(self, current: float, target: float, dt: float) -> dict:
+        if dt <= 0:
+            return {"status": "rejected", "reason": f"dt must be positive, got {dt}"}
+        max_step = self.max_rate * dt
+        delta = target - current
+        if abs(delta) <= max_step:
+            return {"status": "passed", "value": target}
+        clamped = current + max_step if delta > 0 else current - max_step
+        return {"status": "overridden", "original": target, "clamped_to": clamped,
+                "reason": f"rate {abs(delta) / dt} C/s exceeds {self.max_rate} C/s"}
+```
+
+For $100 \to 200$ over 2 s: the allowed step is $10 \cdot 2 = 20$ and the requested step is $100$, so it is clamped to $100 + 20 = 120$. For $100 \to 40$: $\lvert -60 \rvert > 20$, so it is clamped to $100 - 20 = 80$. For $100 \to 90$: $10 \le 20$, so it passes. $O(1)$.
+
+**E3 — reference solution**
+
+```python
+from collections import Counter
+
+class AuditedRuleEngine:
+    def __init__(self):
+        self.physics_rules = []
+        self.safety_rules = []
+        self.log: list[dict] = []
+
+    def add_physics_rule(self, rule):
+        self.physics_rules.append(rule)
+        return self
+
+    def add_safety_rule(self, rule):
+        self.safety_rules.append(rule)
+        return self
+
+    def _decide(self, command: dict) -> dict:
+        for rule in self.physics_rules:
+            result = rule(command)
+            if result.get("status") in ("overridden", "rejected"):
+                return {"decision": result["status"], "source": "physics", "detail": result.get("reason", "")}
+        for rule in self.safety_rules:
+            result = rule(command)
+            if result.get("status") == "rejected":
+                return {"decision": "rejected", "source": "safety", "detail": result.get("reason", "")}
+        return {"decision": "accepted", "source": "ai", "detail": "All rules passed"}
+
+    def evaluate(self, command: dict) -> dict:
+        try:
+            decision = self._decide(command)
+        except Exception as e:                       # fail closed, never crash
+            decision = {"decision": "rejected", "source": "engine_error",
+                        "detail": f"{type(e).__name__}: {e}"}
+        self.log.append({**decision, "command": command})   # every path is audited
+        return decision
+
+    def summary(self) -> dict[str, int]:
+        return dict(Counter(entry["decision"] for entry in self.log))
+```
+
+The four chapter commands give accepted, overridden, rejected (physics) and rejected (safety). `{"temperature": "hot"}` makes `"hot" > 150` raise `TypeError`, which becomes a third `rejected`. The total is `{'accepted': 1, 'overridden': 1, 'rejected': 3}`. Each evaluation costs $O(R)$ for $R$ rules. Failing *closed* (rejecting) on an internal error is the deterministic-fallback principle applied to the engine itself.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

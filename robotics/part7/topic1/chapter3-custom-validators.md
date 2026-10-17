@@ -484,6 +484,183 @@ The layered validation catches bad data at multiple levels — range, physical l
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Before/after trace.** Using the chapter's `ModeDemo` (with its two `print`ing validators), write out the exact output of each call:
+
+```python
+print(ModeDemo(value=7).value)      # (a)
+ModeDemo(value="25.5 C")            # (b)  note: plain "C", no degree sign
+```
+
+**Q2. The case the cleaner misses.** Using the chapter's `PressureReading` with the `parse_pressure_string` before-validator, predict the result of each:
+
+```python
+PressureReading(sensor_id="P-03", pressure_psi="14.7 Psi")   # (a)
+PressureReading(sensor_id="P-04", pressure_psi="  30PSI")    # (b)
+```
+
+**Q3. Which branch fires?** Using the chapter's `ThermalState`, which of these validate? For the ones that fail, give the error message.
+
+```python
+ThermalState(temperature=100.0, pressure=14.7, coolant_flow=0.5)   # (a)
+ThermalState(temperature=120,   pressure=-1,   coolant_flow=0.2)   # (b)
+ThermalState(temperature=60,    pressure=-2,   coolant_flow=5)     # (c)
+```
+
+**Q4. Which layer rejects it?** Using the chapter's complete `SensorReading` (section 5) with `sensor_id="TC-03"` and `pressure=14.7`, fill in the table: which layer (Field constraint, `@field_validator`, `@model_validator`, or none) rejects each input?
+
+| `temperature` | `flow_rate` | Rejected by |
+|---|---|---|
+| 250 | 0.1 | ? |
+| 600 | 0.1 | ? |
+| 90 | 0.5 | ? |
+| -250 | 0.0 | ? |
+
+**Q5. Differential.** Using `SensorPair`, what is the error for `SensorPair(temp_a=25, temp_b=-30)`? What happens if you add `max_delta="60"`?
+
+### Coding Exercises
+
+**E1 (Easy).** Write `JointCommand(joint: str, angle_rad: float)` where `angle_rad` must lie in $[-\pi, \pi]$. A `mode="before"` validator should also accept strings like `"90deg"`, converting them to radians.
+
+- `JointCommand(joint="elbow", angle_rad="90deg").angle_rad` → `1.5707963267948966`
+- `JointCommand(joint="elbow", angle_rad="270deg")` → `ValidationError` (`less than or equal to 3.14159...`)
+
+**E2 (Easy–Medium).** Write `TrajectorySegment(t_start, t_end, distance_m, v_max)`, all floats, with `t_start >= 0`, `distance_m >= 0` and `v_max > 0`. Add a `@model_validator(mode="after")` that requires $t_\text{end} > t_\text{start}$ and $\frac{d}{t_\text{end} - t_\text{start}} \le v_\text{max}$.
+
+- `(t_start=0, t_end=4, distance_m=6, v_max=2)` → valid (average speed 1.5 m/s)
+- `(t_start=1, t_end=3, distance_m=5, v_max=2)` → `Value error, average speed 2.5 m/s exceeds v_max 2.0 m/s`
+
+**E3 (Medium).** Write `GeofencePoint(x: float, y: float, fence_radius_m: float = 10.0)` (radius $> 0$). It should:
+1. Use a `@model_validator(mode="before")` to also accept the LLM shorthand `{"pos": [x, y]}`, rejecting a `pos` that is not exactly 2 elements.
+2. Use a `@model_validator(mode="after")` to reject points with $\sqrt{x^2 + y^2} > r$.
+
+- `GeofencePoint.model_validate({"pos": [3, 4]})` → `x=3.0 y=4.0 fence_radius_m=10.0`
+- `{"pos": [9, 12]}` → `Value error, point is 15.0 m from origin, fence is 10.0 m`
+
+#### Dry-Run: Answers
+
+**Q1.**
+(a)
+
+```
+  BEFORE: received 7 (type=int)
+  AFTER: received 7.0 (type=float)
+7.0
+```
+
+The before-validator sees the raw `int`. Pydantic's float coercion runs between the two validators, so the after-validator sees `7.0`.
+
+(b) The before-validator prints `  BEFORE: received '25.5 C' (type=str)`. Then `"25.5 C".replace("°C", "")` changes nothing, and `float("25.5 C")` raises Python's `ValueError`. Pydantic wraps it as `value` / `Value error, could not convert string to float: '25.5 C'`. The after-validator **never runs**, so no `AFTER:` line is printed.
+
+**Q2.**
+(a) `ValidationError`: `pressure_psi` / `Value error, could not convert string to float: '14.7 Psi'`. The cleaner only removes `"psi"` and `"PSI"`, not `"Psi"`. A more robust version would lower-case first: `v.lower().replace("psi", "")`.
+(b) Valid, `pressure_psi == 30.0`: `"  30PSI"` → `"  30"` → `.strip()` → `"30"` → `30.0`.
+
+**Q3.**
+
+| Call | Check 1: `T > 100 and flow < 1` | Check 2: `p < 0 and T > 50` | Result |
+|---|---|---|---|
+| (a) | $100.0 > 100$ is False | $14.7 < 0$ is False | valid |
+| (b) | True | (never reached) | `Value error, Temperature 120.0C with flow 0.2 L/min is unsafe — high temp requires active cooling` |
+| (c) | $60 > 100$ is False | True | `Value error, Negative pressure with elevated temperature is impossible` |
+
+In (b) both rules are violated, but `raise` exits at the first one, so only one message appears. Also note that `120` prints as `120.0` because the fields were already coerced to `float` before the model validator ran.
+
+**Q4.**
+
+| `temperature` | `flow_rate` | Rejected by | Why |
+|---|---|---|---|
+| 250 | 0.1 | `@field_validator` | passes `le=500`, but $\lvert 250 \rvert > 200$ |
+| 600 | 0.1 | Field constraint | `Input should be less than or equal to 500`. The after-validator never runs on a value that already failed. |
+| 90 | 0.5 | none (valid) | $90 > 80$, but $0.5 < 0.5$ is False |
+| -250 | 0.0 | `@field_validator` | $-250 \ge -273.15$, but $\lvert -250 \rvert > 200$ |
+
+In the first and last rows, the `@model_validator` (high temperature with low flow) **never runs**. If any field fails, the model-level after-validator is skipped, so there is exactly one error.
+
+**Q5.** $\lvert 25 - (-30) \rvert = 55 > 50$, so the error is `Value error, Differential 55.0C exceeds max 50.0C`. With `max_delta="60"` the string is coerced to `60.0`, $55 \le 60$, and the model is valid: `temp_a=25.0 temp_b=-30.0 max_delta=60.0`.
+
+**E1 — reference solution**
+
+```python
+import math
+from typing import Any
+from pydantic import BaseModel, Field, field_validator
+
+class JointCommand(BaseModel):
+    joint: str
+    angle_rad: float = Field(ge=-math.pi, le=math.pi)
+
+    @field_validator("angle_rad", mode="before")
+    @classmethod
+    def accept_degrees(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.strip().endswith("deg"):
+            return math.radians(float(v.strip()[:-3]))
+        return v   # numbers (and plain numeric strings) fall through to normal coercion
+```
+
+The range check is a `Field` constraint, so it runs *after* the conversion: $270° = 4.712$ rad, which is $> \pi$ and therefore rejected. $O(1)$.
+
+**E2 — reference solution**
+
+```python
+from pydantic import BaseModel, Field, model_validator
+
+class TrajectorySegment(BaseModel):
+    t_start: float = Field(ge=0.0)
+    t_end: float
+    distance_m: float = Field(ge=0.0)
+    v_max: float = Field(gt=0.0)
+
+    @model_validator(mode="after")
+    def check_timing(self):
+        if self.t_end <= self.t_start:          # check this first: avoids division by zero
+            raise ValueError(f"t_end {self.t_end} must be after t_start {self.t_start}")
+        v_avg = self.distance_m / (self.t_end - self.t_start)
+        if v_avg > self.v_max:
+            raise ValueError(f"average speed {v_avg} m/s exceeds v_max {self.v_max} m/s")
+        return self
+```
+
+For the failing example: $v_\text{avg} = 5 / (3 - 1) = 2.5 > 2.0$. The ordering of the two checks matters: `t_start=2, t_end=2` would otherwise divide by zero. $O(1)$.
+
+**E3 — reference solution**
+
+```python
+import math
+from typing import Any
+from pydantic import BaseModel, Field, model_validator
+
+class GeofencePoint(BaseModel):
+    x: float
+    y: float
+    fence_radius_m: float = Field(default=10.0, gt=0.0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def unpack_pos(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "pos" in data:
+            data = dict(data)                  # don't mutate the caller's dict
+            pos = data.pop("pos")
+            if not (isinstance(pos, (list, tuple)) and len(pos) == 2):
+                raise ValueError("pos must be a 2-element [x, y] list")
+            data["x"], data["y"] = pos
+        return data
+
+    @model_validator(mode="after")
+    def inside_fence(self):
+        r = math.hypot(self.x, self.y)
+        if r > self.fence_radius_m:
+            raise ValueError(f"point is {r:.1f} m from origin, fence is {self.fence_radius_m} m")
+        return self
+```
+
+`mode="before"` on a model validator receives the **raw input** (usually a dict), so it is a `@classmethod` and must return data, not `self`. `mode="after"` receives the built instance. For `[9, 12]`: $\sqrt{81 + 144} = 15 > 10$. $O(1)$.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

@@ -910,6 +910,206 @@ The middleware interceptor pattern wraps AI-generated actions between pre-execut
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Swapped decorator order.** Using the chapter's `log_interceptor` and `safety_interceptor` in the *reversed* order from "Common Mistake: Wrong Decorator Order", write out everything printed:
+
+```python
+@log_interceptor
+@safety_interceptor
+def execute(command: dict) -> dict:
+    return {"status": "ok", "executed": command["action"]}
+
+print(execute({"action": "set_power", "value": 999, "timestamp": "2025-01-15T10:00:00Z"}))
+print(execute({"action": "set_power", "value": 500}))
+```
+
+**Q2. TrustBoundary edge cases.** Using the chapter's `boundary` (one pre-check for a missing action, one post-check rejecting `value > 100`), what does each call return? Then: what does the last line print, using the chapter's `bad_pre_check`?
+
+```python
+print(boundary.execute({"action": "set_temp", "value": 100}))   # (a)
+print(boundary.execute({"action": "set_temp"}))                 # (b)
+print(boundary.execute({"value": 500}))                         # (c)
+
+b2 = TrustBoundary().add_pre_check(bad_pre_check)
+print(b2.execute({"action": "set_temp", "value": 50}))          # (d)
+```
+
+**Q3. Post-check table.** With `command = {"action": "set_temperature", "value": 200}`, fill in the return value of the chapter's (non-robust) `post_sanity_check` for each `result`:
+
+| `result` | Returned |
+|---|---|
+| `{"status": "ok", "actual_temperature": 205}` | ? |
+| `{"status": "ok", "actual_temperature": 194}` | ? |
+| `{"status": "error", "reason": "heater offline"}` | ? |
+| `{"status": "ok"}` | ? |
+
+Which row would `post_sanity_check_robust` handle differently?
+
+**Q4. Rate limiter trace.** With `limiter = RateLimiter(max_calls=2, window_seconds=1.0)`, the calls below happen back-to-back, then the program sleeps 1.1 s and makes one more call. What is printed for each, PASS or REJECTED?
+
+```
+check({"action": "pulse"})   # 1
+check({"action": "pulse"})   # 2
+check({"action": "stop"})    # 3
+check({"action": "pulse"})   # 4
+# time.sleep(1.1)
+check({"action": "pulse"})   # 5
+```
+
+**Q5. Audit plus safety.** What is `[(h["action"], h["status"]) for h in audit.history]` after these two calls?
+
+```python
+audit = AuditTrail()
+
+@audit.intercept
+@safety_interceptor
+def execute(command: dict) -> dict:
+    return {"status": "ok", "executed": command["action"]}
+
+execute({"action": "set_power", "value": 999})
+execute({"action": "emergency_stop", "value": 9999})
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Write a *parameterized* decorator `range_interceptor(field: str, lo: float, hi: float)`. It rejects a command if `field` is missing (`"Missing '<field>'"`) or outside $[lo, hi]$ (`"<field>=<value> outside [lo, hi]"`), and otherwise calls the wrapped function. Keep the wrapped function's `__name__`.
+
+- `start_motor({"action": "start", "speed_rpm": 4000})` with `@range_interceptor("speed_rpm", 0, 3600)` → `{'status': 'rejected', 'reason': 'speed_rpm=4000 outside [0, 3600]'}`
+- `start_motor({"action": "start"})` → `{'status': 'rejected', 'reason': "Missing 'speed_rpm'"}`
+
+**E2 (Easy–Medium).** Write `retry_interceptor(max_attempts: int)`. It calls the wrapped function up to `max_attempts` times and stops at the first result whose `status` is not `"error"`. A raised exception counts as `{"status": "error", "reason": "Internal: <ExceptionName>"}`. Return the final result with an extra key `"attempts"`.
+
+- A function that returns `error`, then raises `ZeroDivisionError`, then returns `{"status": "ok", "executed": "home"}`, with `max_attempts=3` → `{'status': 'ok', 'executed': 'home', 'attempts': 3}`
+- A function that always raises `TimeoutError`, with `max_attempts=2` → `{'status': 'error', 'reason': 'Internal: TimeoutError', 'attempts': 2}`
+
+**E3 (Medium).** Write `MotorRateLimiter(max_calls, window_s)` whose `check(command, now: float) -> dict | None` limits calls **per (action, motor_id) pair** within a sliding window. Taking `now` as an argument makes it testable without sleeping. Use a `deque` so old timestamps are popped from the front.
+
+- With `max_calls=2, window_s=1.0`, the calls `(t, motor)` = `(0.0, M-01), (0.2, M-01), (0.3, M-02), (0.5, M-01), (1.0, M-01), (1.1, M-01)` → `PASS, PASS, PASS, REJECTED, PASS, REJECTED`
+
+#### Dry-Run: Answers
+
+**Q1.**
+
+```
+[LOG] set_power at 2025-01-15T10:00:00Z
+{'status': 'rejected', 'reason': 'Value exceeds safety limit'}
+[LOG] set_power at ?
+{'status': 'ok', 'executed': 'set_power'}
+```
+
+`log_interceptor` is now outermost, so it prints **before** the safety check runs, even for the rejected command. In the chapter's original order the `999` command produced no `[LOG]` line. The second call has no `timestamp`, so `.get` falls back to `'?'`. Also, `500 > 500` is False, so it passes.
+
+**Q2.**
+
+| Call | Pre-check | Post-check | Returned |
+|---|---|---|---|
+| (a) | has action, returns `None` | `100 > 100` is False | `{'status': 'ok', 'executed': 'set_temp'}` |
+| (b) | passes | `cmd.get("value", 0)` = 0 | `{'status': 'ok', 'executed': 'set_temp'}` |
+| (c) | no action, returns a dict | not reached | `{'status': 'rejected', 'reason': 'Missing action'}` |
+| (d) | returns `False` | not reached | prints `False` |
+
+(d) is the "wrong return type" bug: `False is not None` is True, so the boundary treats `False` as a rejection and returns it. A perfectly valid command is blocked, and the caller receives a bare `False` instead of a dict.
+
+**Q3.**
+
+| `result` | Returned | Why |
+|---|---|---|
+| actual 205 | `{'status': 'ok', 'actual_temperature': 205}` | $\lvert 200 - 205 \rvert = 5$, and $5 > 5$ is False |
+| actual 194 | `{'status': 'rejected', 'reason': 'Temperature drift: requested 200, got 194'}` | $6 > 5$ |
+| status error | `{'status': 'error', 'reason': 'heater offline'}` | non-ok results pass through untouched |
+| `{"status": "ok"}` | `{'status': 'ok'}` | `actual` defaults to the target, so drift is 0 and it silently passes |
+
+The last row is what `post_sanity_check_robust` handles differently. It returns `{'status': 'warning', 'reason': 'Cannot verify temperature: no actual_temperature in result'}` instead of passing silently.
+
+**Q4.** `PASS, PASS, PASS, REJECTED, PASS`.
+
+| # | action | timestamps for that action before the call | Result |
+|---|---|---|---|
+| 1 | pulse | `[]` | PASS |
+| 2 | pulse | `[t1]` | PASS |
+| 3 | stop | `[]` (separate key) | PASS |
+| 4 | pulse | `[t1, t2]`, length 2 $\ge$ 2 | REJECTED (not appended) |
+| 5 | pulse | t1 and t2 are now > 1.0 s old and filtered out, so `[]` | PASS |
+
+**Q5.** `[('set_power', 'rejected'), ('emergency_stop', 'ok')]`. The audit wrapper is outermost, so it records *every* attempt, including the one the safety interceptor rejected (`999 > 500`). The emergency stop bypasses the value limit even at `9999`.
+
+**E1 — reference solution**
+
+```python
+import functools
+from typing import Callable
+
+def range_interceptor(field: str, lo: float, hi: float) -> Callable:
+    def decorator(func: Callable) -> Callable:          # the real decorator
+        @functools.wraps(func)                          # keep __name__, __doc__
+        def wrapper(command: dict) -> dict:
+            value = command.get(field)
+            if value is None:
+                return {"status": "rejected", "reason": f"Missing '{field}'"}
+            if not (lo <= value <= hi):
+                return {"status": "rejected", "reason": f"{field}={value} outside [{lo}, {hi}]"}
+            return func(command)
+        return wrapper
+    return decorator
+```
+
+There are three levels of functions because `@range_interceptor("speed_rpm", 0, 3600)` is first *called* with the arguments, and that call returns the actual decorator. $O(1)$ per command.
+
+**E2 — reference solution**
+
+```python
+import functools
+from typing import Callable
+
+def retry_interceptor(max_attempts: int) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(command: dict) -> dict:
+            result: dict = {"status": "error", "reason": "never ran"}
+            attempt = 0
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    result = func(command)
+                except Exception as e:                   # an exception counts as a failed attempt
+                    result = {"status": "error", "reason": f"Internal: {type(e).__name__}"}
+                if result.get("status") != "error":
+                    break
+            return {**result, "attempts": attempt}
+        return wrapper
+    return decorator
+```
+
+At most `max_attempts` calls. `{**result, ...}` builds a new dict, so the wrapped function's return value is not mutated. A `"rejected"` result is *not* retried, because a safety rejection will not change on a retry.
+
+**E3 — reference solution**
+
+```python
+from collections import defaultdict, deque
+
+class MotorRateLimiter:
+    def __init__(self, max_calls: int, window_s: float):
+        self.max_calls = max_calls
+        self.window_s = window_s
+        self.calls: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+
+    def check(self, command: dict, now: float) -> dict | None:
+        key = (command.get("action", "unknown"), command.get("motor_id", "?"))
+        q = self.calls[key]
+        while q and now - q[0] >= self.window_s:   # drop expired timestamps from the front
+            q.popleft()
+        if len(q) >= self.max_calls:
+            return {"status": "rejected", "reason": f"Rate limit: {key[0]} on {key[1]}"}
+        q.append(now)
+        return None
+```
+
+Trace for `M-01`: $t=0$ gives `[0]`; $0.2$ gives `[0, 0.2]`; $0.5$ is rejected (length 2); at $1.0$, $1.0 - 0 \ge 1$ pops `0`, leaving `[0.2]`, then appends to give `[0.2, 1.0]` (PASS); at $1.1$, $1.1 - 0.2 = 0.9 < 1$, so it is rejected. `M-02` has its own queue. Amortized $O(1)$ per call, because each timestamp is pushed and popped at most once. The chapter's list comprehension is $O(n)$ per call.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

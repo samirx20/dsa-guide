@@ -468,6 +468,156 @@ Field constraints encode physical and business rules directly into your data mod
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Exactly on the boundary.** Using the chapter's `SensorRange` model, which fields fail for this input, and what message does each get?
+
+```python
+SensorRange(positive_only=0.0, non_negative=0.0, below_limit=100.0, at_most=100.0)
+```
+
+**Q2. How many errors?** Using the chapter's `Sensor` model from "What Happens When Each Constraint Fails", what does the loop's `print` show for this new row? How many entries does `e.errors()` hold in total?
+
+```python
+("triple fault", {"sensor_id": "tc-1", "temperature": 200, "pressure": 0, "humidity": 50})
+```
+
+**Q3. Regex trace.** For the pattern `^[A-Z]{2}-\d{3}$`, which of these IDs match: `"TC-042"`, `"T-001"`, `"TCX-042"`, `"TC-0420"`, `"tc-042"`?
+
+**Q4. Passing your own list.** Using the chapter's `ControlPanel`, what do the three printed values show?
+
+```python
+shared = ["LOW_OIL"]
+p = ControlPanel(panel_id="CP-3", active_alarms=shared)
+p.active_alarms.append("HIGH_TEMP")
+print(shared, p.active_alarms, p.active_alarms is shared)
+```
+
+**Q5. `multiple_of` with an `int` field.** Given
+
+```python
+class Fan(BaseModel):
+    fan_speed_pct: int = Field(ge=0, le=100, multiple_of=5)
+```
+
+what is `Fan(fan_speed_pct=v).fan_speed_pct` for each `v` in `[0, "35", 12, 105, 37.0]`, or which constraint rejects it?
+
+### Coding Exercises
+
+**E1 (Easy).** Write a `MotorCommand` model where `motor_id` must match `M-` plus exactly two digits, `rpm` is an `int` in $[0, 6000]$, and `direction` is `"cw"` or `"ccw"` with default `"cw"`.
+
+- `MotorCommand(motor_id="M-07", rpm="1500")` → `motor_id='M-07' rpm=1500 direction='cw'`
+- `MotorCommand(motor_id="M-7", rpm=7000, direction="left")` → `ValidationError` with 3 errors
+
+**E2 (Easy–Medium).** Write `failing_fields(model_cls: type[BaseModel], data: dict) -> list[str]` that returns the unique top-level field names that fail validation, in the order Pydantic reports them (`[]` if valid).
+
+- `failing_fields(MotorCommand, {"motor_id": "M-7", "rpm": 7000, "direction": "left"})` → `["motor_id", "rpm", "direction"]`
+- `failing_fields(MotorCommand, {"motor_id": "M-12", "rpm": 0})` → `[]`
+
+**E3 (Medium).** Write a `GripperCommand` model:
+- `width_mm`: float, $0 < w \le 85$
+- `force_n`: int in $[5, 140]$ and a multiple of 5
+- `mode`: one of `"open"`, `"close"`, `"hold"`
+- `tags`: a list of at most 3 strings, **each** 1 to 12 characters long, default a fresh empty list
+
+- `GripperCommand(width_mm=40, force_n=35, mode="close", tags=["pick", "bin-3"])` → valid
+- `GripperCommand(width_mm=0, force_n=42, mode="close", tags=["pick", ""])` → errors at `width_mm`, `force_n`, `tags.1`
+
+#### Dry-Run: Answers
+
+**Q1.** Two fields fail:
+
+| Field | Value | Rule | Result |
+|---|---|---|---|
+| `positive_only` | `0.0` | `gt=0.0` (strict) | FAIL: `Input should be greater than 0` |
+| `non_negative` | `0.0` | `ge=0.0` (inclusive) | pass |
+| `below_limit` | `100.0` | `lt=100.0` (strict) | FAIL: `Input should be less than 100` |
+| `at_most` | `100.0` | `le=100.0` (inclusive) | pass |
+
+**Q2.** The loop prints `  FAIL: triple fault -> sensor_id`, and `e.errors()` holds **3** entries, in field-definition order:
+
+| # | `loc` | Reason |
+|---|---|---|
+| 0 | `sensor_id` | `"tc-1"` is lowercase, so it fails `^[A-Z]+-\d+$` (`string_pattern_mismatch`). `min_length=3` passes because the string has 4 characters. |
+| 1 | `temperature` | $200 > 150$ (`less_than_equal`) |
+| 2 | `pressure` | $0$ is not $> 0$ (`greater_than`) |
+
+The loop only shows `errors()[0]`, so it hides two of the three problems. Log all of them when debugging LLM output.
+
+**Q3.** Only `"TC-042"` matches.
+- `"T-001"`: one letter, not two. The chapter's own `SensorConfig(sensor_id="T-001", ...)` example would be rejected by this pattern for the same reason.
+- `"TCX-042"`: three letters. `^` prevents matching from the second letter onwards.
+- `"TC-0420"`: four digits. `$` prevents a partial match.
+- `"tc-042"`: lowercase letters are not in `[A-Z]`.
+
+**Q4.** Prints `['LOW_OIL'] ['LOW_OIL', 'HIGH_TEMP'] False`. When Pydantic v2 validates a `list[str]` field it builds a **new** list, so the model does not alias the caller's list. `default_factory=list` covers the default case, and validation covers the passed-in case.
+
+**Q5.**
+
+| `v` | Steps | Result |
+|---|---|---|
+| `0` | $0 \in [0,100]$, $0 \bmod 5 = 0$ | `0` |
+| `"35"` | str → int `35`, in range, $35 \bmod 5 = 0$ | `35` |
+| `12` | in range, $12 \bmod 5 = 2$ | rejected: `Input should be a multiple of 5` |
+| `105` | $105 > 100$ | rejected: `Input should be less than or equal to 100` |
+| `37.0` | float with no fraction → int `37`, $37 \bmod 5 = 2$ | rejected: `multiple_of` |
+
+**E1 — reference solution**
+
+```python
+from typing import Literal
+from pydantic import BaseModel, Field
+
+class MotorCommand(BaseModel):
+    motor_id: str = Field(pattern=r"^M-\d{2}$")   # anchored: "M-7" and "M-123" both fail
+    rpm: int = Field(ge=0, le=6000)
+    direction: Literal["cw", "ccw"] = "cw"
+```
+
+The three errors for the bad input are `motor_id` (pattern), `rpm` ($7000 > 6000$) and `direction` (literal). Each field check is $O(1)$, apart from the regex, which is linear in the string length.
+
+**E2 — reference solution**
+
+```python
+from pydantic import BaseModel, ValidationError
+
+def failing_fields(model_cls: type[BaseModel], data: dict) -> list[str]:
+    try:
+        model_cls.model_validate(data)
+        return []
+    except ValidationError as e:
+        seen: list[str] = []
+        for err in e.errors():
+            # model-level errors have an empty loc
+            name = str(err["loc"][0]) if err["loc"] else "__root__"
+            if name not in seen:
+                seen.append(name)
+        return seen
+```
+
+$O(k^2)$ for $k$ errors because of the list membership test, which is fine for a handful of fields. Use a `dict` as an ordered set if $k$ is large.
+
+**E3 — reference solution**
+
+```python
+from typing import Annotated, Literal
+from pydantic import BaseModel, Field
+
+Tag = Annotated[str, Field(min_length=1, max_length=12)]   # per-item constraint
+
+class GripperCommand(BaseModel):
+    width_mm: float = Field(gt=0.0, le=85.0)
+    force_n: int = Field(ge=5, le=140, multiple_of=5)
+    mode: Literal["open", "close", "hold"]
+    tags: list[Tag] = Field(default_factory=list, max_length=3)   # list-level constraint
+```
+
+The bad example fails at `width_mm` ($0$ is not $> 0$), `force_n` ($42 \bmod 5 \neq 0$) and `tags.1` (the empty string is shorter than `min_length=1`). `Field(max_length=3)` on the list limits the *number of items*: four tags gives a single `tags` error of type `too_long`. The `Annotated` alias limits *each string*. Both checks are linear in the number of tags.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

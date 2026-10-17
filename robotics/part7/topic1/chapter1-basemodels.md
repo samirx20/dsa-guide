@@ -569,6 +569,174 @@ from pydantic import ValidationError    # Error type for try/except
 
 ---
 
+## Practice & Self-Check
+
+### Predict the Output / Trace by Hand
+
+**Q1. Coercion direction.** Using the chapter's two-field `SensorReading` (`sensor_id: str`, `temperature: float`), predict what each line does: print a value, or raise `ValidationError`?
+
+```python
+r1 = SensorReading(sensor_id="T-010", temperature=72)
+print(r1.temperature, type(r1.temperature).__name__)   # (a)
+
+r2 = SensorReading(sensor_id="T-011", temperature="  98.6 ")
+print(r2.temperature)                                   # (b)
+
+r3 = SensorReading(sensor_id=42, temperature=1.0)       # (c)
+```
+
+**Q2. Two errors, two paths.** Using the chapter's `Location` / `DroneTelemetry` models, how many errors does this raise, and what is the dotted path of each? Does `battery_pct="75"` cause one of them?
+
+```python
+DroneTelemetry.model_validate({
+    "drone_id": "DRN-9",
+    "battery_pct": "75",
+    "location": {"latitude": 37.7},
+    "heading": "north",
+})
+```
+
+**Q3. Serialization.** Using the chapter's `Alert` model, what do the two `print` calls show? Note that `code` is passed as a string.
+
+```python
+alert = Alert(severity="high", message="Temperature exceeded", code="501")
+print(alert.model_dump(exclude={"code"}))
+print(alert.model_dump_json())
+```
+
+**Q4. Integer fields and fractions.** With the same `Alert` model, which of these succeeds, and what is `.code` when it does?
+
+```python
+Alert(severity="low", message="ok", code=501.0)   # (a)
+Alert(severity="low", message="ok", code=501.5)   # (b)
+```
+
+**Q5. JSON with a quoted number.** Does this validate? If yes, what is printed?
+
+```python
+print(PressureReading.model_validate_json(
+    '{"sensor_id": "P-042", "pressure": "14.7", "unit": "psi"}'
+))
+```
+
+### Coding Exercises
+
+**E1 (Easy).** Define a `BatteryStatus` model with `robot_id: str`, `voltage: float`, `charging: bool`, and write `parse_battery(raw: str) -> BatteryStatus | None` that validates a raw LLM JSON string and returns `None` (never raises) when validation fails.
+
+- `parse_battery('{"robot_id": "R-1", "voltage": "24.3", "charging": true}')` → `robot_id='R-1' voltage=24.3 charging=True`
+- `parse_battery('{"robot_id": "R-1", "voltage": "low", "charging": true}')` → `None`
+
+**E2 (Easy–Medium).** Write `validate_batch(items: list[dict]) -> tuple[list[SensorReading], list[str]]` using the two-field `SensorReading`. Return the valid readings and, for every individual error, a string `"item {i}: {dotted.path}: {msg}"`. One bad item can produce more than one error string.
+
+- Input `[{"sensor_id": "T-1", "temperature": "21.5"}, {"sensor_id": "T-2"}, {"sensor_id": "T-3", "temperature": "hot"}]`
+- Valid temperatures: `[21.5]`
+- Errors: `["item 1: temperature: Field required", "item 2: temperature: Input should be a valid number, unable to parse string as a number"]`
+
+**E3 (Medium).** Define `Waypoint(latitude: float, longitude: float)` and `Mission(mission_id: str, waypoints: list[Waypoint])`. Write `first_error_path(data: dict) -> str | None` that returns the dotted path of the first validation error (list indices included), or `None` if the data is valid.
+
+- Waypoints `[{"latitude": 37.7, "longitude": -122.4}, {"latitude": "north", "longitude": -122.5}]` → `"waypoints.1.latitude"`
+- `{"mission_id": "M-2", "waypoints": []}` → `None` (an empty list is still a valid list)
+
+#### Dry-Run: Answers
+
+**Q1.**
+(a) prints `72.0 float`. The int `72` is coerced to the float `72.0`.
+(b) prints `98.6`. The string is stripped of surrounding whitespace and parsed as a number.
+(c) raises `ValidationError`: `sensor_id` / `Input should be a valid string [type=string_type, input_value=42, input_type=int]`. Pydantic v2 turns numeric strings into numbers, but it does **not** turn numbers into strings. Coercion only goes one way.
+
+**Q2.** **2 errors**, collected in one pass.
+
+| Path | Message | Why |
+|---|---|---|
+| `location.longitude` | `Field required` (`type=missing`) | the nested dict has no `longitude` key |
+| `heading` | `Input should be a valid number, unable to parse string as a number` | `"north"` is not numeric |
+
+`battery_pct="75"` is fine: it is coerced to `75.0`. Pydantic does not stop at the first failure. It reports every failing field, each with its full path.
+
+**Q3.**
+
+```python
+{'severity': 'high', 'message': 'Temperature exceeded'}
+{"severity":"high","message":"Temperature exceeded","code":501}
+```
+
+`exclude` drops `code` from the dict. In the JSON string, `code` is the **integer** `501` (no quotes) because `"501"` was coerced to `int` at construction. Without `indent`, `model_dump_json()` gives compact output with no spaces after `:` or `,`.
+
+**Q4.**
+(a) succeeds, `.code == 501` (an `int`). A float with no fractional part is accepted for an `int` field.
+(b) raises `ValidationError`: `code` / `Input should be a valid integer, got a number with a fractional part [type=int_from_float, ...]`. Pydantic will not silently truncate `501.5` to `501`.
+
+**Q5.** It validates and prints `sensor_id='P-042' pressure=14.7 unit='psi'`. In lax mode a JSON string containing a number is accepted for a `float` field, just like `"72.5"` in the chapter's coercion example.
+
+**E1 — reference solution**
+
+```python
+from pydantic import BaseModel, ValidationError
+
+class BatteryStatus(BaseModel):
+    robot_id: str
+    voltage: float
+    charging: bool
+
+def parse_battery(raw: str) -> BatteryStatus | None:
+    try:
+        return BatteryStatus.model_validate_json(raw)   # parse + validate in one step
+    except ValidationError:
+        return None
+```
+
+$O(n)$ in the length of the JSON string. Catching only `ValidationError` (not bare `Exception`) means real bugs elsewhere still surface. Malformed JSON also raises `ValidationError` (`type=json_invalid`), so it returns `None` as well.
+
+**E2 — reference solution**
+
+```python
+from pydantic import BaseModel, ValidationError
+
+class SensorReading(BaseModel):
+    sensor_id: str
+    temperature: float
+
+def validate_batch(items: list[dict]) -> tuple[list[SensorReading], list[str]]:
+    good: list[SensorReading] = []
+    bad: list[str] = []
+    for i, item in enumerate(items):
+        try:
+            good.append(SensorReading.model_validate(item))
+        except ValidationError as e:
+            for err in e.errors():                       # one entry per failing field
+                path = ".".join(str(p) for p in err["loc"])
+                bad.append(f"item {i}: {path}: {err['msg']}")
+    return good, bad
+```
+
+$O(n)$ over the batch. `e.errors()` returns a list of dicts with `loc` (a tuple path), `msg`, `type` and `input`, which is easier to log than `str(e)`.
+
+**E3 — reference solution**
+
+```python
+from pydantic import BaseModel, ValidationError
+
+class Waypoint(BaseModel):
+    latitude: float
+    longitude: float
+
+class Mission(BaseModel):
+    mission_id: str
+    waypoints: list[Waypoint]
+
+def first_error_path(data: dict) -> str | None:
+    try:
+        Mission.model_validate(data)
+        return None
+    except ValidationError as e:
+        # loc for a list item is ('waypoints', 1, 'latitude'); the index is an int
+        return ".".join(str(p) for p in e.errors()[0]["loc"])
+```
+
+Validation recurses into every list element, and the list index becomes part of `loc`. `str(p)` handles the integer index.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
