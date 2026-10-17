@@ -182,8 +182,8 @@ string frequencySort(string s) {
     return result;
 }
 // Example: "tree" → counts={t:1, r:1, e:2}
-// Sorted pairs: [('e',2), ('t',1), ('r',1)]
-// Result: "eetr"
+// Sorted pairs: [('e',2), ('t',1), ('r',1)] (tie order of 't'/'r' depends on unordered_map order)
+// Result: "eetr" (or "eert"; both are valid answers)
 ```
 
 ---
@@ -238,7 +238,7 @@ for (string s : words) {
 **Variation: Group Shifted Strings**
 ```cpp
 // "abc" and "bcd" should be in the same group (shifted by 1)
-// "xyz" and "aza" should be in the same group (shifted by 25/1)
+// "az" and "ba" should be in the same group (shifted by 1, wrapping z -> a)
 vector<vector<string>> groupStrings(vector<string>& strings) {
     unordered_map<string, vector<string>> groups;
     
@@ -381,7 +381,7 @@ int subarraySum(vector<int>& nums, int k) {
 //   Check: 9 - 5 = 4, prefixSums[4] = 1 → MATCH! count = 2
 //   prefixSums = {0:1, 1:1, 3:1, 6:1, 4:1, 9:1}
 //
-// Result: 2 subarrays: [2,3] and [1,2,3,-2,5]
+// Result: 2 subarrays: [2,3] and [5]
 ```
 
 **Dry Run Table:**
@@ -533,7 +533,7 @@ for (auto& [key, val] : map) {
 
 // MISTAKE 4: Using map[] in a hot loop (double lookup)
 for (int i = 0; i < n; i++) {
-    map[nums[i]]++;  // Two lookups: one to find, one to modify
+    map[nums[i]]++;  // One lookup: operator[] finds (or inserts) and returns a reference
 }
 // This is fine for simple increments, but for complex operations:
 auto it = map.find(nums[i]);

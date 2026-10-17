@@ -244,7 +244,7 @@ A common mistake is thinking a single `for` loop is always $O(N)$. If you use an
 
 ```cpp
 void badCode(vector<int>& arr) {
-    for (int i = 0; i < arr.size(); i++) { // Loops O(N) times
+    for (int i = 0, n = arr.size(); i < n; i++) { // Loops O(N) times
         // .insert() at the front of a vector takes O(N) time!
         arr.insert(arr.begin(), 99);
     }
@@ -256,23 +256,23 @@ void badCode(vector<int>& arr) {
 ```
 arr = {1, 2, 3}, N = 3
 
-Iteration 1: insert at front → shift 0 elements → O(N) work
+Iteration 1: insert at front → shift 3 elements → O(N) work
   arr = {99, 1, 2, 3}  (size is now 4)
 
-Iteration 2: insert at front → shift 1 element → O(N) work
+Iteration 2: insert at front → shift 4 elements → O(N) work
   arr = {99, 99, 1, 2, 3}  (size is now 5)
 
-Iteration 3: insert at front → shift 2 elements → O(N) work
+Iteration 3: insert at front → shift 5 elements → O(N) work
   arr = {99, 99, 99, 1, 2, 3}  (size is now 6)
 
 Wait — the array is GROWING! Each insert at front shifts ALL existing elements.
-Iteration 1: shifts 0 elements
-Iteration 2: shifts 1 element
-Iteration 3: shifts 2 elements
+Iteration 1: shifts N elements
+Iteration 2: shifts N+1 elements
+Iteration 3: shifts N+2 elements
 ...
-Total shifts: 0 + 1 + 2 + ... + (N-1) = N(N-1)/2 → O(N²)
+Total shifts: N + (N+1) + ... + (2N-1) = N(3N-1)/2 → O(N²)
 
-Even worse than O(N²)! Because the array grows, it's actually O(N²).
+Each insert shifts even more than N elements because the array grows, but the total is still O(N²).
 ```
 
 ### 7. Amortized O(1) — The Hidden Constant
@@ -344,7 +344,7 @@ fib(5):
   Total calls: 15 (for fib(5))
   For fib(N): ~2^N calls (exponential tree)
   fib(30) ≈ 2.7 million calls
-  fib(40) ≈ 2.4 billion calls → VERY SLOW
+  fib(40) ≈ 331 million calls → VERY SLOW
 
   This is why naive recursion for fibonacci is O(2^N)
   (Use dynamic programming to fix it → O(N))
@@ -357,12 +357,12 @@ fib(5):
 | Single loop over N | $O(N)$ | `for(i=0; i<N; i++)` |
 | Two consecutive loops | $O(N)$ | Two `for` loops back to back |
 | Nested loops (both N) | $O(N^2)$ | `for` inside `for` |
-| Nested loops (N and M) | $O(NM)` | Different size loops |
+| Nested loops (N and M) | $O(NM)$ | Different size loops |
 | Halving/doubling loop | $O(\log N)$ | `while(n>1) n/=2` |
 | Sort + loop | $O(N \log N)$ | `sort()` then `for` |
-| Triple nested loop | $O(N^3)` | Three `for` loops |
-| All subsets | $O(2^N)` | `for(mask=0; mask<(1<<N); mask++)` |
-| All permutations | $O(N!)` | `next_permutation` in loop |
+| Triple nested loop | $O(N^3)$ | Three `for` loops |
+| All subsets | $O(2^N)$ | `for(mask=0; mask<(1<<N); mask++)` |
+| All permutations | $O(N!)$ | `next_permutation` in loop |
 
 ### 10. Common Mistakes
 
@@ -401,13 +401,13 @@ MISTAKE 4: "O(N) + O(N) = O(N²)"
 | Single loop over N | $O(N)$ | One `for` or `while` with linear progression |
 | Two sequential loops | $O(N)$ | Two loops one after another |
 | Nested loops (both N) | $O(N^2)$ | Loop inside loop, both iterate N times |
-| Nested loops (N and M) | $O(NM)` | Different size inputs |
-| Halving/doubling loop | $O(\log N)` | `i *= 2` or `n /= 2` |
-| Sort then iterate | $O(N \log N)` | `sort()` + `for` loop |
-| Triple nested | $O(N^3)` | Three nested loops |
-| Recursive (2 calls) | $O(2^N)` | `f(n) = f(n-1) + f(n-1)` |
-| Recursive (N calls) | $O(N!)` | `f(n) = f(n-1) * n` |
-| Amortized push_back | $O(1)` per push | Vector resize is O(N) but rare |
+| Nested loops (N and M) | $O(NM)$ | Different size inputs |
+| Halving/doubling loop | $O(\log N)$ | `i *= 2` or `n /= 2` |
+| Sort then iterate | $O(N \log N)$ | `sort()` + `for` loop |
+| Triple nested | $O(N^3)$ | Three nested loops |
+| Recursive (2 calls) | $O(2^N)$ | `f(n) = f(n-1) + f(n-1)` |
+| Recursive (N calls) | $O(N!)$ | `T(n) = n * T(n-1)` (n calls of size n-1) |
+| Amortized push_back | $O(1)$ per push | Vector resize is O(N) but rare |
 
 ---
 

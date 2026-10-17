@@ -75,11 +75,11 @@ Pattern: roughly 2^N nodes
 | `fib(1)` | 1 | 1 | `[fib(5), fib(4), fib(3)]` |
 | `fib(3)` | 3 | 2 | `[fib(5), fib(4)]` |
 | `fib(2)` | 2 | 1 | `[fib(5), fib(4)]` |
-| `fib(1)` | 1 | 1 | `[fib(5), fib(4)]` |
 | `fib(4)` | 4 | 3 | `[fib(5)]` |
+| `fib(3)` | 3 | ? | `[fib(5), fib(3)]` |
+| `fib(2)` | 2 | 1 | `[fib(5), fib(3)]` |
+| `fib(1)` | 1 | 1 | `[fib(5), fib(3)]` |
 | `fib(3)` | 3 | 2 | `[fib(5)]` |
-| `fib(2)` | 2 | 1 | `[fib(5)]` |
-| `fib(1)` | 1 | 1 | `[fib(5)]` |
 | `fib(5)` | 5 | **5** | `[]` |
 
 **Step-by-Step Walkthrough:**
@@ -255,7 +255,7 @@ fastPow(2, 10):
 └─ returns 32 * 32 = 1024
 
 Brute force: 10 multiplications
-D&C:         5 multiplications (log₂(10))
+D&C:         6 multiplications (O(log N): ≤ 2 per halving)
 ```
 
 **Dry-Run Table:**

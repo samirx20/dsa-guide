@@ -145,7 +145,7 @@ int minEatingSpeed(vector<int>& piles, int h) {
 **Feasibility Visualization:**
 ```
 Speed:   1    2    3    4    5    6    7    8    9   10   11
-Hours:  27   14   10    8    7    6    5    5    4    4    4
+Hours:  27   15   10    8    8    6    5    5    5    5    4
 Valid?:  F    F    F    T    T    T    T    T    T    T    T
                          ↑
                     First True = 4

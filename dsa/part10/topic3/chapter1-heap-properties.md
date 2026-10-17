@@ -49,7 +49,7 @@ Complete:                NOT Complete:
     2   3                    2   3
    / \ /                    / \   \
   4  5 6                   4  5   6
-                            ↑ gap at 6's left!
+                                ↑ gap: 3's left child is missing!
 Every level filled         Last level not left-aligned
 except possibly last,
 filled left to right
@@ -314,8 +314,8 @@ void buildMaxHeap(vector<int>& heap) {
 //
 // Start from index 4 and sift down each:
 //
-// Index 4 (value 16): children 8, 7
-//   16 > 8 and 16 > 7 → no swap needed
+// Index 4 (value 16): only child is index 9 (value 7)
+//   16 > 7 → no swap needed
 //
 // Index 3 (value 2): children 14, 8
 //   2 < 14 → swap with 14
@@ -328,16 +328,16 @@ void buildMaxHeap(vector<int>& heap) {
 // Index 1 (value 1): children 14, 16
 //   1 < 16 → swap with 16
 //   [4, 16, 10, 14, 1, 9, 3, 2, 8, 7]
-//   Continue sift down: 1 vs 8, 7 → swap with 8
-//   [4, 16, 10, 14, 8, 9, 3, 2, 1, 7]
+//   Continue sift down: 1 vs only child 7 (index 9) → swap with 7
+//   [4, 16, 10, 14, 7, 9, 3, 2, 8, 1]
 //
 // Index 0 (value 4): children 16, 10
 //   4 < 16 → swap with 16
-//   [16, 4, 10, 14, 8, 9, 3, 2, 1, 7]
-//   Continue: 4 vs 14, 8 → swap with 14
-//   [16, 14, 10, 4, 8, 9, 3, 2, 1, 7]
-//   Continue: 4 vs 2, 1 → swap with 2
-//   [16, 14, 10, 2, 8, 9, 3, 4, 1, 7]
+//   [16, 4, 10, 14, 7, 9, 3, 2, 8, 1]
+//   Continue: 4 vs 14, 7 → swap with 14
+//   [16, 14, 10, 4, 7, 9, 3, 2, 8, 1]
+//   Continue: 4 vs 2, 8 → swap with 8
+//   [16, 14, 10, 8, 7, 9, 3, 2, 4, 1]
 //
 // Final max-heap!
 ```
@@ -426,8 +426,9 @@ void heapSort(vector<int>& nums) {
     
     // Extract elements one by one: O(N log N)
     for (int i = nums.size() - 1; i > 0; i--) {
-        swap(nums[0], nums[i]);  // Move max to end
-        make_heap(nums.begin(), nums.begin() + i);  // Re-heapify
+        // Move max to end and sift the new root down: O(log N)
+        // (calling make_heap here instead would be O(N) per step → O(N^2) total)
+        pop_heap(nums.begin(), nums.begin() + i + 1);
     }
     
     // Result: sorted in ascending order

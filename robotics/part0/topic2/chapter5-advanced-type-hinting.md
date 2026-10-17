@@ -1,4 +1,4 @@
-# Part 0, Topic 1: Python Systems Basics
+# Part 0, Topic 2: Python Systems Basics
 ## Chapter 2: Advanced Type Hinting
 
 **Prerequisite Knowledge:** Basic Python variables and functions, introductory understanding of type hints (like `int`, `str`, `list`).
@@ -156,8 +156,8 @@ result = first_item([1, 2, 3])       # T = int, result is int
 result = first_item(["a", "b"])      # T = str, result is str
 result = first_item([1.0, 2.0])      # T = float, result is float
 
-# This would be flagged:
-result = first_item([1, "hello"])    # T can't be both int and str!
+# This is NOT flagged — the checker widens T instead of erroring:
+result = first_item([1, "hello"])    # T = object (mypy) or int | str (pyright)
 ```
 
 **Common mistake — using `Any` instead of generics:**
@@ -380,7 +380,7 @@ class LLMToolCall(TypedDict):
 #   └── Key name in the dictionary
 
 class AgentState(TypedDict):
-    status: Literal["idle", "gather
+    status: Literal["idle", "gathering", "analyzing", "responding"]
 #                    ^^^^^  ^^^^^^^^
 #                    |      |
 #                    |      └── Status can only be one of these exact strings

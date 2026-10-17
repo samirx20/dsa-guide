@@ -1,4 +1,4 @@
-# Part 3, Topic 1: Relational Databases & SQL
+# Part 6, Topic 1: Relational Databases & SQL
 ## Chapter 1: Tables, Rows, & Columns
 
 ### What You'll Learn

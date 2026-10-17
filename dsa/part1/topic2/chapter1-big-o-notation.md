@@ -226,8 +226,8 @@ Pitfall 2: Saying O(N + M) when N == M
 
 Pitfall 3: Confusing best, average, and worst case
   → Big O = WORST CASE. Always.
-  → If asked for best case, say "Big Omega (Ω)"
-  → If asked for average, say "Big Theta (Θ)"
+  → If asked for best case, analyze the best-case input (Big Omega (Ω) is a lower bound, not a synonym for "best case")
+  → If asked for average, analyze the expected input (Big Theta (Θ) is a tight bound, not a synonym for "average case")
 
 Pitfall 4: Forgetting about recursion
   → A recursive function with depth N uses O(N) SPACE (call stack)
@@ -293,7 +293,7 @@ You must memorize this hierarchy, ordered from best (fastest) to worst (slowest)
 | $O(N)$ | Linear | Proportional | Single loop | 100 | 10,000 |
 | $O(N \log N)$ | Linearithmic | Gentle curve | Sort, divide & conquer | 664 | 133,000 |
 | $O(N^2)$ | Quadratic | Steep curve | Nested loops | 10,000 | 100,000,000 |
-| $O(2^N)$ | Exponential | Vertical wall | Brute-force subsets | 1.26×10³⁰ | 💥 |
+| $O(2^N)$ | Exponential | Vertical wall | Brute-force subsets | 1.27×10³⁰ | 💥 |
 | $O(N!)$ | Factorial | Worse than exp | All permutations | 9.3×10¹⁵⁷ | 💥💥 |
 
 ### 7. Space Complexity

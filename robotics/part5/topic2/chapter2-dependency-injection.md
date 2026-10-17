@@ -1,4 +1,4 @@
-# Part 1, Topic 2: FastAPI Development
+# Part 5, Topic 2: FastAPI Development
 ## Chapter 2: Dependency Injection
 
 **Prerequisite Knowledge:** Basic understanding of FastAPI endpoints and Python functions.
@@ -58,8 +58,7 @@ def status(config: dict = Depends(get_config)) -> dict:
     # Now `config` has whatever get_config() returned!
     return {"config": config}
 
-async def main() -> None:
-    from asgiref.sync import sync_to_async
+def main() -> None:
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 ```
@@ -169,8 +168,8 @@ def get_db() -> Generator[FakeSession, None, None]:
 # 3. Code before 'yield' runs (setup)
 # 4. db is passed to the endpoint
 # 5. Endpoint runs
-# 6. Code after 'yield' runs (teardown)
-# 7. Response is sent to client
+# 6. Response is sent to client
+# 7. Code after 'yield' runs (teardown; default scope="request" in current FastAPI)
 ```
 
 The `yield` keyword makes this a generator dependency. FastAPI runs the code before `yield` to set up, and the code after `yield` runs in the `finally` block for cleanup.
@@ -398,7 +397,7 @@ def verify_api_key(x_api_key: str = Header(...)) -> str:
 
     if x_api_key not in valid_keys:
         raise HTTPException(status_code=403, detail="Invalid API key")
-        # If the header is missing or invalid, this runs
+        # If the header is invalid, this runs (a MISSING header → 422 before this)
         # Endpoint never executes
     return x_api_key
     # If valid, returns the key (can be used by endpoint if needed)
@@ -519,7 +518,7 @@ def list_readings(db = Depends(get_db)):
 
 ### 7. Multiple Dependencies
 
-An endpoint can depend on multiple dependencies. They all run concurrently.
+An endpoint can depend on multiple dependencies. FastAPI resolves them one after another, in declaration order, before the endpoint runs.
 
 ```python
 from fastapi import FastAPI, Depends
@@ -560,13 +559,13 @@ def dashboard(
     auth: dict = Depends(get_auth),        # Dependency 2
     db: dict = Depends(get_db),            # Dependency 3 (yield)
 ) -> dict:
-    # All three dependencies run in parallel
-    # FastAPI resolves them concurrently
+    # All three dependencies run sequentially (NOT in parallel)
+    # FastAPI resolves them one by one, in declaration order
     # Endpoint receives all three as parameters
 
 # Timeline:
 # 1. Request arrives
-# 2. FastAPI calls get_config(), get_auth(), get_db() concurrently
+# 2. FastAPI calls get_config(), then get_auth(), then get_db()
 # 3. All three complete
 # 4. dashboard(config, auth, db) runs
 # 5. After dashboard: get_db()'s teardown runs (yield cleanup)
@@ -581,8 +580,8 @@ def dashboard(
 # RIGHT: FastAPI automatically creates a new generator per endpoint call
 # Each endpoint gets its own fresh database connection
 
-# If you WANT to share a dependency across multiple endpoints:
-# Use a class-based dependency
+# Wrapping the resource in a class does NOT share it across endpoints:
+# get_db() below still yields a fresh DatabaseSession per request
 class DatabaseSession:
     def __init__(self):
         self.connection = create_connection()
@@ -732,7 +731,7 @@ Use `Depends()` to decouple endpoints from external resources. Yield dependencie
 | Chained dependencies | Auto-resolved chain | `def b(a = Depends(a_func)): ...` |
 | `Depends()` caching | Same dep, same result | Two `Depends(get_db)` = one call |
 | Generator dependency | Auto cleanup | `def get_db(): ... yield db ... finally:` |
-| `lifespan` | App startup/shutdown | `@asynccontextmanager def lifespan(app):` |
+| `lifespan` | App startup/shutdown | `@asynccontextmanager async def lifespan(app):` |
 
 ---
 

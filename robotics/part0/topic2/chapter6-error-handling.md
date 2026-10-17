@@ -1,4 +1,4 @@
-# Part 0, Topic 1: Python Systems Basics
+# Part 0, Topic 2: Python Systems Basics
 ## Chapter 3: Error Handling
 
 **Prerequisite Knowledge:** Basic Python syntax, understanding of functions, and general awareness of what an error or "crash" is in programming.
@@ -162,6 +162,7 @@ async def call_llm(prompt: str) -> str:
     # Step 1: Try doing the risky thing
     try:
         response = await client.post(url, json={"prompt": prompt})
+        response.raise_for_status()  # httpx only raises HTTPStatusError if you ask it to
         
     # Step 2: Catch specific errors if the risky thing fails
     except httpx.TimeoutException as exc:
@@ -273,6 +274,7 @@ def timer(label: str):
         print(f"{label}: {elapsed:.3f}s")
 
 # Step 2: Use the context manager with the 'with' keyword
+# (shown at top level for brevity; 'await' must be inside an async def in a .py script)
 with timer("LLM call"):
     # Control jumps to the 'yield' above, runs this, then jumps back
     result = await call_llm("What is the engine temperature?")
@@ -312,10 +314,10 @@ with open("data.json", "r") as f:
     data = f.read()
 # File is automatically closed, even if an exception occurs
 
-# Database connection — automatically closes connection
+# Database connection — automatically commits (or rolls back on error)
 with sqlite3.connect("factory.db") as conn:
     cursor = conn.execute("SELECT * FROM sensors")
-# Connection is automatically closed
+# Transaction is committed — but sqlite3 does NOT close the connection here (call conn.close())
 
 # Temporary directory — automatically deleted
 import tempfile
@@ -423,8 +425,9 @@ match validate_temperature(42.5):
     case Err(error=msg):
         # msg = the error string
         print(f"Validation failed: {msg}")
-# The match statement FORCES you to handle both cases!
-# If you forget one, mypy will warn you
+# Matching on Ok/Err makes you think about both cases.
+# mypy only warns about a forgotten one if you add `case _: assert_never(...)`
+# (or the function would fall through without returning)
 ```
 
 **Result vs Exceptions — when to use which:**
@@ -523,7 +526,7 @@ logger.info("Pipeline started", extra={"query": query})
 #          ^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^
 #          |                    |
 #          |                    └── Extra context attached to the log
-#          |                        Shows as: query=What is the temp?
+#          |                        Stored as record.query (shown only if your formatter includes it)
 #          └── Log level: info (normal operation)
 #
 # Log levels (most to least severe):
@@ -565,7 +568,8 @@ logger.exception("Error processing sensor: %s", sensor_id)
 try:
     result = call_llm(prompt)
 except Exception:
-    # This catches EVERYTHING — even KeyboardInterrupt, SystemExit
+    # This catches almost EVERYTHING (every Exception subclass) — only
+    # BaseException-only types like KeyboardInterrupt and SystemExit escape it
     # You might swallow critical errors
     pass
 

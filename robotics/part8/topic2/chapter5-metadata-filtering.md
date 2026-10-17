@@ -1,4 +1,4 @@
-# Part 4, Topic 2: Metadata & Advanced Retrieval
+# Part 8, Topic 2: Metadata & Advanced Retrieval
 ## Chapter 2: Metadata Filtering
 
 **Prerequisite Knowledge:** Basic understanding of Python dictionaries and lists.
@@ -228,8 +228,8 @@ for r in results:
 #
 # Step 1: Score ALL chunks (no filtering yet)
 #   chunk[0]: "Replace seal every 5000 hours" → score ≈ 0.99
-#   chunk[1]: "Vibration threshold is 5 mm/s" → score ≈ 0.98
-#   chunk[2]: "Oil change interval 10000 hrs" → score ≈ 0.15
+#   chunk[1]: "Vibration threshold is 5 mm/s" → score ≈ 0.99
+#   chunk[2]: "Oil change interval 10000 hrs" → score ≈ 0.29
 #
 # Step 2: Sort by score (highest first)
 #   [chunk0, chunk1, chunk2]

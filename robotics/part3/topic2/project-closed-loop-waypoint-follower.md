@@ -154,6 +154,7 @@ public:
         P_[1][2] += F12 * P_[2][2]; P_[2][1] = P_[1][2];
         P_[2][2] += q_th;
         // ^^^ Propagate P = F * P * F^T + Q concisely; uncertainty grows on every 10ms tick
+        //     (the x-y cross term P_[0][1] is held at 0, matching the diagonal S used in updateGPS)
     }
 
     bool updateGPS(double z_x, double z_y, double r_var) {
@@ -180,6 +181,8 @@ public:
         x_[2] = wrapToPi(x_[2] + K20 * y0 + K21 * y1);
         // ^^^ Fuse GPS innovation into [x, y, theta]
 
+        P_[2][2] -= K20 * P_[0][2] + K21 * P_[1][2];
+        // ^^^ Heading variance shrinks too (uses P_[0][2], P_[1][2] before they are scaled below)
         P_[0][0] *= (1.0 - K00);
         P_[1][1] *= (1.0 - K11);
         P_[0][2] *= (1.0 - K00); P_[2][0] = P_[0][2];
@@ -395,7 +398,7 @@ Use these four concrete engineering verification tests to validate your implemen
 
 | Milestone | Test Condition | Expected Quantitative Pass Criterion |
 | :--- | :--- | :--- |
-| **1. Angle Wrapping across $\pm\pi$** | Place robot at $(0, 0)$ facing $\hat{\theta} = +178^\circ$ and waypoint at $(-5, -0.2)$ ($\theta_{\text{goal}} = -178^\circ$). | Heading error $e_\theta = -4^\circ$ ($-0.07\text{ rad}$), **not** $-356^\circ$; robot turns $4^\circ$ right smoothly. |
+| **1. Angle Wrapping across $\pm\pi$** | Place robot at $(0, 0)$ facing $\hat{\theta} = +178^\circ$ and waypoint at $(-5, -0.2)$ ($\theta_{\text{goal}} = -178^\circ$). | Heading error $e_\theta = +4^\circ$ ($+0.07\text{ rad}$), **not** $-356^\circ$; robot turns $4^\circ$ left smoothly across the seam. |
 | **2. Pivot-Before-Charge Alignment** | Place waypoint $95^\circ$ behind the robot ($|e_\theta| > 90^\circ$). | Forward speed command $v_{\text{cmd}} = 0.0\text{ m/s}$ while $|e_\theta| \ge 90^\circ$; robot pivots in place before accelerating. |
 | **3. Multi-Rate EKF vs. Dead-Reckoning** | Run the 4-waypoint loop with wheel slip ($\sigma_v = 0.1\text{ m/s}$) with GPS ON vs. GPS OFF. | With $10\text{ Hz}$ EKF GPS ON, position RMSE stays $< 0.15\text{ m}$ and captures all 4 waypoints; with GPS OFF, robot drifts $> 1.2\text{ m}$ off course. |
 | **4. $3\sigma$ Mahalanobis Glitch Rejection** | Inject a $+15\text{ m}$ GPS spike at $t = 5.0\text{ s}$ (`tick == 500`). | `mahal_sq > 9.21` triggers; `ekf_update_gps` returns `False`, and trajectory shows zero steering jerk. |

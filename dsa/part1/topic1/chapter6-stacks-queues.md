@@ -72,7 +72,7 @@ Memory layout (LIFO):
 | `top()` | $O(1)$ | $O(1)$ | Returns reference to top |
 | `size()` | $O(1)$ | $O(1)$ | Stored member variable |
 | `empty()` | $O(1)$ | $O(1)$ | Returns bool |
-| `swap(other)` | $O(N)$ | $O(1)$ | Swaps contents with another stack |
+| `swap(other)` | $O(1)$ | $O(1)$ | Swaps contents with another stack |
 
 ### 3. `std::queue<T>` (FIFO)
 
@@ -219,8 +219,8 @@ Deque memory layout:
 | `dq[i]` | $O(1)$ | $O(1)$ | Random access (unlike stack/queue!) |
 | `size()` | $O(1)$ | $O(1)$ | Stored member variable |
 | `empty()` | $O(1)$ | $O(1)$ | Returns bool |
-| `insert(it, val)` | $O(N)$ | $O(N)$ | Shifts elements (avoid in interviews) |
-| `erase(it)` | $O(N)$ | $O(N)$ | Shifts elements (avoid in interviews) |
+| `insert(it, val)` | $O(N)$ | $O(1)$ | Shifts elements (avoid in interviews) |
+| `erase(it)` | $O(N)$ | $O(1)$ | Shifts elements (avoid in interviews) |
 
 ### 7. Stack vs Queue vs Deque vs Vector — Comparison
 
@@ -236,7 +236,7 @@ Deque memory layout:
 | Time: pop_back | N/A | N/A | $O(1)$ | $O(1)$ |
 | Time: pop_front | N/A | $O(1)$ | $O(1)$ | $O(N)$ |
 | Time: random access | N/A | N/A | $O(1)$ | $O(1)$ |
-| Memory Layout | Contiguous | Chunked | Chunked | Contiguous |
+| Memory Layout | Chunked (deque by default) | Chunked | Chunked | Contiguous |
 
 ### 8. Common Interview Pattern: Balanced Parentheses
 

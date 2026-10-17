@@ -1,4 +1,4 @@
-# Part 4, Topic 2: Metadata & Advanced Retrieval
+# Part 8, Topic 2: Metadata & Advanced Retrieval
 ## Project 1: Industrial RAG Pipeline
 
 Build a complete retrieval-augmented generation pipeline that filters equipment manuals by machine serial number and retrieves the most relevant maintenance chunks with source attribution.
@@ -32,7 +32,7 @@ manuals = [
     }
 ]
 
-def chunk_manual(text, chunk_size=400, overlap=100):
+def chunk_manual(text, chunk_size=400, overlap=200):
     chunks = []
     start = 0
     while start < len(text):

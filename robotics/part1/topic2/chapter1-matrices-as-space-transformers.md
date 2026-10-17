@@ -418,7 +418,7 @@ Look at **Row 5 (`Rank-1 Projection`)**:
 
 ### Mistake 3: Inverting a Matrix Explicitly to Solve $\mathbf{A}\mathbf{x} = \mathbf{b}$ in Large Systems
 - **Symptom**: For $6\times 6$ or $100\times 100$ robotics systems (like inverse kinematics or SLAM), computing `np.linalg.inv(A) @ b` is slow and numerically inaccurate when $\mathbf{A}$ is nearly singular.
-- **Fix**: For small $2\times 2$ or $3\times 3$ matrices, closed-form inverse (or $\mathbf{R}^T$ for rotations) is great. For larger linear systems $\mathbf{A}\mathbf{x} = \mathbf{b}$, use a linear solver (`np.linalg.solve(A, b)` in Python or `A.ldlt().solve(b)` in C++ Eigen) and check the condition number / determinant when near singularities.
+- **Fix**: For small $2\times 2$ or $3\times 3$ matrices, closed-form inverse (or $\mathbf{R}^T$ for rotations) is great. For larger linear systems $\mathbf{A}\mathbf{x} = \mathbf{b}$, use a linear solver (`np.linalg.solve(A, b)` in Python or `A.partialPivLu().solve(b)` in C++ Eigen, `A.ldlt().solve(b)` when $\mathbf{A}$ is symmetric) and check the condition number / determinant when near singularities.
 
 ---
 

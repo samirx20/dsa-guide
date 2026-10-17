@@ -302,14 +302,14 @@ int sumOfSquares(int a, int b) {     // Step 2: sumOfSquares() frame pushed
 int main() {                         // Step 1: main() frame pushed
     int x = 3;
     int y = 4;
-    int total = sumOfSquares(x, y);  // Step 8: receives 25
+    int total = sumOfSquares(x, y);  // Step 7: receives 25
 
     // Allocating a dynamic integer on the Heap:
-    int* heapVal = new int(999);     // Step 9: pointer on Stack, 999 on Heap
+    int* heapVal = new int(999);     // Step 8: pointer on Stack, 999 on Heap
     cout << total << " " << *heapVal << "\n";
 
-    delete heapVal;                  // Step 10: frees the Heap memory
-    return 0;                        // Step 11: main() frame popped!
+    delete heapVal;                  // Step 9: frees the Heap memory
+    return 0;                        // Step 10: main() frame popped!
 }
 ```
 
@@ -318,7 +318,7 @@ int main() {                         // Step 1: main() frame pushed
 ```
 STACK (Grows Downward)                                   HEAP (Grows Upward)
 +----------------------------------------------+         +----------------------------------+
-| [Frame 1: main()]                            |         | (Empty at Step 4; at Step 9,     |
+| [Frame 1: main()]                            |         | (Empty at Step 4; at Step 8,     |
 |   x       = 3          (Addr: 0x7FFF_0030)   |         |  Address 0x5500_00A0 will hold   |
 |   y       = 4          (Addr: 0x7FFF_002C)   |         |  the 4-byte integer 999)         |
 |   total   = <waiting>  (Addr: 0x7FFF_0028)   |         +----------------------------------+

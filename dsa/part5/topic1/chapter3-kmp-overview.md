@@ -18,7 +18,7 @@ Pattern: A A B
 Step 1:  [A A B] A B      Match at pos 0? A=A ✓, A=A ✓, B≠A ✗ → shift
          A A A B A B
 
-Step 2:   A [A A B] B     Match at pos 1? A=A ✓, A=A ✓, B≠A ✗ → shift
+Step 2:   A [A A B] B     Match at pos 1? A=A ✓, A=A ✓, B=B ✓ → FOUND at pos 1! (keep going for more)
          A A A B A B
 
 Step 3:    A A [A B A]    Match at pos 2? A=A ✓, A≠B ✗ → shift
@@ -27,7 +27,7 @@ Step 3:    A A [A B A]    Match at pos 2? A=A ✓, A≠B ✗ → shift
 Step 4:     A A A [B A B] Match at pos 3? A≠B ✗ → shift
          A A A B A B
 
-Step 5:      A A A B [A B] Match at pos 4? A=A ✓, B=B ✓ → FOUND at pos 4!
+Step 5:      A A A B [A B] Pos 4? Only 2 chars left, pattern (3) can't fit → STOP. Only match: pos 1
          A A A B A B
 ```
 
@@ -42,16 +42,16 @@ Naive approach worst case:
 Text:    "AAAAAAAAB"
 Pattern: "AAAAAB"
 
-Every position matches 5 chars then fails on the 6th.
-We do 5 comparisons × (N-M+1) positions = O(N × M) work.
+Every position matches 5 chars then fails on the 6th (the last position matches all 6).
+We do 6 comparisons × (N-M+1) positions = O(N × M) work.
 ```
 
 **Dry-run comparison:**
 ```
 Approach     Comparisons for "AAAAAAAAB" vs "AAAAAB"
 ──────────   ──────────────────────────────────────
-Naive        5 × 5 = 25 comparisons
-KMP          ~10 comparisons (linear!)
+Naive        6 × 4 = 24 comparisons
+KMP          12 comparisons (linear!)
 ```
 
 ---
@@ -254,19 +254,19 @@ Naive approach:
   Position 0: match A,A, fail B → shift 1
   Position 1: match A,A, fail B → shift 1
   Position 2: match A,A, fail B → shift 1
-  Position 3: match A,A, fail B → shift 1
-  Position 4: match A,B ✓ → FOUND
+  Position 3: match A,A,B ✓ → FOUND
   
-  Total comparisons: 3×4 + 2 = 14
+  Total comparisons: 3×3 + 3 = 12
 
 KMP approach:
   Text:    A A A A A B
   Pattern: A A B  (LPS: [0,1,0])
   
   Position 0-2: match A,A, fail B → j=lps[1]=1 (skip 1 comparison!)
-  Position 2:   match A,B ✓ → j=2, match B,B ✓ → FOUND!
+  i=2..4:       each extra 'A': match A, fail B → j=lps[1]=1 (i never moves back)
+  i=4..5:       match A, match B,B ✓ → FOUND at 3!
   
-  Total comparisons: ~6
+  Total comparisons: 9
 
 Key: i NEVER goes backward. Each character of text is compared at most a few times.
 ```
@@ -350,7 +350,7 @@ bool isRotation(string s1, string s2) {
     // Concatenate s1 with itself: if s2 is a rotation, it's a substring
     string combined = s1 + s1;
     // Use KMP (or string::find) to check if s2 is substring of combined
-    return kmpSearchReturnBool(combined, s2);
+    return !findAllOccurrences(combined, s2).empty();  // Problem 1 above
 }
 // "abcde" + "abcde" = "abcdeabcde"
 // "cdeab" is a substring → YES, it's a rotation

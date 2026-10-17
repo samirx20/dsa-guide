@@ -1,4 +1,4 @@
-# Part 6, Topic 1: SDK Design & Distribution
+# Part 6, Topic 2: SDK Design & Distribution
 ## Chapter 4: CI/CD with GitHub Actions
 
 ### What You'll Learn
@@ -128,7 +128,7 @@ steps:
 
 ## 4. Caching in CI
 
-Speed up workflows by caching `node_modules`.
+Speed up workflows by caching npm's download cache (`~/.npm`).
 
 ```yaml
 jobs:
@@ -144,7 +144,7 @@ jobs:
           cache: 'npm'  # ← Caches npm dependencies automatically
 
       - run: npm ci
-        # If package-lock.json hasn't changed, uses cached node_modules
+        # If package-lock.json hasn't changed, restores the cached ~/.npm (npm ci still rebuilds node_modules)
 ```
 
 ```text

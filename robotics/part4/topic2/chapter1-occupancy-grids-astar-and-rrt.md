@@ -50,7 +50,7 @@ Instead, each cell $m_i$ tracks a continuous belief probability $p(m_i) \in (0, 
 $$L(m_i) = \ln\left(\frac{p(m_i)}{1 - p(m_i)}\right) \quad \Longleftrightarrow \quad p(m_i) = \frac{1}{1 + e^{-L(m_i)}}$$
 
 Why Log-Odds? Because multiplying Bayesian probabilities turns into **simple addition and subtraction**:
-- Every time a laser beam passes *through* cell $m_i$ without hitting anything, we subtract $l_{\text{free}} = -0.4$ (clamped at $L_{\min} = -5.0$).
+- Every time a laser beam passes *through* cell $m_i$ without hitting anything, we add $l_{\text{free}} = -0.4$ (clamped at $L_{\min} = -5.0$).
 - At the endpoint cell where the laser beam *reflects*, we add $l_{\text{occ}} = +0.85$ (clamped at $L_{\max} = +5.0$).
 
 ---
@@ -130,7 +130,7 @@ A heuristic $h(n)$ is called **Admissible** if it **never overestimates** the tr
 
 $$0 \le h(n) \le h^*(n) \quad \forall n$$
 
-Why does admissibility matter? Because if $h(n)$ never overestimates the remaining distance, $f(n) = g(n) + h(n)$ is a guaranteed lower bound on any complete path through $n$. Therefore, the moment $A^*$ pops the `Goal` node from the Min-Heap, **it is mathematically impossible for any unexpanded node to lead to a shorter path!**
+Why does admissibility matter? Because if $h(n)$ never overestimates the remaining distance, $f(n) = g(n) + h(n)$ is a guaranteed lower bound on any complete path through $n$. Therefore, the moment $A^*$ pops the `Goal` node from the Min-Heap, **it is mathematically impossible for any unexpanded node to lead to a shorter path!** (The C++ code below also uses a closed set that never re-opens a node; that shortcut additionally needs a **consistent** heuristic, $h(n) \le c(n, n') + h(n')$. Manhattan, Octile and Euclidean are all consistent on their grids.)
 
 Match your heuristic to your robot's allowed grid movements:
 1. **Manhattan Distance (For 4-Connected Grids: Up/Down/Left/Right only):**
@@ -151,10 +151,10 @@ Let's trace $A^*$ by hand on a concrete $5 \times 5$ C-Space grid (4-connected, 
    5x5 C-SPACE GRID FOR A* DRY RUN (Start = (0,0), Goal = (0,4))
 ================================================================================
        Col 0   Col 1   Col 2   Col 3   Col 4
-Row 0 [ S 0 ] [  1  ] [ #W# ] [  7  ] [ G 8 ]
-Row 1 [  .  ] [  2  ] [ #W# ] [  6  ] [  .  ]
-Row 2 [  .  ] [  3  ] [ #W# ] [  5  ] [  .  ]
-Row 3 [  .  ] [  *  ] [  4  ] [  *  ] [  .  ]
+Row 0 [ S 0 ] [  1  ] [ #W# ] [  9  ] [ G10 ]
+Row 1 [  .  ] [  2  ] [ #W# ] [  8  ] [  .  ]
+Row 2 [  .  ] [  3  ] [ #W# ] [  7  ] [  .  ]
+Row 3 [  .  ] [ *4  ] [ *5  ] [ *6  ] [  .  ]
 Row 4 [  .  ] [  .  ] [  .  ] [  .  ] [  .  ]
 
   Optimal Path Found (* = path turns around wall at Row 3):
@@ -171,12 +171,13 @@ Row 4 [  .  ] [  .  ] [  .  ] [  .  ] [  .  ]
 | **3** | **`(1, 1)`** | `2` | `4` | **`6`** | `(1,2)` is Wall `#`! Push `(2,1): 3+5=8` | `parent[(2,1)] = (1,1)` |
 | **4** | **`(1, 0)`** | `1` | `5` | **`6`** | `(2,0): 2+6=8` (`(1,1)` already has $g=2 \le 2$) | `parent[(2,0)] = (1,0)` |
 | **5** | **`(2, 1)`** | `3` | `5` | **`8`** | `(2,2)` is Wall `#`! Push `(3,1): 4+6=10` | `parent[(3,1)] = (2,1)` |
-| **6** | **`(3, 1)`** | `4` | `6` | **`10`** | **Wall cleared!** Push `(3,2): 5+5=10`, `(4,1): 5+7=12` | `parent[(3,2)] = (3,1)` |
-| **7** | **`(3, 2)`** | `5` | `5` | **`10`** | Push `(3,3): 6+4=10`, `(4,2): 6+6=12` | `parent[(3,3)] = (3,2)` |
-| **8** | **`(3, 3)`** | `6` | `4` | **`10`** | Push `(2,3): 7+3=10`, `(3,4): 7+3=10` | `parent[(2,3)] = (3,3)` |
-| **9** | **`(2, 3)`** | `7` | `3` | **`10`** | Push `(1,3): 8+2=10` | `parent[(1,3)] = (2,3)` |
-| **10** | **`(1, 3)`** | `8` | `2` | **`10`** | Push `(0,3): 9+1=10` | `parent[(0,3)] = (1,3)` |
-| **11** | **`(0, 3)`** | `9` | `1` | **`10`** | Push **`(0,4): 10+0=10`** *(Goal reached!)* | `parent[(0,4)] = (0,3)` |
+| **6** | **`(2, 0)`** | `2` | `6` | **`8`** | Push `(3,0): 3+7=10` (`(2,1)` already closed) | `parent[(3,0)] = (2,0)` |
+| **7** | **`(3, 1)`** | `4` | `6` | **`10`** | **Wall cleared!** Push `(3,2): 5+5=10`, `(4,1): 5+7=12` | `parent[(3,2)] = (3,1)` |
+| **8** | **`(3, 2)`** | `5` | `5` | **`10`** | Push `(3,3): 6+4=10`, `(4,2): 6+6=12` | `parent[(3,3)] = (3,2)` |
+| **9** | **`(3, 3)`** | `6` | `4` | **`10`** | Push `(2,3): 7+3=10`, `(3,4): 7+3=10` | `parent[(2,3)] = (3,3)` |
+| **10** | **`(2, 3)`** | `7` | `3` | **`10`** | Push `(1,3): 8+2=10` | `parent[(1,3)] = (2,3)` |
+| **11** | **`(1, 3)`** | `8` | `2` | **`10`** | Push `(0,3): 9+1=10` | `parent[(0,3)] = (1,3)` |
+| **12** | **`(0, 3)`** | `9` | `1` | **`10`** | Push **`(0,4): 10+0=10`** *(Goal reached!)* | `parent[(0,4)] = (0,3)` |
 
 Now let's write the complete, self-contained C++ implementation of C-Space Obstacle Inflation + 8-Connected $A^*$ Search:
 
@@ -388,7 +389,7 @@ class Node:
     parent_idx: int = -1
 
 def is_edge_collision_free(p1: Node, p2: Node, obstacles: list[tuple[float, float, float]]) -> bool:
-    """Checks 10 interpolated points along edge (p1 -> p2) against circular obstacles (ox, oy, r)."""
+    """Checks 11 interpolated points along edge (p1 -> p2) against circular obstacles (ox, oy, r)."""
     for i in range(11):
         alpha = i / 10.0
         px = p1.x + alpha * (p2.x - p1.x)

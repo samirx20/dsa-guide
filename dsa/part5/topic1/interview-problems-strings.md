@@ -176,7 +176,7 @@ bool isValid(string s) {
 Approach              Time     Space    Correct?
 ────────────────────  ───────  ───────  ────────
 Stack (push closer)   O(N)     O(N)     ✓ Correct
-Counting only (±1)    O(N)     O(1)     ✗ Wrong for "{[]}"
+Counting only (±1)    O(N)     O(1)     ✗ Wrong for "([)]"
 Regex replace loop    O(N^2)   O(N)     ✓ But slow
 ```
 
@@ -376,7 +376,7 @@ i=9: digit=3, result = 9128347233
 ```cpp
 int myAtoi(string s) {
     int i = 0, n = s.length(), sign = 1;
-    long result = 0; // Use long to catch overflow easily
+    long long result = 0; // Use long long (64-bit everywhere) to catch overflow easily
 
     // 1. Skip spaces
     while (i < n && s[i] == ' ') i++;
@@ -407,9 +407,9 @@ int myAtoi(string s) {
 // The key ASCII trick: s[i] - '0' converts char digit to int
 // '4' - '0' = 52 - 48 = 4
 //
-// Why use long for result?
+// Why use long long for result?
 // If result exceeds INT_MAX during computation, int would overflow
-// (undefined behavior in C++). long catches it gracefully.
+// (undefined behavior in C++). long long (64-bit even on Windows, where long is 32-bit) catches it gracefully.
 //
 // Overflow check BEFORE assignment:
 //   If result * sign would exceed INT_MAX → clamp to INT_MAX

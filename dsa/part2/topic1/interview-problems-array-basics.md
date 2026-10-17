@@ -58,7 +58,7 @@ Example: nums = [2, 7, 11, 15], target = 9
 Step 1: i=0, num=2, complement=7, map={2:0}
         → 7 not in map, store 2
 
-Step 2: i=1, num=7, complement=2, map={2:0, 7:1}
+Step 2: i=1, num=7, complement=2, map={2:0}
         → 2 IS in map at index 0!
         → Return [0, 1] ✓
 ```
@@ -79,7 +79,7 @@ Second pass:
 | i | nums[i] | complement | map state | found? | result |
 |---|---------|------------|-----------|--------|--------|
 | 0 | 2 | 9-2=7 | {2:0} | no | - |
-| 1 | 7 | 9-7=2 | {2:0,7:1} | YES | [0,1] |
+| 1 | 7 | 9-7=2 | {2:0} | YES | [0,1] |
 
 #### Code: Edge Case - Duplicates
 ```cpp
@@ -255,11 +255,12 @@ int maxProfit(vector<int>& prices) {
 
 #### Error Scenario: Starting at Index 0
 ```cpp
-// WRONG: Not updating minPrice before calculating profit
+// WRONG: starting minPrice at 0 instead of prices[0] (or INT_MAX)
+int minPrice = 0, maxProfit = 0;
 for (int i = 0; i < prices.size(); i++) {
-    int currentProfit = prices[i] - minPrice; // Bug: uses old minPrice
+    int currentProfit = prices[i] - minPrice; // Bug: "buys" at a fake price of 0
     maxProfit = max(maxProfit, currentProfit);
-    minPrice = min(minPrice, prices[i]); // Should be BEFORE profit calc
+    minPrice = min(minPrice, prices[i]); // stays 0, so this returns max(prices) (7, not 5)
 }
 ```
 
@@ -455,6 +456,7 @@ vector<int> productExceptSelf(vector<int>& nums) {
     int totalProduct = 1;
     for (int num : nums) totalProduct *= num;
     
+    int n = nums.size();
     vector<int> result(n);
     for (int i = 0; i < n; i++) {
         result[i] = totalProduct / nums[i]; // BUG: division by zero!

@@ -169,7 +169,7 @@ max_element returns an ITERATOR (pointer), not the value itself:
   *max_element → dereference to get value 9
 
   Without dereference (*), you get a memory address!
-  cout << max_element(nums.begin(), nums.end());  // prints address like 0x7ffd...
+  cout << max_element(nums.begin(), nums.end());  // compile error: vector iterators have no operator<<
   cout << *max_element(nums.begin(), nums.end()); // prints 9
 ```
 
@@ -229,7 +229,7 @@ partial_sort(nums.begin(), nums.begin()+3, nums.end()):
 nth_element(nums.begin(), nums.begin()+3, nums.end()):
   Rearranges so that:
   - Elements at indices 0,1,2 are the 3 smallest (any order)
-  - Element at index 3 is the 4th smallest (the median-of-medians)
+  - Element at index 3 is the 4th smallest (exactly where full sort would put it)
   - Elements at indices 4+ are the largest (any order)
   Time: O(N) average — faster than full sort!
   Use: Finding median, Kth smallest element in O(N)
@@ -301,10 +301,10 @@ do {
 next_permutation algorithm:
 
   {1, 2, 3} → {1, 3, 2}
-    Find rightmost increasing pair: (1,2) at indices 0,1
-    Find smallest element > 1 to the right: 2
-    Swap: {2, 1, 3}
-    Reverse suffix from index 1: {2, 1, 3}
+    Find rightmost increasing pair: (2,3) at indices 1,2
+    Find smallest element > 2 to the right: 3
+    Swap: {1, 3, 2}
+    Reverse suffix from index 2: {1, 3, 2}
 
   {3, 2, 1} → wraps to {1, 2, 3}
     No increasing pair found → return false
@@ -353,7 +353,7 @@ sort(nums.begin(), nums.end(), [](int a, int b) { return a < b; });
 // MISTAKE 3: Forgetting to dereference max_element/min_element
 vector<int> nums = {5, 9, 2};
 int maxVal = max_element(nums.begin(), nums.end());
-// WRONG: maxVal is an iterator (pointer), not the value!
+// WRONG: max_element returns an iterator, not the value — compile error!
 
 int maxVal = *max_element(nums.begin(), nums.end()); // 9 ✓
 

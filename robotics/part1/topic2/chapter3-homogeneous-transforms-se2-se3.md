@@ -153,7 +153,7 @@ We know $^W_B\mathbf{T}$ (how $\{B\}$ sits inside $\{W\}$). What is the inverse 
 **Beginner Trap**: Beginners guess that you just transpose $\mathbf{R}$ and negate $\mathbf{t}$: $\begin{bmatrix} \mathbf{R}^T & -\mathbf{t} \\ \mathbf{0}^T & 1 \end{bmatrix}$. **WRONG!**
 Why is $-\mathbf{t} = [-3, -2]^T$ wrong?
 - Stand at $(3, 2)$ facing $+Y$ (North). Where is the World origin $(0, 0)$ from your perspective?
-- $(0, 0)$ is $2\text{ m}$ **behind** you ($x_B = -2$) and $3\text{ m}$ to your **right** ($y_B = -3$), which is $[-2, -3]^T$, NOT $[-3, -2]^T$!
+- $(0, 0)$ is $2\text{ m}$ **behind** you ($x_B = -2$) and $3\text{ m}$ to your **left** ($y_B = +3$), which is $[-2, +3]^T$, NOT $[-3, -2]^T$!
 - Why? Because $\mathbf{t}_{WB} = [3, 2]^T$ was measured along the **World axes**, whereas $^B_W\mathbf{T}$ needs the offset expressed along the **Robot's rotated axes**!
 
 Let's solve $^W\mathbf{p} = \mathbf{R}\,^B\mathbf{p} + \mathbf{t}$ for $^B\mathbf{p}$ step by step:
@@ -405,7 +405,7 @@ Look at **Step 4** physically:
 - **Fix**: Memorize the block inverse identity: $\mathbf{T}^{-1} = \begin{bmatrix} \mathbf{R}^T & -\mathbf{R}^T\mathbf{t} \\ \mathbf{0}^T & 1 \end{bmatrix}$. You must rotate $-\mathbf{t}$ into the child frame using $\mathbf{R}^T$!
 
 ### Mistake 2: Applying a Point Transform ($w = 1$) to a Velocity or Normal Vector ($w = 0$)
-- **Symptom**: Your robot is at $(x = 100\text{ m}, y = 50\text{ m})$ moving at $1\text{ m/s}$. You transform the velocity vector using `transform_point`, and the robot's velocity suddenly becomes $101\text{ m/s}$!
+- **Symptom**: Your robot is at $(x = 100\text{ m}, y = 50\text{ m})$ moving at $1\text{ m/s}$. You transform the velocity vector using `transform_point`, and the robot's velocity $(1, 0)$ (heading $0$) suddenly becomes $(101, 50)$, about $113\text{ m/s}$!
 - **Fix**: Positions/points use homogeneous coordinate $w = 1$ ($\mathbf{R}\mathbf{p} + \mathbf{t}$). Free vectors (velocities, accelerations, forces, surface normals) use $w = 0$ ($\mathbf{R}\mathbf{v}$ only).
 
 ### Mistake 3: Multiplying Transforms in Wrong Subscript Order (`T_BS * T_WB`)

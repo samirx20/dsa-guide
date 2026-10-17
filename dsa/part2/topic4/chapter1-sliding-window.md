@@ -306,20 +306,20 @@ if (counts[leftChar] == 0) counts.erase(leftChar);
 #### Why Erase Matters
 ```
 String: "abba"
-Window tracking: {a: 2, b: 2} → INVALID (a has count 2)
+At right=2, window "abb": counts = {a: 1, b: 2} → size 2 < length 3 → INVALID
 
 Without erase:
-- When left moves past first 'a', counts = {a: 1, b: 2}
-- Map size is still 2, but we have duplicate 'b'
-- We can't use map.size() to check uniqueness!
+- When left moves past first 'a', counts = {a: 0, b: 2}
+- Map size is still 2 = window length 2 ("bb"), so it looks valid
+- But we have duplicate 'b' — the stale {a: 0} entry fools map.size()!
 
 With erase:
-- When left moves past first 'a', counts = {a: 0}
+- When left moves past first 'a', counts['a'] hits 0
 - Erase 'a' → counts = {b: 2}
-- Map size = 1, but we have duplicate 'b'
-- Still can't use map.size() alone!
+- Map size = 1 < window length 2 → still INVALID, keep shrinking
+- Remove first 'b' → counts = {b: 1}, window "b" → valid ✓
 
-Actually, the condition should be:
+So, with erase, the condition can be:
 while (counts.size() < window length) → INVALID
 Or: while (right - left + 1 > unique characters) → INVALID
 ```
@@ -348,21 +348,19 @@ Array with negatives: [2, -1, 5, -3, 2, -1]
 #### ASCII Diagram: When Window Breaks
 ```
 Array: [10, -5, 10, -5, 10]
-Target: sum ≤ 15
+Target: longest window with sum ≤ 0
 
-Window expansion:
-[10] sum=10, valid ✓
-[10,-5] sum=5, valid ✓
-[10,-5,10] sum=15, valid ✓
-[10,-5,10,-5] sum=10, valid ✓
-[10,-5,10,-5,10] sum=20, INVALID
+Window expansion (shrink left while sum > 0):
+right=0: [10] sum=10, INVALID → shrink → [] (left=1)
+right=1: [-5] sum=-5, valid ✓ len=1
+right=2: [-5,10] sum=5, INVALID → shrink → [10] sum=10, INVALID → shrink → [] (left=3)
+right=3: [-5] sum=-5, valid ✓ len=1
+right=4: [-5,10] sum=5, INVALID → shrink → [10] → [] (left=5)
 
-Shrink left:
-[-5,10,-5,10] sum=10, valid ✓
-[-5,10,-5] sum=0, valid ✓
+Template answer: 1
 
-But this is wrong! We should have [10,-5,10] at sum=15
-The window shrank too much because -5 made the sum smaller.
+But this is wrong! We should have [-5,10,-5] at sum=0 (length 3)
+The window shrank too much: at right=2 it threw away -5, not knowing the next -5 would bring the sum back down.
 
 The issue: with negative numbers, shrinking doesn't always help!
 ```

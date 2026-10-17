@@ -83,11 +83,11 @@ git log --oneline --graph --all
 
 ---
 
-### 2. What Is a Branch, Really? (Just a 40-Byte Pointer!)
+### 2. What Is a Branch, Really? (Just a 41-Byte Pointer!)
 
 In older version control systems, creating a branch meant copying the entire 500 MB project directory into a new folder.
 
-In Git, a **branch** does **not** copy any files! A branch is literally just a **tiny 40-byte text file** inside `.git/refs/heads/` that stores the **SHA-1 hash of a single commit** — like a movable sticky note attached to a commit node!
+In Git, a **branch** does **not** copy any files! A branch is literally just a **tiny 41-byte text file** (40 hex characters plus a newline) inside `.git/refs/heads/` that stores the **SHA-1 hash of a single commit** — like a movable sticky note attached to a commit node!
 
 And what is **`HEAD`**? **`HEAD`** is simply a special pointer that says: *"Which branch sticky note am I currently standing on?"*
 
@@ -128,7 +128,7 @@ git switch main
 git switch -c feat/ekf-slam
 #          ^^ ^^^^^^^^^^^^^
 #          |  Name of the new branch sticky note.
-#          '-c' ("create"): creates a new 40-byte file '.git/refs/heads/feat/ekf-slam'
+#          '-c' ("create"): creates a new 41-byte file '.git/refs/heads/feat/ekf-slam'
 #                           containing the current commit's SHA-1 hash, and points HEAD to it!
 
 git switch main

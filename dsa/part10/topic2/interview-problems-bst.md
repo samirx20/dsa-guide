@@ -95,7 +95,7 @@ bool isValidBST(TreeNode* root) {
 | 5 | (-∞, +∞) | Yes | In range |
 | 1 | (-∞, 5) | Yes | 1 < 5 |
 | 7 | (5, +∞) | Yes | 7 > 5 |
-| 4 | (5, +∞) | No | 4 < 5 |
+| 4 | (5, 7) | No | 4 < 5 |
 
 ---
 
@@ -255,8 +255,7 @@ TreeNode* insertIntoBST(TreeNode* root, int val) {
 // Insert 5:
 // 5 > 4 → go right
 // 5 < 7 → go left
-// 5 > 3 → go right
-// nullptr → create node(5)
+// nullptr (7's left) → create node(5)
 //
 // Result:
 //        4
@@ -271,9 +270,8 @@ TreeNode* insertIntoBST(TreeNode* root, int val) {
 | Step | Current Node | Compare | Action |
 |------|--------------|---------|--------|
 | 1 | 4 | 5 > 4 | Go right |
-| 2 | 7 | 5 < 7 | Go left |
-| 3 | 3 | 5 > 3 | Go right (null) |
-| 4 | null | - | Create node(5) |
+| 2 | 7 | 5 < 7 | Go left (null) |
+| 3 | null | - | Create node(5) as 7's left |
 
 ---
 
@@ -424,7 +422,7 @@ public:
 // sum=28: visit 0, sum=28, node=28
 //
 // Result:
-//        28
+//        22
 //       /  \
 //     28   13
 //    / \   / \
@@ -484,11 +482,11 @@ public:
 //       build(10, 7, 8) → 10>8 ✗, return null
 //   build(10, 8, +∞) → 10>8 ✓
 //     Create node(10), index=5
-//     build(12, 8, 10) → 12>10 ✓
+//     build(12, 8, 10) → 12>10 ✗, return null
+//     build(12, 10, +∞) → 12>10 ✓
 //       Create node(12), index=6
-//       build(∞, 10, 12) → done
-//       build(∞, 12, ∞) → done
-//     build(∞, 10, ∞) → done
+//       build(end, 10, 12) → index out of range, return null
+//       build(end, 12, +∞) → index out of range, return null
 //
 // Result:
 //        8

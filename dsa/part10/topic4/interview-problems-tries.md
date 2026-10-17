@@ -238,7 +238,6 @@ public:
 //
 // Build Trie from words:
 //   root → o → a → t → h* (word: "oath")
-//                 → d* (word: "oad"... wait, no)
 //   root → p → e → a* (word: "pea")
 //   root → e → a → t* (word: "eat")
 //   root → r → a → i → n* (word: "rain")
@@ -539,9 +538,10 @@ string longestWord(vector<string>& words) {
 // Result: "world"
 //
 // If words = ["a", "banana", "app", "appl", "apply", "application"]:
-// "application" can be built: a → ap → app → appl → apply → application
-// But "appl" is not a word → path breaks
-// Longest valid: "apply" (a → ap → app → appl → apply)
+// "apply" / "application" would need a → ap → app → appl → ...
+// But "ap" is not a word → every path below "a" breaks immediately
+// Longest valid: "a"
+// (Add "ap" to the list and the answer becomes "apply": a → ap → app → appl → apply)
 ```
 
 ---

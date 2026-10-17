@@ -1,4 +1,4 @@
-# Part 5, Topic 4: Real-time Communication
+# Part 6, Topic 2: Real-time Communication
 ## Chapter 1: WebSocket Protocol
 
 ### What You'll Learn
@@ -79,7 +79,7 @@ Step 3: TCP connection stays open, both sides can send anytime
 ## 3. WebSocket Server with Hono
 
 ```bash
-npm install hono @hono/node-server
+npm install hono @hono/node-server @hono/node-ws
 ```
 
 ```typescript
@@ -351,7 +351,7 @@ const sub = new Redis()
 sub.subscribe('room:general')
 sub.on('message', (channel, message) => {
     // Forward to local WebSocket clients in that room
-    for (const client of rooms.get(channel) || []) {
+    for (const client of rooms.get(channel.replace('room:', '')) || []) {
         client.send(message)
     }
 })

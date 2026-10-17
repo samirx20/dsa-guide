@@ -1,4 +1,4 @@
-# Part 2, Topic 2: Physics-First Rule Engines
+# Part 7, Topic 2: Physics-First Rule Engines
 ## Chapter 2: Deterministic Fallbacks
 
 **Prerequisite Knowledge:** Basic Python dictionary usage, understanding of functions and basic conditional logic (`if`/`else`).
@@ -92,11 +92,10 @@ Output:
 ```
 Context {'ai_suggestion': 80, 'max_safe': 100} -> {'source': 'ai_recommendation', 'value': 80}
 Context {'ai_suggestion': 500, 'max_safe': 100} -> {'source': 'ai_recommendation', 'value': 500}
-Context {'ai_suggestion': 500, 'max_safe': 100} -> {'source': 'physics_rule', 'value': 100}
-Context {} -> {'source': 'safe_default', 'value': 50}
+Context {} -> {'source': 'physics_rule', 'value': 100}
 ```
 
-The physics rule clips the AI recommendation to the safe maximum. The safe default kicks in when there is no AI output at all.
+Notice the flaw this exposes: because the first non-`None` answer wins and the AI step runs first, the unsafe 500 is accepted unclipped, and with no AI output the physics step (`min(100, 100)`) answers before the safe default is ever reached. For the physics rule to clip the AI recommendation to the safe maximum, it must run before (or wrap) the AI step — which is exactly why the hierarchy in Section 4 puts physics rules first.
 
 ### Why the Chain Order Matters
 
@@ -448,7 +447,7 @@ Output:
 ```
 oven: accepted — Within limits
 oven: overridden — oven max temp is 500C
-freezer: rejected — freezer min temp is -40C
+freezer: accepted — Within limits
 server_rack: overridden — server_rack max temp is 45C
 unknown: rejected — Unknown equipment: unknown
 ```

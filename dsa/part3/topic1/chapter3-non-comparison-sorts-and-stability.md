@@ -67,7 +67,7 @@ as many times as it appeared. This avoids any comparison logic.
 Algorithm Flow:
   ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
   │  Input Array  │────▶│  Count Freq  │────▶│  Reconstruct │
-  │  [4,2,2,8,3]  │     │  [0,1,2,2..] │     │  [1,2,2,3,4] │
+  │  [4,2,2,8,3]  │     │  [0,0,2,1..] │     │  [2,2,3,4,8] │
   └──────────────┘     └──────────────┘     └──────────────┘
         O(N)                O(K)                  O(N)
 ```
@@ -257,8 +257,8 @@ For each digit position (1s, 10s, 100s...):
 Example: [170, 45, 75, 90, 802, 24, 2, 66]
 
 After sorting by 1s digit:
-  170(0), 90(0), 802(2), 2(2), 24(4), 45(5), 66(6), 75(5)
-  Grouped by 1s: {0:170,90}, {2:802,2}, {4:24}, {5:45,66}, {6:66,75}
+  170(0), 90(0), 802(2), 2(2), 24(4), 45(5), 75(5), 66(6)
+  Grouped by 1s: {0:170,90}, {2:802,2}, {4:24}, {5:45,75}, {6:66}
 
 After sorting by 10s digit:
   802(0), 2(0), 24(2), 45(4), 66(6), 170(7), 75(7), 90(9)
@@ -271,8 +271,8 @@ After sorting by 100s digit:
 
 | Pass | Digit | Input Array | Bucket State (0-9) | Result |
 |------|-------|-------------|-------------------|--------|
-| 1 | 1s | `[170, 45, 75, 90, 802, 24, 2, 66]` | 0:[170,90,802], 1:[], 2:[2], 3:[], 4:[24], 5:[45], 6:[66], 7:[75], 8:[], 9:[] | `[170, 90, 802, 2, 24, 45, 66, 75]` |
-| 2 | 10s | `[170, 90, 802, 2, 24, 45, 66, 75]` | 0:[802,2], 1:[], 2:[24], 3:[], 4:[45], 5:[], 6:[66], 7:[170,75], 8:[], 9:[90] | `[802, 2, 24, 45, 66, 170, 75, 90]` |
+| 1 | 1s | `[170, 45, 75, 90, 802, 24, 2, 66]` | 0:[170,90], 1:[], 2:[802,2], 3:[], 4:[24], 5:[45,75], 6:[66], 7:[], 8:[], 9:[] | `[170, 90, 802, 2, 24, 45, 75, 66]` |
+| 2 | 10s | `[170, 90, 802, 2, 24, 45, 75, 66]` | 0:[802,2], 1:[], 2:[24], 3:[], 4:[45], 5:[], 6:[66], 7:[170,75], 8:[], 9:[90] | `[802, 2, 24, 45, 66, 170, 75, 90]` |
 | 3 | 100s | `[802, 2, 24, 45, 66, 170, 75, 90]` | 0:[2,24,45,66,75,90], 1:[170], 2:[], 3:[], 4:[], 5:[], 6:[], 7:[], 8:[802], 9:[] | `[2, 24, 45, 66, 75, 90, 170, 802]` |
 
 *   **Time Complexity:** $O(d \times (N + b))$, where $d$ is the number of digits, and $b$ is the base (10 for decimal). Since $d$ and $b$ are usually small constants, it is considered $O(N)$.
@@ -304,7 +304,7 @@ void bucketSort(vector<float>& arr) {
 
     // Sort each bucket (insertion sort for small buckets)
     for (auto& bucket : buckets) {
-        sort(bucket.begin(), bucket.end());
+        stable_sort(bucket.begin(), bucket.end());
     }
 
     // Concatenate all buckets
@@ -324,7 +324,7 @@ arr = [0.42, 0.32, 0.23, 0.52, 0.25, 0.47, 0.51]
 Step 1: Distribute into buckets (n=7 buckets for 7 elements)
   bucket[0] (0.00-0.14): []
   bucket[1] (0.14-0.28): [0.23, 0.25]
-  bucket[2] (0.28-0.42): [0.32, 0.42]
+  bucket[2] (0.28-0.42): [0.42, 0.32]
   bucket[3] (0.42-0.57): [0.52, 0.47, 0.51]
   bucket[4] (0.57-0.71): []
   bucket[5] (0.71-0.85): []
@@ -382,14 +382,14 @@ struct Student {
 Merge Sort preserves order of equal elements during merge. Quick Sort's partition can jump equal elements across the pivot, breaking relative order.
 
 **Why does this matter?**
-Multi-key sorting: sort by Department first (any sort), then by Name using stable sort. Names within each department stay grouped.
+Multi-key sorting: sort by Department first (any sort), then by Name using stable sort. Employees with the same Name stay ordered by Department.
 
 ```cpp
 // Multi-key sort using stability:
 // 1. Sort by Department (unstable is fine for first sort)
 sort(employees.begin(), employees.end(), byDepartment);
 
-// 2. Sort by Name (MUST be stable to preserve department grouping)
+// 2. Sort by Name (MUST be stable to preserve department order among equal names)
 stable_sort(employees.begin(), employees.end(), byName);
 
 // Result: sorted by Name, and within same Name, grouped by Department

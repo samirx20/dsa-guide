@@ -69,7 +69,7 @@ Latency (ms)
              1   2   3   4   5   6   7   8   9  10  11  12  13  14   Tick (k)
 
   Legend:
-    * = High-Throughput Managed Runtime (Avg = 0.22 ms, Max = 18.0 ms -> CRASH)
+    * = High-Throughput Managed Runtime (Avg = 0.20 ms, Max = 18.0 ms -> CRASH)
     o = Deterministic Real-Time C++     (Avg = 1.20 ms, Max = 1.30 ms -> SAFE)
 ================================================================================
 ```
@@ -193,7 +193,7 @@ struct BloatedImuPacket {
     double gyro_z;          // 8 bytes (Offset 24..31)
     uint8_t status_flags;   // 1 byte  (Offset 32)
     // --- 7 bytes of hidden tail padding so struct size is a multiple of 8! ---
-}; // Total sizeof = 40 bytes! (16 bytes of actual data + 17 bytes wasted!)
+}; // Total sizeof = 40 bytes! (23 bytes of actual data + 17 bytes wasted!)
 
 // GOOD: Ordered largest-to-smallest and explicitly aligned to 32 bytes
 // Fits 2 packets per 64-byte CPU cache line with ZERO cache-line straddling!

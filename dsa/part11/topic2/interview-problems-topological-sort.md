@@ -20,7 +20,7 @@ Course Schedule I:    "Can I finish all courses?"
                       └── Yes/No (cycle exists or not)
 
 Course Schedule II:   "What order should I take them?"
-                      └── [C0, C1, C3, C2] (topological order)
+                      └── [C0, C1, C2, C3] (topological order)
 ```
 
 ---

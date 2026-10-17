@@ -3,7 +3,7 @@
 
 The biggest danger of Backtracking is the Time Complexity.
 
-Because Backtracking explores every possible combination, its time complexity is usually Exponential $O(2^N)$ or Factorial $O(N!)$. For an input size of $N=20$, $O(N!)$ would take longer than the age of the universe to compute.
+Because Backtracking explores every possible combination, its time complexity is usually Exponential $O(2^N)$ or Factorial $O(N!)$. For an input size of $N=20$, $O(N!)$ is about $2.4 \times 10^{18}$ operations, which would take decades (~77 years at $10^9$ operations/second) to compute.
 
 We optimize backtracking using **Pruning**.
 
@@ -66,24 +66,22 @@ You are "cutting" a branch off the tree, saving massive amounts of computation.
 #### Decision Tree: Combination Sum `[2,3,6,7]` target = `7`
 
 ```
-                        [] (sum=0)
-                     /    |    \
-                   /      |      \
-                [2]      [3]      [7]
-              sum=2     sum=3     sum=7 ← ✓ FOUND
-               / \       | \
-             /   |       |   \
-         [2,2] [2,3]  [3,3] [3,6]
-         sum=4 sum=5  sum=6 sum=9
-           |     |      |     ✂
-         [2,2,2]  ✂   [3,3,3]
-         sum=6  sum=8  sum=9
-           |           ✂
-      [2,2,2,2]      ✂
-      sum=8>7 ✂
+                            [] (sum=0)
+                  /          |          \          \
+               [2]          [3]          [6]         [7]
+              sum=2        sum=3        sum=6       sum=7 ← ✓ FOUND
+              /   \         /   \          |
+         [2,2]   [2,3]  [3,3]  [3,6]    [6,6]
+         sum=4   sum=5  sum=6  sum=9 ✂  sum=12 ✂
+         /    \      \      \
+   [2,2,2]  [2,2,3]  [2,3,3]  [3,3,3]
+   sum=6    sum=7 ✓  sum=8 ✂  sum=9 ✂
+      |
+  [2,2,2,2]
+  sum=8>7 ✂
 
   Solutions: [2,2,3] ✓   [7] ✓
-  Nodes with pruning: ~15    Without: ~25
+  Nodes (recursive calls) with pruning: 10    Without: 28
 ```
 
 ---
@@ -144,16 +142,18 @@ With pruning: break skips 6 AND 7 instantly (sorted → all remaining are bigger
 | 2 | 0 | 2 | [2,2] | 4 | Recurse |
 | 3 | 0 | 2 | [2,2,2] | 6 | Recurse |
 | 4 | 0 | 2 | [2,2,2,2] | 8 | **Prune** (8>7, break) |
-| 5 | 1 | 3 | [2,2,2] | 6 | **Prune** (6+3>7, break) |
-| 6 | 1 | 3 | [2,2] | 4 | Choose 3 → [2,2,3] sum=7 ✓ |
-| 7 | 2 | 6 | [2,2] | 4 | **Prune** (4+6>7, break) |
-| 8 | 1 | 3 | [2] | 2 | Choose 3 → [2,3] sum=5 |
-| 9 | 1 | 3 | [2,3,3] | 8 | **Prune** (8>7, break) |
-| 10 | 2 | 6 | [2,3] | 5 | **Prune** (5+6>7, break) |
-| 11 | 2 | 6 | [2] | 2 | **Prune** (2+6>7, break) |
-| 12 | 2 | 6 | [] | 0 | Choose 6 → [6] sum=6 |
-| 13 | 3 | 7 | [6] | 6 | **Prune** (6+7>7, break) |
-| 14 | 3 | 7 | [] | 0 | Choose 7 → [7] sum=7 ✓ |
+| 5 | 1 | 3 | [2,2] | 4 | Choose 3 → [2,2,3] sum=7 ✓ |
+| 6 | 2 | 6 | [2,2] | 4 | **Prune** (4+6>7, break) |
+| 7 | 1 | 3 | [2] | 2 | Choose 3 → [2,3] sum=5 |
+| 8 | 1 | 3 | [2,3,3] | 8 | **Prune** (8>7, break) |
+| 9 | 2 | 6 | [2] | 2 | **Prune** (2+6>7, break) |
+| 10 | 1 | 3 | [] | 0 | Choose 3 → [3] sum=3 |
+| 11 | 1 | 3 | [3] | 3 | Choose 3 → [3,3] sum=6 |
+| 12 | 1 | 3 | [3,3,3] | 9 | **Prune** (9>7, break) |
+| 13 | 2 | 6 | [3] | 3 | **Prune** (3+6>7, break) |
+| 14 | 2 | 6 | [] | 0 | Choose 6 → [6] sum=6 |
+| 15 | 2 | 6 | [6] | 6 | **Prune** (6+6>7, break) |
+| 16 | 3 | 7 | [] | 0 | Choose 7 → [7] sum=7 ✓ |
 
 **Solutions found: [2,2,3] and [7]**
 
@@ -213,13 +213,15 @@ With pruning: skips directly past all invalid elements.
 
 | Input | Target | Nodes Without Pruning | Nodes With Pruning | Reduction |
 |-------|--------|----------------------|-------------------|-----------|
-| [2,3,6,7] | 7 | ~25 | 15 | 40% |
-| [2,3,5] | 8 | ~20 | 10 | 50% |
-| [2,3,7] | 18 | ~40 | 15 | 63% |
-| [1,2,3] | 6 | ~15 | 8 | 47% |
-| [2,4,6,8] | 10 | ~30 | 12 | 60% |
+| [2,3,6,7] | 7 | 28 | 10 | 64% |
+| [2,3,5] | 8 | 23 | 13 | 43% |
+| [2,3,7] | 18 | 93 | 57 | 39% |
+| [1,2,3] | 6 | 35 | 23 | 34% |
+| [2,4,6,8] | 10 | 38 | 18 | 53% |
 
-**As the target grows relative to the smallest element, pruning becomes MORE effective.**
+(A "node" is one call to `backtrack`, root included. "Without pruning" is the Section 4 version, which only returns once `sum > target`; "with pruning" is the sorted + `break` code above.)
+
+**As the target grows relative to the smallest element, pruning saves MORE calls in absolute terms, though the percentage saved shrinks** (e.g. `[2,3,6,7]`: target 7 saves 18 of 28 calls, target 20 saves 105 of 223).
 
 ---
 
@@ -296,12 +298,14 @@ Sort once → both checks become simple comparisons.
 | Step | i | nums[i] | current[] | currentSum | Action |
 |------|---|---------|-----------|------------|--------|
 | 1 | 0 | 1 | [1] | 1 | Recurse |
-| 2 | 0 | 1 | [1,1] | 2 | Recurse |
-| 3 | 1 | 1 | [1,1] | 2 | **Skip** (i>index, nums[1]==nums[0]) |
-| 4 | 2 | 2 | [1,1] | 2 | Choose 2 → [1,1,2] sum=4 |
-| 5 | 3 | 5 | [1,1,2] | 4 | Choose 5 → [1,1,2,5] sum=9 |
-| 6 | 3 | 5 | [1,1,2,5] | 9 | **Prune** (9>8, break) |
-| 7 | 4 | 6 | [1,1,2] | 4 | **Prune** (4+6>8, break) |
+| 2 | 1 | 1 | [1,1] | 2 | Recurse (i == index, first pick at this depth → allowed) |
+| 3 | 2 | 2 | [1,1] | 2 | Choose 2 → [1,1,2] sum=4 |
+| 4 | 3 | 5 | [1,1,2] | 4 | **Prune** (4+5>8, break) |
+| 5 | 3 | 5 | [1,1] | 2 | Choose 5 → [1,1,5] sum=7 |
+| 6 | 4 | 6 | [1,1,5] | 7 | **Prune** (7+6>8, break) |
+| 7 | 4 | 6 | [1,1] | 2 | Choose 6 → [1,1,6] sum=8 ✓ |
+| … | … | … | … | … | ([1,2,5], [1,7] found under [1]) |
+| 8 | 1 | 1 | [] | 0 | **Skip** (i>index=0, nums[1]==nums[0]) |
 
 ---
 
@@ -363,8 +367,9 @@ void backtrack(vector<int>& nums, int target, int index,
 
 **What's happening:**
 ```
-Without early termination: enter recursion, then check sum > target, then return
-With early termination: check sum > target BEFORE recursion → saves function call overhead
+Without early termination: sum keeps growing and the loop recurses forever
+With early termination: check sum > target at the top of the call, BEFORE the loop → the call returns at once
+(The sorted + break version checks BEFORE the recursive call, so it also saves the call itself)
 ```
 
 ---
@@ -453,8 +458,8 @@ if (currentSum + nums[i] > target) continue;
 
 | Problem | Without Pruning | With Pruning | Pruning Type |
 |---------|----------------|--------------|--------------|
-| **Combination Sum** | O(2^N * target) | O(2^(N/2)) avg | Sum + early termination |
-| **Combination Sum II** | O(2^N * target) | O(2^(N/2)) avg | Sum + duplicate |
+| **Combination Sum** | O(N^(T/M)) (T=target, M=min) | O(N^(T/M)) worst, better avg | Sum + early termination |
+| **Combination Sum II** | O(2^N) | O(2^N) worst, better avg | Sum + duplicate |
 | **Subsets II** | O(2^N) | O(2^N) worst, better avg | Duplicate |
 | **Permutations** | O(N!) | O(N!) worst, better avg | Visited check |
 
@@ -471,7 +476,7 @@ if (currentSum + nums[i] > target) continue;
 | **Duplicate pruning** | Sort + `i > index && nums[i] == nums[i-1]` |
 | **Remaining sum** | Can remaining elements reach the target? |
 | **Bounds pruning** | Compute min/max possible from remaining elements |
-| **Impact** | Can reduce $O(2^N)$ to $O(2^{N/2})$ or better |
+| **Impact** | Same worst-case Big-O, but far fewer nodes explored in practice |
 
 ---
 

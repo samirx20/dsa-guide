@@ -347,7 +347,7 @@ bool deleteWord(TrieNode* node, string& word, int depth) {
 | Search | O(L) | O(1) | Find exact word |
 | StartsWith | O(L) | O(1) | Check prefix |
 | FindAll | O(L + M) | O(M) | All words with prefix |
-| Delete | O(L) | O(1) | Remove word |
+| Delete | O(L) | O(L) | Remove word (recursion stack) |
 | isEmpty | O(ALPHABET) | O(1) | Check if node has children |
 
 Where L = word length, M = number of matches

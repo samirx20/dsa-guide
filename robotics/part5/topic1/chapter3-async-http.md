@@ -1,4 +1,4 @@
-# Part 1, Topic 1: Asynchronous Python
+# Part 5, Topic 1: Asynchronous Python
 ## Chapter 3: Async HTTP
 
 **Prerequisite Knowledge:** Understanding of the event loop, `async`/`await` keywords, and basic HTTP requests (like GET and POST).
@@ -108,10 +108,10 @@ The `async with` block creates a connection pool that reuses TCP connections acr
 # │ Feature          │ requests           │ httpx.AsyncClient  │
 # ├──────────────────┼────────────────────┼────────────────────┤
 # │ Blocking?        │ Yes                │ No (async)         │
-# │ Connection pool  │ Manual             │ Automatic          │
+# │ Connection pool  │ Via Session        │ Automatic          │
 # │ HTTP/2 support   │ No                 │ Yes                │
 # │ Timeouts         │ Basic              │ Granular           │
-# │ Retry support    │ Via adapter        │ Built-in           │
+# │ Retry support    │ Via adapter        │ Connect only       │
 # │ Type hints       │ Partial            │ Full               │
 # └──────────────────┴────────────────────┴────────────────────┘
 ```
@@ -221,7 +221,7 @@ for attempt in range(max_retries):  # 0, 1, 2
     #                  Exponential backoff:
     #                  attempt=0: sleep 1s  (2**0 = 1)
     #                  attempt=1: sleep 2s  (2**1 = 2)
-    #                  attempt=2: sleep 4s  (2**2 = 4)
+    #                  attempt=2: last try with max_retries=3 -> re-raises, no sleep
     #                  This avoids hammering a struggling server
 
     except httpx.HTTPStatusError as exc:
@@ -232,7 +232,7 @@ for attempt in range(max_retries):  # 0, 1, 2
         #                    Client errors won't succeed on retry
 ```
 
-The `2 ** attempt` pattern is called exponential backoff — wait 1 second, then 2, then 4. This avoids hammering a struggling server.
+The `2 ** attempt` pattern is called exponential backoff — wait 1 second, then 2 (then 4, 8, ... if you allow more attempts). This avoids hammering a struggling server.
 
 ### 5. Timeout Configuration
 
@@ -333,7 +333,7 @@ async def main():
 #
 # httpx automatically:
 # - Sets Content-Type: application/json when using json=
-# - Follows redirects (up to 30 by default)
+# - Does NOT follow redirects unless follow_redirects=True (then up to 20)
 # - Handles chunked transfer encoding
 # - Decodes gzip/deflate responses
 ```

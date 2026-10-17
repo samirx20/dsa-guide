@@ -48,7 +48,7 @@ int main() {
     pair<int, string> p3 = {3, "Charlie"};
 
     // Auto type deduction
-    auto p4 = make_pair(4, "Diana"); // pair<int, string>
+    auto p4 = make_pair(4, "Diana"); // pair<int, const char*>
 }
 ```
 
@@ -240,7 +240,7 @@ auto [row, col] = coords;
 // id=1, row=2, col=3
 
 // A tuple containing pairs
-tuple<pair<int,int>, string> t = {{{5, 10}, "target"}};
+tuple<pair<int,int>, string> t = {{5, 10}, "target"};
 auto [pos, label] = t;
 auto [x, y] = pos;
 // x=5, y=10, label="target"

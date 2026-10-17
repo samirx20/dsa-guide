@@ -17,7 +17,7 @@ You must understand the subtle differences in the `for` loop and the recursive c
 | **Recursive call** | `i + 1` | `i + 1` | (no index) |
 | **Extra tracking** | None | None | `visited[]` array |
 | **Save when** | Every call | `current.size() == K` | `current.size() == N` |
-| **Time complexity** | $O(N \cdot 2^N)$ | $O(C(N,K))$ | $O(N \cdot N!)$ |
+| **Time complexity** | $O(N \cdot 2^N)$ | $O(K \cdot C(N,K))$ | $O(N \cdot N!)$ |
 
 ---
 
@@ -280,7 +280,7 @@ Only save when size == K AND target == 0.
 nums=[2,3,6,7], k=2, target=7
 
   [] target=7
-   ├─ [2] target=5 → [2,3] target=2 (no), [2,6] target=-1 (no), [2,7] target=-5 (no)
+   ├─ [2] target=5 → [2,3] target=2 (no), [2,6] target=-1 (no), [2,7] target=-2 (no)
    ├─ [3] target=4 → [3,6] target=-2 (no), [3,7] target=-3 (no)
    ├─ [6] target=1 → [6,7] target=-6 (no)
    └─ [7] target=0 → need size 2, no pair sums to 0
@@ -351,7 +351,7 @@ From [2], we can only pick 1 (visited[1]=true, skip 2)
 
 Key difference from Subsets:
   Subsets: loop starts at 'index' → [1] can only reach [1,2], [1,3]
-  Permutations: loop starts at 0 → [1] can reach [1,2], [2,1]
+  Permutations: loop starts at 0 → [2] can reach [2,1] (looks backwards)
 ```
 
 **Dry-Run Table:**
@@ -584,7 +584,7 @@ The check: if (i > 0 && nums[i] == nums[i-1] && !visited[i-1])
 | **Loop start** | `index` | `index` | `0` |
 | **Recurse with** | `i + 1` | `i + 1` | (no index) |
 | **Save condition** | Every call | `size == K` | `size == N` |
-| **Time complexity** | O(N * 2^N) | O(C(N,K)) | O(N * N!) |
+| **Time complexity** | O(N * 2^N) | O(K * C(N,K)) | O(N * N!) |
 | **Output count** | 2^N | C(N,K) | N! |
 
 ---
@@ -631,6 +631,7 @@ Start here
 ```cpp
 void combinationSum(vector<int>& nums, int target, int index,
                     vector<int>& current, vector<vector<int>>& result) {
+    if (target < 0) return;  // overshot (needed: reuse would otherwise recurse forever)
     if (target == 0) { result.push_back(current); return; }
     for (int i = index; i < nums.size(); i++) {
         current.push_back(nums[i]);

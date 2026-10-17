@@ -1,4 +1,4 @@
-# Part 3, Topic 1: Relational Databases & SQL
+# Part 6, Topic 1: Relational Databases & SQL
 ## Chapter 3: Foreign Keys & Constraints
 
 ### What You'll Learn
@@ -127,7 +127,7 @@ INSERT INTO posts (title, author_id) VALUES ('Hello World', 999);
 
 What happens when you try to delete a user who has posts?
 
-### Default: RESTRICT (Block)
+### Default: NO ACTION (Block, like RESTRICT)
 
 ```sql
 -- If user 1 has posts, this FAILS
@@ -210,7 +210,7 @@ posts:
 
 | Option | Behavior | Use Case |
 |--------|----------|----------|
-| `RESTRICT` | Block deletion | Most cases (default) |
+| `RESTRICT` | Block deletion | Most cases (default `NO ACTION` also blocks) |
 | `CASCADE` | Delete related rows | User's posts, comments |
 | `SET NULL` | Set foreign key to NULL | Keep content, anonymize |
 | `SET DEFAULT` | Set to default value | Rare |
@@ -285,7 +285,7 @@ Don't index:
 | Foreign key | `FOREIGN KEY (col) REFERENCES other_table(id)` |
 | Cascade delete | `ON DELETE CASCADE` |
 | Set null | `ON DELETE SET NULL` |
-| Block delete | `ON DELETE RESTRICT` (default) |
+| Block delete | `ON DELETE RESTRICT` (default `NO ACTION` also blocks) |
 | Create index | `CREATE INDEX idx_name ON table(column)` |
 | Check constraint | `CHECK (column > 0)` |
 | Unique constraint | `UNIQUE` |

@@ -39,7 +39,7 @@ Just like maps, there are two versions. **Always default to `unordered_set`.**
 | Insert | $O(1)$ average | $O(\log N)$ |
 | Erase | $O(1)$ average | $O(\log N)$ |
 | Order | Random | Sorted |
-| Memory | Higher | Lower |
+| Memory | Bucket array + nodes (often less) | 3 pointers + color per node (often more) |
 | Worst Case | $O(N)$ (collisions) | $O(\log N)$ always |
 | Special Feature | Speed | `upper_bound()`, `lower_bound()` |
 

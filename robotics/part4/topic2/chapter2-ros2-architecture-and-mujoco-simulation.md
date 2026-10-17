@@ -34,7 +34,7 @@ In legacy **ROS1**, every node required a central coordinator process called `ro
 **ROS2** eliminated the central master completely by building on **DDS (Data Distribution Service)**—an industrial real-time pub/sub standard used in spacecraft, air-traffic control, and autonomous vehicles:
 - **Zero Single Point of Failure:** Nodes discover each other automatically using UDP multicast discovery.
 - **Language Interoperability:** You can write your $500\text{ Hz}$ motor controller and $A^*$ planner in **C++ (`rclcpp`)** for deterministic speed, and your Vision-Language-Action (VLA) model in **Python (`rclpy` + PyTorch)**—and both talk over the exact same binary DDS topics!
-- **Zero-Copy Shared Memory (Iceoryx / Intra-Process):** When two C++ ROS2 nodes run on the same machine, DDS can pass a `std::unique_ptr` or shared-memory pointer in sub-microsecond time without serializing bytes over the network stack!
+- **Zero-Copy Shared Memory (Iceoryx / Intra-Process):** When two C++ ROS2 nodes run in the same process, `rclcpp` intra-process comms pass a `std::unique_ptr` straight past DDS; across processes on the same machine, a shared-memory transport (Iceoryx / loaned messages) passes a shared-memory pointer—both in sub-microsecond time without serializing bytes over the network stack!
 
 ---
 
@@ -84,7 +84,7 @@ One of ROS2's superpowers is **QoS (Quality of Service)**—the ability to tune 
 
 ### 3. Writing a Real-Time C++ (`rclcpp`) Node: Laser Obstacle Safety Filter
 
-Let's examine a clean, modern ROS2 C++ node that subscribes to `/scan` (`sensor_msgs::msg::LaserScan`) with `SensorDataQoS` (`BestEffort`, `KeepLast(1)`) and publishes safe velocity commands `/cmd_vel` (`geometry_msgs::msg::Twist`) at $50\text{ Hz}$, automatically braking to $0.0\text{ m/s}$ if any obstacle enters a $0.60\text{ m}$ safety zone:
+Let's examine a clean, modern ROS2 C++ node that subscribes to `/scan` (`sensor_msgs::msg::LaserScan`) with `SensorDataQoS` (`BestEffort`, `KeepLast(5)`) and publishes safe velocity commands `/cmd_vel` (`geometry_msgs::msg::Twist`) at $50\text{ Hz}$, automatically braking to $0.0\text{ m/s}$ if any obstacle enters a $0.60\text{ m}$ safety zone:
 
 ```cpp
 #include "rclcpp/rclcpp.hpp"
@@ -347,7 +347,7 @@ def run_mujoco_500hz_simulation():
     model = mujoco.MjModel.from_xml_string(MJCF_XML)
     data = mujoco.MjData(model)
 
-    # Start arm hanging straight down (q = [90 deg, 0 deg]), target horizontal [0, -45 deg]
+    # Start arm drooping downward (q = [60 deg, 30 deg]), target horizontal [0, -45 deg]
     data.qpos[:] = np.deg2rad([60.0, 30.0])
     q_target = np.deg2rad([0.0, -45.0])
 
@@ -403,10 +403,10 @@ if __name__ == "__main__":
 | Sim Tick | Time $t$ ($\text{s}$) | Shoulder $q_1$ (Target $0.0^\circ$) | Elbow $q_2$ (Target $-45.0^\circ$) | Gravity Bias $\mathbf{g}(\mathbf{q})$ ($\text{N}\cdot\text{m}$) | Commanded Torque $\boldsymbol{\tau}_{\text{ctrl}}$ ($\text{N}\cdot\text{m}$) | End-Effector Height $z$ ($\text{m}$) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **0** | `0.00 s` | $+60.00^\circ$ | $+30.00^\circ$ | `[-4.91,  0.00]` | **`[-50.00, -30.00]`** *(Saturated accel)* | `0.167 m` |
-| **100** | `0.20 s` | $+8.42^\circ$ | $-38.15^\circ$ | `[-12.84, -1.68]` | **`[ -1.12,  -0.45]`** *(Decelerating)* | `1.148 m` |
-| **200** | `0.40 s` | $+0.31^\circ$ | $-44.82^\circ$ | `[-13.30, -1.39]` | **`[-13.15,  -1.41]`** *(Settling)* | `1.280 m` |
-| **300** | `0.60 s` | $+0.01^\circ$ | $-44.99^\circ$ | `[-13.31, -1.39]` | **`[-13.31,  -1.39]`** *(Holding against $g$)* | `1.283 m` |
-| **500** | `1.00 s` | **`0.00°`** | **`-45.00°`** | `[-13.31, -1.39]` | **`[-13.31,  -1.39]`** *(Zero steady error!)* | **`1.283 m`** |
+| **100** | `0.20 s` | $+25.77^\circ$ | $-20.07^\circ$ | `[ -9.95, -2.28]` | **`[  4.54,   1.20]`** *(Decelerating)* | `0.743 m` |
+| **200** | `0.40 s` | $+6.21^\circ$ | $-37.94^\circ$ | `[-11.31, -1.71]` | **`[ -7.27,  -0.76]`** *(Settling)* | `1.156 m` |
+| **300** | `0.60 s` | $+1.49^\circ$ | $-42.96^\circ$ | `[-11.27, -1.47]` | **`[-10.30,  -1.25]`** *(Holding against $g$)* | `1.252 m` |
+| **500** | `1.00 s` | **`0.08°`** | **`-44.82°`** | `[-11.20, -1.39]` | **`[-11.14,  -1.38]`** *(Zero steady error!)* | **`1.281 m`** |
 
 ---
 

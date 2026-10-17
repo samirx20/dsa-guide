@@ -56,7 +56,7 @@ Proof by exchange argument:
 - My greedy choice G picks interval B (ends at time 3, the earliest)
 - If A != B, then B ends before A
 - Swap A with B in O → O'
-- O' is still valid (B ends before A started, so no new overlaps)
+- O' is still valid (B ends no later than A, and every other interval in O starts after A ends, so no new overlaps)
 - O' has the same count as O
 - Therefore, greedy choice B can be in an optimal solution
 ```
@@ -233,7 +233,7 @@ Answer: 4 meetings
 
 ### Pattern 3: Sort by Value/Weight
 - **When:** Maximizing value with constraints
-- **Examples:** Jump Game, Gas Station, Task Scheduler
+- **Examples:** Fractional Knapsack (sort by value/weight ratio), Boats to Save People, Task Scheduler
 
 ### Pattern 4: Priority Queue (Heap)
 - **When:** Need to always pick the "best" from a dynamic set

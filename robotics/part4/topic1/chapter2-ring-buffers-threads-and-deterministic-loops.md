@@ -10,7 +10,7 @@ Before starting this chapter, you should be comfortable with:
 - RAII destructors (`~ClassName()`) that automatically clean up resources when exiting a scope `{ ... }`.
 
 By the end of this chapter, you will be able to:
-1. Explain why a real robot splits its software across **multiple concurrent threads running at different frequencies** ($400\text{ Hz}$ IMU, $100\text{ Hz}$ PID motor control, $20\text{ Hz}$ LiDAR path planning, and async network telemetry).
+1. Explain why a real robot splits its software across **multiple concurrent threads running at different frequencies** ($400\text{ Hz}$ IMU, $100\text{ Hz}$ PID motor control, $10\text{ Hz}$ LiDAR path planning, and async network telemetry).
 2. Build a fixed-capacity, zero-heap-allocation **Ring Buffer (Circular Queue)** using `std::array<T, Capacity>` and modulo wrap-around arithmetic `next = (i + 1) % Capacity`.
 3. Explain why robotics sensor buffers use **Overwrite-Oldest (`push_overwrite`)** semantics instead of blocking or dropping new sensor readings.
 4. Synchronize producer and consumer threads safely using **`std::mutex`** with RAII **`std::lock_guard`**, and understand how **`std::atomic`** enables lock-free Single-Producer Single-Consumer (SPSC) queues.
@@ -243,7 +243,7 @@ And then we call **`std::this_thread::sleep_until(next_tick)`**!
 > [!CAUTION]
 > **Never Use `std::chrono::system_clock` for Control Loops!**
 > `std::chrono::system_clock` is the "wall-clock time of day" (e.g., `14:32:05 UTC`). When your robot connects to Wi-Fi, the Linux NTP daemon (`chronyd` / `systemd-timesyncd`) can suddenly jump `system_clock` backward or forward by $500\text{ ms}$ to sync with an internet time server! If `system_clock` jumps backward by $500\text{ ms}$, `sleep_until()` will freeze your robot's motor loop for half a second!
-> **Always use `std::chrono::steady_clock`**, which is a strictly monotonic hardware timer (backed by `CLOCK_MONOTONIC` on Linux) that can **never jump backward or be adjusted by NTP**.
+> **Always use `std::chrono::steady_clock`**, which is a strictly monotonic hardware timer (backed by `CLOCK_MONOTONIC` on Linux) that can **never jump backward or be stepped by NTP** (NTP may only gently slew its rate).
 
 ---
 
@@ -251,7 +251,7 @@ And then we call **`std::this_thread::sleep_until(next_tick)`**!
 
 Let's combine everything from Chapters 1 and 2 into a complete, zero-heap-allocation C++ program featuring:
 1. A cache-aligned `ImuSample` struct (`alignas(32)`).
-2. A thread-safe, fixed-capacity `RingBuffer<T, Capacity>` with `push_overwrite()` and `pop_latest()`.
+2. A thread-safe, fixed-capacity `RingBuffer<T, Capacity>` with `push_overwrite()` and `pop_oldest()`.
 3. A $400\text{ Hz}$ IMU producer thread and a phase-locked $100\text{ Hz}$ PID consumer thread using `std::chrono::steady_clock` and `sleep_until`.
 
 ```cpp

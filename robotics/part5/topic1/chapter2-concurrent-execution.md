@@ -1,4 +1,4 @@
-# Part 1, Topic 1: Asynchronous Python
+# Part 5, Topic 1: Asynchronous Python
 ## Chapter 2: Concurrent Execution
 
 **Prerequisite Knowledge:** Understanding of the event loop (Chapter 1), `async` and `await` keywords.
@@ -269,7 +269,8 @@ try:
 except* ValueError as eg:
     for exc in eg.exceptions:
         print(f"Task failed: {exc}")
-# task1 and task3 are cancelled because task2 failed
+# Any sibling still pending when task2 fails is cancelled (here task1 and task3
+# have no 'await', so they already finished in the same loop iteration)
 ```
 
 ### 5. `asyncio.wait()` — Fine-Control Over Concurrency
@@ -391,7 +392,7 @@ async def main():
 **What's happening:**
 ```python
 # If a Task has no references, Python may garbage collect it
-# This cancels the task silently — no error, no warning!
+# The task is destroyed mid-flight — only a "Task was destroyed but it is pending!" log!
 #
 # To prevent this:
 # 1. Always await the task (preferred)

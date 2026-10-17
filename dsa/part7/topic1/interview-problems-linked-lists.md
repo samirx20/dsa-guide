@@ -105,9 +105,9 @@ List1: `1 -> 3 -> 5`, List2: `2 -> 4 -> 6`
 | 1 | node(3) | node(2) | node(1) | node(1) | 1 < 2, attach 1 |
 | 2 | node(3) | node(4) | node(2) | node(2) | 3 > 2, attach 2 |
 | 3 | node(5) | node(4) | node(3) | node(3) | 3 < 4, attach 3 |
-| 4 | node(5) | node(6) | node(4) | node(4) | 5 < 6, attach 4 |
+| 4 | node(5) | node(6) | node(4) | node(4) | 5 > 4, attach 4 |
 | 5 | nullptr | node(6) | node(5) | node(5) | 5 < 6, attach 5 |
-| 6 | nullptr | nullptr | node(6) | node(6) | list1 empty, attach rest |
+| 6 | nullptr | node(6) | node(6) | node(5) | list1 empty, attach rest |
 
 Return `dummy.next` => `1 -> 2 -> 3 -> 4 -> 5 -> 6 -> nullptr`
 
@@ -187,9 +187,7 @@ Array: `[1, 3, 4, 2, 2]` (values act as "next pointers")
 |------|--------|--------|--------|
 | Init | nums[0]=1 | nums[0]=1 | - |
 | 1 | nums[1]=3 | nums[nums[1]]=nums[3]=2 | slow+1, fast+2 |
-| 2 | nums[3]=2 | nums[nums[2]]=nums[4]=2 | slow+1, fast+2 |
-| 3 | nums[2]=4 | nums[nums[2]]=nums[4]=2 | slow+1, fast+2 |
-| 4 | nums[4]=2 | nums[nums[2]]=nums[4]=2 | slow+1, fast+2 |
+| 2 | nums[3]=2 | nums[nums[2]]=nums[4]=2 | slow+1, fast+2 (slow == fast, stop) |
 
 Phase 1: slow=2, fast=2 (meet!)
 

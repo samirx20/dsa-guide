@@ -352,7 +352,7 @@ int partition(vector<int>& arr, int left, int right) {
         if (arr[j] < pivot) {
 //              ^     ^
 //              |     └── Compare with pivot
-//              |       Strict less than (not <= for stability)
+//              |       Strict less than (Lomuto is unstable with < or <=)
 //              └── Current element
             
             i++;
@@ -478,7 +478,7 @@ Phase 1: Scan and swap elements < pivot to the left
 
 After partitioning:
 ┌────┬────┬────┬────┬────┬────┬────┐
-│ 10 │ 30 │ 40 │ 50 │ 70 │ 80 │ 90 │
+│ 10 │ 30 │ 40 │ 50 │ 70 │ 90 │ 80 │
 │ <  │ <  │ <  │ <  │PIV │ >= │ >= │
 └────┴────┴────┴────┴────┴────┴────┘
               ↑
@@ -487,7 +487,7 @@ After partitioning:
 
 Recursive calls:
 - Left:  [10, 30, 40, 50]  (indices 0-3)
-- Right: [80, 90]           (indices 5-6)
+- Right: [90, 80]           (indices 5-6)
 ```
 
 **Edge Case - Already Sorted Array (Worst Case):**
@@ -542,7 +542,7 @@ int medianOfThree(vector<int>& arr, int left, int right) {
     if (arr[left] > arr[right]) swap(arr[left], arr[right]);
     if (arr[mid] > arr[right]) swap(arr[mid], arr[right]);
     
-    // Put median at right-1, use as pivot
+    // Put median at right, use as pivot
     swap(arr[mid], arr[right]);
     return partition(arr, left, right);
 }
@@ -564,7 +564,7 @@ int medianOfThree(vector<int>& arr, int left, int right) {
 *   **Time Complexity:** 
     *   **Average & Best Case:** $O(N \log N)$.
     *   **Worst Case:** $O(N^2)$. This happens if the array is already sorted and you always pick the last element as the pivot (the partition tree becomes a straight line of depth $N$). This is mitigated in reality by picking a random pivot.
-*   **Space Complexity:** $O(\log N)$ Auxiliary Space (for the recursive call stack). **It sorts in-place!**
+*   **Space Complexity:** $O(\log N)$ Auxiliary Space on average (for the recursive call stack; $O(N)$ worst case for this naive recursion). **It sorts in-place!**
 *   **Stability:** Not stable (partitioning swaps elements across wide gaps).
 
 ---
@@ -602,7 +602,7 @@ int medianOfThree(vector<int>& arr, int left, int right) {
 
 **Key Formulas:**
 - Merge Sort recursion depth: $\log_2 N$
-- Merge Sort total comparisons: $N \log_2 N$ (exact: $N \lceil \log_2 N \rceil$)
+- Merge Sort total comparisons: $N \log_2 N$ (upper bound: $N \lceil \log_2 N \rceil$)
 - Quick Sort recursion depth: $\log N$ average, $N$ worst case
 - Quick Sort partition comparisons: $N-1$ per partition
 

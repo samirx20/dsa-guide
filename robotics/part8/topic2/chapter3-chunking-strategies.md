@@ -1,4 +1,4 @@
-# Part 4, Topic 1: Vector Search & Embeddings
+# Part 8, Topic 2: Vector Search & Embeddings
 ## Chapter 3: Chunking Strategies
 
 **Prerequisite Knowledge:** Basic understanding of strings, lists, and loops in Python.
@@ -38,7 +38,7 @@ Embedding models have a maximum input length, and even if they did not, embeddin
 
 ### 1. Why Chunking Is Necessary
 
-An equipment manual might be 50 pages long. The `text-embedding-3-small` model accepts up to 8191 tokens — roughly 30,000 characters. Beyond that, text is silently truncated, losing critical information. Even within the limit, embedding an entire document produces one vector that averages out all topics, making it useless for searching specific procedures:
+An equipment manual might be 50 pages long. The `text-embedding-3-small` model accepts up to 8191 tokens — roughly 30,000 characters. Beyond that, the OpenAI API rejects the request with a 400 error (some providers, such as Voyage, silently truncate by default instead), and cutting the text down yourself loses critical information. Even within the limit, embedding an entire document produces one vector that averages out all topics, making it useless for searching specific procedures:
 
 ```python
 manual = open("pump_manual.txt").read()
@@ -54,7 +54,7 @@ short_manual = manual[:30000]  # Silently truncated!
 ```python
 manual = open("pump_manual.txt").read()
 # Reads entire file into one string: 45,000 chars ≈ 11,250 tokens
-# Embedding model limit is 8,191 tokens → text is silently truncated
+# Embedding model limit is 8,191 tokens → the API rejects it, so it must be cut down
 # manual[:30000] drops everything after char 30,000
 # If the seal replacement procedure is on page 40, it's GONE
 #
@@ -72,7 +72,7 @@ Chunking solves both problems: each chunk stays within token limits, and each ch
 | `text-embedding-3-small` | 8,191 | ~32,000 | 800-1,500 chars |
 | `text-embedding-3-large` | 8,191 | ~32,000 | 800-1,500 chars |
 | `text-embedding-ada-002` | 8,191 | ~32,000 | 800-1,500 chars |
-| `voyage-2` | 32,000 | ~128,000 | 1,000-2,000 chars |
+| `voyage-2` | 4,000 | ~16,000 | 1,000-2,000 chars |
 
 ### 2. Fixed-Size Chunking
 
@@ -105,9 +105,9 @@ text = "A" * 3000 + "B" * 3000 + "C" * 3000
 #       0-2999    3000-5999   6000-8999
 # chunk_size=2000, overlap=500, step=1500
 #
-# Chunk 0: text[0:2000]    → "AAA...AABBB..." (mixed A and B)
-# Chunk 1: text[1500:3500] → "BBB...BBBCC..." (mixed B and C)
-# Chunk 2: text[3000:5000] → "BBB...BBBCC..." (mixed B and C)
+# Chunk 0: text[0:2000]    → "AAA...AAA"      (pure A)
+# Chunk 1: text[1500:3500] → "AAA...AABBB..." (mixed A and B)
+# Chunk 2: text[3000:5000] → "BBB...BBB"      (pure B)
 # Chunk 3: text[4500:6500] → "BBB...BBBCC..." (mixed B and C)
 # Chunk 4: text[6000:8000] → "CCC...CCC"      (pure C)
 # Chunk 5: text[7500:9000] → "CCC...CCC"      (pure C, shorter)
@@ -124,9 +124,9 @@ Fixed-size chunking is fast and predictable. The problem is that it splits mid-s
 text = "Before installing the pump, verify alignment with the motor coupling."
 
 # BAD: Fixed-size split at exactly 30 characters
-chunk_a = text[:30]  # "Before installing the pump,"
-chunk_b = text[30:]  # ", verify alignment with the motor coupling."
-# Problem: "pump," ends chunk A, but the sentence continues
+chunk_a = text[:30]  # "Before installing the pump, ve"
+chunk_b = text[30:]  # "rify alignment with the motor coupling."
+# Problem: "verify" is cut into "ve" + "rify", and the sentence continues
 # The embedding for chunk A loses context of what comes after
 
 # BETTER: Split at word boundaries
@@ -197,9 +197,9 @@ for i, c in enumerate(result):
 # Each sentence is a complete thought
 #
 # max_chunk_size=80 characters
-# Sentence 1: "The pump operates at 1500 RPM." = 31 chars → fits
-# Sentence 2: "Temperature should stay below 80C." = 35 chars → 31+35=66 → fits
-# Sentence 3: "If vibration exceeds 5mm/s, shut down immediately." = 51 chars → 66+51=117 → OVER
+# Sentence 1: "The pump operates at 1500 RPM." = 30 chars → fits
+# Sentence 2: "Temperature should stay below 80C." = 34 chars → 30+34=64 → fits
+# Sentence 3: "If vibration exceeds 5mm/s, shut down immediately." = 50 chars → 64+50=114 → OVER
 # Save chunk 0: "The pump operates at 1500 RPM. Temperature should stay below 80C."
 # Start new chunk with sentence 3
 ```
@@ -284,7 +284,8 @@ for i, c in enumerate(chunks):
 #   If not → try the next delimiter (finer granularity)
 #
 # chunk_size=150, overlap=200
-# The overlap > chunk_size so the fallback character split kicks in
+# The "\n\n" split already fits, so the fallback character split is never reached
+# (if it were, overlap > chunk_size gives a negative step and an empty result)
 # In production, set overlap < chunk_size (e.g., overlap=50 for chunk_size=150)
 ```
 
@@ -363,16 +364,16 @@ overlap_demo()
 #        0    5   10   15   20   25   30   35   40   45   50   55
 #
 # chunk_a = text[:45]
-# "Step 1: Install the base plate. Step 2: Attach"
+# "Step 1: Install the base plate. Step 2: Attac"
 #                                            ^^^^
 #                                            Ends mid-sentence
 #
 # chunk_b = text[35:80]
-# "Step 2: Attach the motor. Step 3: Connect wiring. ..."
+# "p 2: Attach the motor. Step 3: Connect wiring"
 #  ^^^^^
 #  Starts at char 35, overlapping with chunk_a
 #
-# Overlap region: text[35:45] = "e plate. S"
+# Overlap region: text[35:45] = "p 2: Attac"
 # This text appears in BOTH chunks
 # The embedding for "Step 2: Attach" now has context from both sides
 ```

@@ -1,4 +1,4 @@
-# Part 6, Topic 1: System Integration
+# Part 8, Topic 2: System Integration
 ## Chapter 2: Observability
 
 **Prerequisite Knowledge:** Basic understanding of functions, logging, and performance timing.
@@ -109,7 +109,7 @@ def redact(value: str, show_last: int = 4) -> str:
     return "*" * (len(value) - show_last) + value[-show_last:]
 
 logger.log("auth", api_key=redact("sk-1234567890abcdef"))
-# Output: {"event": "auth", "api_key": "************cdef"}
+# Output: {"event": "auth", "api_key": "***************cdef"}
 ```
 
 **What's happening:**
@@ -535,8 +535,13 @@ Line 25:  return results, all_errors          -> Max retries exhausted; return a
 # WITH logging, you see:
 # {"event": "validation_attempt", "attempt": 0,
 #  "errors": ["temp_c 98.2 exceeds 95.0C", "pressure_psi 210.3 exceeds 200.0PSI"]}
-# {"event": "validation_attempt", "attempt": 1, "errors": []}
-# => First attempt found 2 errors; second attempt passed. Resolved in 1 retry.
+# {"event": "validation_attempt", "attempt": 1,
+#  "errors": ["temp_c 98.2 exceeds 95.0C", "pressure_psi 210.3 exceeds 200.0PSI"]}
+# {"event": "validation_attempt", "attempt": 2,
+#  "errors": ["temp_c 98.2 exceeds 95.0C", "pressure_psi 210.3 exceeds 200.0PSI"]}
+# => The same 2 errors on all 3 attempts: validator_with_logging re-checks the SAME
+#    results, so a retry can only pass if something corrects the data in between
+#    (the logs make that visible; see SelfCorrectingValidator below).
 ```
 
 #### Production: Self-Correction With LLM Feedback

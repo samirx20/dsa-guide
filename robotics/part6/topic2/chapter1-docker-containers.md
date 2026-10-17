@@ -1,4 +1,4 @@
-# Part 5, Topic 2: Docker & Background Workers
+# Part 6, Topic 2: Docker & Background Workers
 ## Chapter 1: Containers & Docker
 
 ### What You'll Learn
@@ -271,7 +271,7 @@ docker-compose up -d:
 | Stop services | `docker-compose down` |
 | Rebuild | `docker-compose up -d --build` |
 
-> **Next:** For adding Redis to your Docker Compose stack — caching, rate limiting, and session storage — see [Part 5, Topic 3: Redis Caching Patterns](../topic3/chapter2-redis-caching.md).
+> **Next:** For adding Redis to your Docker Compose stack — caching, rate limiting, and session storage — see [Part 6, Topic 2: Redis Caching Patterns](./chapter3-redis-caching.md).
 
 ---
 

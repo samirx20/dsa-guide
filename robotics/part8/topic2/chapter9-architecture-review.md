@@ -1,4 +1,4 @@
-# Part 6, Topic 1: System Integration
+# Part 8, Topic 2: System Integration
 ## Chapter 1: Architecture Review
 
 **Prerequisite Knowledge:** Basic understanding of functions, Pydantic models, and the concept of an AI agent.
@@ -181,7 +181,7 @@ Step 3: If violation found, add to errors list
 Step 4: Always keep item in validated list (even with errors)
 
 Output: validated = [same items as input]
-        errors = ["Temperature 96.5C exceeds 95.0C limit"]
+        errors = []  (87.3C, 142.1PSI and 4.2mm/s are all within limits)
 ```
 
 #### Stage 5 — Synthesizer (LLM)
@@ -235,8 +235,8 @@ class DiagnosticPipeline:
         state = PipelineState(query=query)
 
         # 2. Pass it through the stages
-        state.context = retriever_stage(query, serial_number, self.documents)
         state.tool_calls = planner_stage(query, [])
+        state.context = retriever_stage(query, serial_number, self.documents)
         state.tool_results = executor_stage(state.tool_calls)
         state.validated_results, errors = validator_stage(state.tool_results)
         state.errors = errors
@@ -254,8 +254,8 @@ class DiagnosticPipeline:
 Pipeline Execution Flow:
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. Initialize PipelineState with query                      │
-│ 2. Retriever: Find relevant documents                      │
-│ 3. Planner: Decide which tools to call                     │
+│ 2. Planner: Decide which tools to call                     │
+│ 3. Retriever: Find relevant documents                      │
 │ 4. Executor: Run the tools                                 │
 │ 5. Validator: Check results against rules                  │
 │ 6. Synthesizer: Generate human-readable answer             │
@@ -272,16 +272,16 @@ class ProductionPipeline:
 
     def run(self, query: str, serial_number: str) -> PipelineState:
         state = PipelineState(query=query)
-        stage_status = {}
+        stage_status = self.stage_status = {}  # _safe_stage records each stage here
         
         try:
-            # Stage 1: Retriever
-            state.context = self._safe_stage("retriever", 
-                lambda: retriever_stage(query, serial_number, self.documents))
-            
-            # Stage 2: Planner
+            # Stage 1: Planner
             state.tool_calls = self._safe_stage("planner",
                 lambda: planner_stage(query, []))
+            
+            # Stage 2: Retriever
+            state.context = self._safe_stage("retriever", 
+                lambda: retriever_stage(query, serial_number, self.documents))
             
             # Stage 3: Executor
             state.tool_results = self._safe_stage("executor",
@@ -303,7 +303,7 @@ class ProductionPipeline:
             state.final_answer = f"Error: {str(e)}"
         
         state.metadata = {
-            "stages_completed": len(stage_status),
+            "stages_completed": sum(v == "ok" for v in stage_status.values()),
             "stage_status": stage_status,
             "total_tool_calls": len(state.tool_calls),
             "error_count": len(state.errors)
@@ -315,9 +315,11 @@ class ProductionPipeline:
         """Execute stage with error handling and logging."""
         try:
             result = stage_func()
+            self.stage_status[stage_name] = "ok"
             self.logger.info(f"Stage {stage_name} completed successfully")
             return result
         except Exception as e:
+            self.stage_status[stage_name] = "failed"
             self.logger.error(f"Stage {stage_name} failed: {str(e)}")
             raise
 ```

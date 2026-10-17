@@ -1,4 +1,4 @@
-# Part 5, Topic 2: Docker & Background Workers
+# Part 6, Topic 2: Docker & Background Workers
 ## Chapter 2: Background Queues
 
 ### What You'll Learn
@@ -221,7 +221,7 @@ await videoQueue.add('process-video', { videoId }, {
     attempts: 3,
     backoff: {
         type: 'exponential',  // Wait longer each retry
-        delay: 1000           // 1s, 2s, 4s
+        delay: 1000           // 1s, 2s (3 attempts = 2 retries)
     }
 })
 

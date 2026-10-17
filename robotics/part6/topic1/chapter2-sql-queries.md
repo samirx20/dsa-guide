@@ -1,4 +1,4 @@
-# Part 3, Topic 1: Relational Databases & SQL
+# Part 6, Topic 1: Relational Databases & SQL
 ## Chapter 2: SQL Queries (CRUD & JOINs)
 
 ### What You'll Learn
@@ -27,7 +27,7 @@ VALUES
 
 -- Insert with all columns (not recommended - order matters)
 INSERT INTO users
-VALUES (DEFAULT, 'dave', 'dave@email.com', DEFAULT, DEFAULT, DEFAULT);
+VALUES (DEFAULT, 'dave', 'dave@email.com', DEFAULT, DEFAULT, DEFAULT, DEFAULT);
 ```
 
 **What's happening:**

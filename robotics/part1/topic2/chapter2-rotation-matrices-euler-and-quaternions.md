@@ -165,13 +165,14 @@ Look closely at that matrix!
 - Both Roll ($\phi$) and Yaw ($\psi$) now spin the robot around the **exact same vertical axis**! You have lost one of your three degrees of freedom—a singularity called **Gimbal Lock**. Near $\theta = \pm 90^\circ$, attempting to extract Euler angles causes $\phi$ and $\psi$ to jump instantaneously by $180^\circ$, crashing Apollo 11's IMU backup warning and breaking naive drone controllers!
 
 ```
-   NORMAL FLIGHT (Pitch = 0 deg)               GIMBAL LOCK (Pitch = +90 deg, Nose Straight Up!)
-        +Z_world (Yaw axis)                        +Z_world (Yaw axis) AND +X_body (Roll axis)
+   NORMAL FLIGHT (Pitch = 0 deg)               GIMBAL LOCK (Pitch = +90 deg, Nose Straight Down!)
+        +Z_world (Yaw axis)                        +Z_world (Yaw axis)
            ^                                          ^   <-- BOTH AXES ARE NOW PARALLEL!
-           |                                          |       Changing Roll (phi) or Yaw (psi)
-           *------> +X_body (Roll axis)               *       rotates around the EXACT SAME axis!
-          /                                          /
-         v +Y (Pitch axis)                          v +Y (Pitch axis)
+           |                                          |       (+X_body = -Z_world: same line, opposite way)
+           *------> +X_body (Roll axis)               *       Changing Roll (phi) or Yaw (psi)
+          /                                          /|       rotates around the EXACT SAME axis!
+         v +Y (Pitch axis)                          v v +X_body (Roll axis, nose down)
+                                              +Y (Pitch axis)
 ```
 
 ### 4.3 Enter Unit Quaternions: $\mathbf{q} = [w, x, y, z]^T$

@@ -28,7 +28,7 @@ Master these specific problems, as they represent the core variations of Binary 
 |----------|------------|------|-------|
 | Classic Binary Search | Sorted array, find target | $O(\log N)$ | $O(1)$ |
 | Boundary Binary Search | Find first/last occurrence | $O(\log N)$ | $O(1)$ |
-| Rotated Array Search | Sorted but rotated | $O(\log N)$ | $O(\log N)$ |
+| Rotated Array Search | Sorted but rotated | $O(\log N)$ | $O(1)$ |
 | 2D Matrix Search | Sorted rows + columns | $O(\log(MN))$ | $O(1)$ |
 | Answer Space Search | "Min max" / "Max min" problems | $O(N \log M)$ | $O(1)$ |
 

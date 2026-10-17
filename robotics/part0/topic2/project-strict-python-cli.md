@@ -1,4 +1,4 @@
-# Part 0, Topic 1: Python Systems Basics
+# Part 0, Topic 2: Python Systems Basics
 ## Project 1: Strict Python CLI for Parsing Factory Log Files
 
 It is time to apply everything from this topic in a single project. You will build a command-line tool that reads factory sensor logs, validates the data with strict types, and reports anomalies.
@@ -33,7 +33,7 @@ Prove you can set up a typed Python project from scratch, handle CLI arguments, 
 
 #### 5. Error Handling
 - If the file does not exist, print a clear error message and exit with code 1.
-- If no file argument is provided, print usage information and exit with code 1.
+- If no file argument is provided, print usage information and exit with a non-zero code (`argparse` does this for you, using code 2).
 - Use `try/except` blocks with your custom exception types or Pydantic `ValidationError`.
 
 ### Evaluation Checklist

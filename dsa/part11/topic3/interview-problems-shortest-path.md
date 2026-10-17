@@ -38,7 +38,7 @@ These problems require identifying the correct algorithm and adapting the standa
 Graph:  Node 1 ←(1)— Node 2 —(1)→ Node 3 —(1)→ Node 4
                      (source)
 
-Step 1: Init  dist[] = [INF, INF, 0, INF]  heap = [(0,2)]
+Step 1: Init  dist[] = [INF, INF, 0, INF, INF]  heap = [(0,2)]   (index 0 unused)
 Step 2: Pop (0,2) → dist[1]=1, dist[3]=1   heap = [(1,1),(1,3)]
 Step 3: Pop (1,1) → no neighbors             heap = [(1,3)]
 Step 4: Pop (1,3) → dist[4]=2               heap = [(2,4)]
@@ -51,7 +51,7 @@ Final: dist[] = [INF, 1, 0, 1, 2] → max = 2
 
 | Step | Pop | dist[] | Key Update |
 |------|-----|--------|------------|
-| Init | — | [INF, INF, 0, INF] | src=0 |
+| Init | — | [INF, INF, 0, INF, INF] | dist[src=2]=0 |
 | 1 | (0,2) | [INF, 1, 0, 1, INF] | Reach 1 and 3 |
 | 2 | (1,1) | [INF, 1, 0, 1, INF] | No outgoing edges |
 | 3 | (1,3) | [INF, 1, 0, 1, 2] | Reach destination |
@@ -119,10 +119,13 @@ Grid:    1  2  2
 
 Step 1: effort[0][0]=0  heap=[(0,0,0)]
 Step 2: Pop (0,0,0) → effort[0][1]=max(0,|1-2|)=1, effort[1][0]=max(0,|1-3|)=2
-Step 3: Pop (1,0,1) → effort[0][2]=max(1,|2-2|)=1, effort[1][1]=max(1,|2-8|)=7
+Step 3: Pop (1,0,1) → effort[0][2]=max(1,|2-2|)=1, effort[1][1]=max(1,|2-8|)=6
 Step 4: Pop (1,0,2) → effort[1][2]=max(1,|2-2|)=1
-Step 5: Pop (1,1,2) → effort[2][2]=max(1,|2-5|)=3
-Step 6: Pop (2,2) at destination → RETURN 3
+Step 5: Pop (1,1,2) → effort[2][2]=max(1,|2-5|)=3   (not final yet!)
+Step 6: Pop (2,1,0) → effort[2][0]=max(2,|3-5|)=2, effort[1][1]=max(2,|3-8|)=5
+Step 7: Pop (2,2,0) → effort[2][1]=max(2,|5-3|)=2
+Step 8: Pop (2,2,1) → effort[2][2]=max(2,|3-5|)=2 < 3 → improved!
+Step 9: Pop (2,2,2) at destination → RETURN 2   (path 1→3→5→3→5)
 ```
 
 ### Dry-Run Table
@@ -130,10 +133,13 @@ Step 6: Pop (2,2) at destination → RETURN 3
 | Step | Pop Cell | Effort | Updated Cells |
 |------|----------|--------|---------------|
 | 1 | (0,0) | 0 | (0,1)=1, (1,0)=2 |
-| 2 | (0,1) | 1 | (0,2)=1, (1,1)=7 |
+| 2 | (0,1) | 1 | (0,2)=1, (1,1)=6 |
 | 3 | (0,2) | 1 | (1,2)=1 |
 | 4 | (1,2) | 1 | (2,2)=3 |
-| 5 | (2,2) | 3 | DESTINATION → return 3 |
+| 5 | (1,0) | 2 | (2,0)=2, (1,1)=5 |
+| 6 | (2,0) | 2 | (2,1)=2 |
+| 7 | (2,1) | 2 | (2,2)=2 |
+| 8 | (2,2) | 2 | DESTINATION → return 2 |
 
 ### Code
 

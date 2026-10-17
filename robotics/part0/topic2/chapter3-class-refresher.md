@@ -1,4 +1,4 @@
-# Part 0, Topic 0: The Bridge: Python Foundations
+# Part 0, Topic 2: The Bridge: Python Foundations
 ## Chapter 3: Class & Object Refresher
 
 **Prerequisite Knowledge:** Basic Python functions and variables.
@@ -330,7 +330,7 @@ class SensorReading:
     unit: str = "celsius"                    # Default value
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     #                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    #                                      For mutable defaults (like datetime),
+    #                                      For per-instance defaults (like now()),
     #                                      use field(default_factory=...)
     #                                      instead of a direct value
 
@@ -369,12 +369,13 @@ timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 # ❌ WRONG: Mutable default (list, dict)
 @dataclass
 class SensorConfig:
-    readings: list = []  # BAD! All instances share the SAME list!
+    readings: list = []  # BAD! @dataclass refuses this at class definition:
+    # ValueError: mutable default <class 'list'> for field readings is not allowed: use default_factory
 
 r1 = SensorConfig()
 r2 = SensorConfig()
 r1.readings.append(22.5)
-print(r2.readings)  # [22.5] — r2 also has the reading! Shared state!
+print(r2.readings)  # Never reached (ValueError above). In a plain class, a list class attribute WOULD be shared: [22.5]
 
 # ✅ RIGHT: Use field(default_factory=list)
 @dataclass

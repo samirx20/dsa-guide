@@ -118,7 +118,7 @@ Notice what $u_{\text{FF}}$ depends on: it depends on the **desired trajectory**
 
 ### 4. Numerical Dry-Run: Cascaded Position $\to$ Velocity + Feedforward
 
-Let's trace **4 control ticks** ($\Delta t = 0.1\text{ s}$) of a robot joint moving toward target $\theta_{\text{ref}} = 10.0\text{ rad}$ under a constant gravity load requiring $+2.0\text{ V}$ of holding effort ($u_{\text{FF}} = +2.0\text{ V}$).
+Let's trace **4 control ticks** of a robot joint (the loop runs at $\Delta t = 0.1\text{ s}$; these 4 ticks are snapshots spread along the move, not consecutive ticks, since at $\le 5\text{ rad/s}$ one tick moves the joint at most $0.5\text{ rad}$) moving toward target $\theta_{\text{ref}} = 10.0\text{ rad}$ under a constant gravity load requiring $+2.0\text{ V}$ of holding effort ($u_{\text{FF}} = +2.0\text{ V}$).
 - **Outer Position P-Loop:** $K_{p,\text{pos}} = 2.0\text{ (rad/s)/rad}$, clamped to max speed $\dot{\theta}_{\max} = \pm 5.0\text{ rad/s}$.
 - **Inner Velocity P-Loop:** $K_{p,\text{vel}} = 1.5\text{ V/(rad/s)}$.
 - **Total Command:** $u = u_{\text{FF}} + K_{p,\text{vel}} \cdot (\dot{\theta}_{\text{ref}} - \dot{\theta})$.
@@ -233,7 +233,7 @@ Let's trace what $\mathbf{u} = -\mathbf{K}\mathbf{x} = -\bigl(k_1 x + k_2 \dot{x
 
 | Scenario | Cart Pos $x$ ($\text{m}$) | Cart Vel $\dot{x}$ ($\text{m/s}$) | Pitch $\theta$ ($\text{rad}$) | Pitch Rate $\dot{\theta}$ ($\text{rad/s}$) | Pos Term $-k_1 x$ | Vel Term $-k_2 \dot{x}$ | Pitch Term $-k_3 \theta$ | Rate Term $-k_4 \dot{\theta}$ | Total Force $u = -\mathbf{K}\mathbf{x}$ | Physical Intuition |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1. Leaning Forward** | $0.0$ | $0.0$ | $+0.10$ | $0.0$ | $0.0$ | $0.0$ | $-4.0\text{ N}$ | $0.0$ | **$-4.0\text{ N}$** | Drives wheels backward/under the fall to catch the tilt! |
+| **1. Leaning Forward** | $0.0$ | $0.0$ | $+0.10$ | $0.0$ | $0.0$ | $0.0$ | $-4.0\text{ N}$ | $0.0$ | **$-4.0\text{ N}$** | Drives wheels toward the lean ($-x$; with these gains $\theta > 0$ means leaning toward $-x$), getting under the fall to catch the tilt! |
 | **2. Falling Fast** | $0.0$ | $0.0$ | $+0.10$ | $+0.50$ | $0.0$ | $0.0$ | $-4.0\text{ N}$ | $-4.0\text{ N}$ | **$-8.0\text{ N}$** | Pitch + angular velocity combine for urgent recovery. |
 | **3. Upright, Drifted Right** | $+0.50$ | $0.0$ | $0.0$ | $0.0$ | $+1.0\text{ N}$ | $0.0$ | $0.0$ | $0.0$ | **$+1.0\text{ N}$** | Gently nudges wheels to pitch back toward $x=0$. |
 | **4. Returning to Origin** | $+0.20$ | $-0.40$ | $-0.02$ | $0.0$ | $+0.4\text{ N}$ | $-1.2\text{ N}$ | $+0.8\text{ N}$ | $0.0$ | **$0.0\text{ N}$** | All 4 coupled states balance in dynamic harmony! |
@@ -423,7 +423,7 @@ for step in range(8):
 | **Tuning Outer Loop Before Inner Loop** | Position loop oscillates wildly or inner velocity loop ignores position commands. | Outer loop assumes the inner loop tracks $\dot{\theta}_{\text{ref}}$ accurately; an untuned inner loop acts like a broken actuator. | Always disconnect the outer loop first, tune the inner loop to track step inputs crisply, then close the outer loop. |
 | **Running Inner & Outer Loops at the Same Slow Rate** | Cascaded setup performs *worse* than a single PID loop, with sluggish phase lag. | Inner loop needs to converge several times faster than outer loop updates. | Run inner current loop at $10\text{ kHz}$, middle velocity loop at $1\text{ kHz}$, and outer position loop at $100\text{ Hz}$ (or update outer loop every $N$ inner ticks). |
 | **Feeding Measured $y(t)$ into Velocity/Accel Feedforward** | Violent motor chattering whenever velocity feedforward $K_v$ or $K_a$ is turned up. | Differentiating noisy encoder measurements $\dot{y}, \ddot{y}$ turns feedforward into a noisy feedback loop! | Always compute $u_{\text{FF}}$ from the **smooth desired reference trajectory** $\dot{r}(t), \ddot{r}(t)$ (except smooth configuration terms like $\cos\theta$). |
-| **LQR State Units Mismatch in $\mathbf{Q}$** | LQR ignores angle errors or saturates motors over tiny millimeter errors. | Putting angles in degrees ($100$) vs. radians ($1.74$) changes $x^T \mathbf{Q} x$ by $100^2 = 10{,}000\times$! | Always use consistent SI units ($\text{m}, \text{m/s}, \text{rad}, \text{rad/s}$) and normalize $\mathbf{Q}_{ii} = \frac{1}{\text{max\_acceptable\_error}_i^2}$ (Bryson's Rule). |
+| **LQR State Units Mismatch in $\mathbf{Q}$** | LQR ignores angle errors or saturates motors over tiny millimeter errors. | Putting angles in degrees ($100$) vs. radians ($1.74$) changes $x^T \mathbf{Q} x$ by $(180/\pi)^2 \approx 3{,}283\times$! | Always use consistent SI units ($\text{m}, \text{m/s}, \text{rad}, \text{rad/s}$) and normalize $\mathbf{Q}_{ii} = \frac{1}{\text{max\_acceptable\_error}_i^2}$ (Bryson's Rule). |
 
 ---
 

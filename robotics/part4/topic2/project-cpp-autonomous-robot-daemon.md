@@ -12,7 +12,7 @@ Instead of writing toy single-threaded scripts that freeze when planning a path 
 1. **Thread 1 — $400\text{ Hz}$ IMU & Wheel Odometry Producer (`2.5 ms` period):**
    Integrates high-rate gyroscope and wheel-encoder rates into a cache-aligned `alignas(32) RobotStatePacket` and pushes it into a bounded, zero-allocation **Overwrite-Oldest Ring Buffer**.
 2. **Thread 2 — $20\text{ Hz}$ C-Space Obstacle Inflator & $A^*$ Path Planner (`50.0 ms` period):**
-   Inflates a 2D Occupancy Grid by the robot's physical radius $R_{\text{robot}} = 0.25\text{ m}$ and runs 8-connected Octile **$A^*$ Search** to publish a collision-free waypoint path via `std::shared_ptr<const WaypointPath>` (zero-copy atomic pointer swap!).
+   Inflates a 2D Occupancy Grid by the robot's physical radius $R_{\text{robot}} = 0.25\text{ m}$ and runs 8-connected Octile **$A^*$ Search** to publish a collision-free waypoint path via `std::shared_ptr<const WaypointPath>` (zero-copy, mutex-guarded pointer swap!).
 3. **Thread 3 — $100\text{ Hz}$ Hard Real-Time Trajectory Tracking Controller (`10.0 ms` period):**
    Runs on a phase-locked `std::chrono::steady_clock` + `sleep_until(next_tick)` cadence, drains the latest state from the Ring Buffer, reads the latest `shared_ptr<const WaypointPath>`, computes Pure-Pursuit / PD wheel velocity commands $(v, \omega)$, and records worst-case loop jitter ($\mu\text{s}$).
 4. **Thread 4 — $20\text{ Hz}$ Asynchronous RAII UDP Telemetry Broadcaster (`50.0 ms` period):**
@@ -31,7 +31,7 @@ Instead of writing toy single-threaded scripts that freeze when planning a path 
                                        v
                     [ RealTimeRingBuffer<RobotStatePacket, 16> ]
                                        |
-                          pop_latest() |
+                pop_latest_and_clear() |
                                        v
   +--------------------------------------------------------------------------+
   | Thread 3: Hard Real-Time PD / Pure-Pursuit Controller (100 Hz / 10.0 ms) |
@@ -39,7 +39,7 @@ Instead of writing toy single-threaded scripts that freeze when planning a path 
   |   * Tracks worst-case wakeup jitter_us & deadline overruns.              |
   +--------------------------------------------------------------------------+
                   ^                                         |
-                  | Atomic zero-copy read                   | push_overwrite()
+                  | Locked zero-copy read                   | push_overwrite()
                   | std::shared_ptr<const WaypointPath>     v
   +-------------------------------+         [ RealTimeRingBuffer<TelemetryFrame, 8> ]
   | Thread 2: C-Space & A*        |                         |
@@ -582,7 +582,7 @@ cmake --build . --config Release
 ./robot_daemon
 ```
 
-You will observe deterministic $100\text{ Hz}$ execution with sub-microsecond loop body times (`Exec=1.40 us`) and automatic RAII motor disarm on shutdown:
+You will observe deterministic $100\text{ Hz}$ execution with few-microsecond loop body times (`Exec=1.40 us`) and automatic RAII motor disarm on shutdown:
 
 ```text
 [RAII SafetyGuard] Armed motor bus (v=0.0 m/s, w=0.0 rad/s)

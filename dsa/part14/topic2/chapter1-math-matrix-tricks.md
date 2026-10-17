@@ -228,12 +228,12 @@ Binary exponentiation: O(log n).
 3^13 = 3^(8 + 4 + 1) = 3^8 * 3^4 * 3^1
 
 Process bits from right to left:
-  bit 0 (1): result *= base  -> result = 3
-  bit 1 (0): skip            -> result = 3
-  bit 2 (1): result *= base  -> result = 3 * 9 = 27
-  bit 3 (1): result *= base  -> result = 27 * 81 = 2187
+  bit 0 (1): result *= base  -> result = 3            (base = 3^1 = 3)
+  bit 1 (0): skip            -> result = 3            (base = 3^2 = 9)
+  bit 2 (1): result *= base  -> result = 3 * 81 = 243  (base = 3^4 = 81)
+  bit 3 (1): result *= base  -> result = 243 * 6561 = 1594323  (base = 3^8 = 6561)
 
-3^13 = 2187 (only 4 multiplications instead of 13!)
+3^13 = 1594323 (only 4 multiplications instead of 13!)
 ```
 
 ### Dry-Run Table: 3^13
@@ -246,9 +246,9 @@ Process bits from right to left:
 | 4 | 1 | 1 | 6561 | 243*6561=1594323 | result *= base |
 | 5 | 0 | — | — | — | done |
 
-Wait, let me recalculate. 3^13 = 1594323. That's correct for 3^13.
+The final result, 3^13 = 1594323, is correct.
 
-Actually, 3^13 = 1594323? Let me verify: 3^1=3, 3^2=9, 3^3=27, 3^4=81, 3^5=243, 3^6=729, 3^7=2187, 3^8=6561, 3^9=19683, 3^10=59049, 3^11=177147, 3^12=531441, 3^13=1594323. Yes.
+To verify by repeated multiplication: 3^1=3, 3^2=9, 3^3=27, 3^4=81, 3^5=243, 3^6=729, 3^7=2187, 3^8=6561, 3^9=19683, 3^10=59049, 3^11=177147, 3^12=531441, 3^13=1594323, as expected.
 
 ```cpp
 long long power(long long base, long long exp) {

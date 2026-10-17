@@ -70,11 +70,11 @@ We recursively divide the array into halves until we reach single elements (base
 | Step | Array State | Action |
 |------|-------------|--------|
 | 1 | `[38, 27, 43, 3, 9, 82, 10]` | Split at mid=3 |
-| 2 | `[38, 27, 43]` + `[3, 9, 82, 10]` | Recurse left |
-| 3 | `[38]` + `[27, 43]` | Split |
-| 4 | `[27]` + `[43]` | Merge → `[27, 43]` |
-| 5 | `[27, 38, 43]` | Merge → `[27, 38, 43]` |
-| 6 | `[27, 38, 43]` + `[3, 9, 82, 10]` | Merge halves |
+| 2 | `[38, 27, 43, 3]` + `[9, 82, 10]` | Recurse left |
+| 3 | `[38, 27]` + `[43, 3]` | Split |
+| 4 | `[27, 38]` + `[3, 43]` | Merge pairs |
+| 5 | `[3, 27, 38, 43]` | Merge → `[3, 27, 38, 43]` |
+| 6 | `[3, 27, 38, 43]` + `[9, 10, 82]` | Merge halves |
 | 7 | `[3, 9, 10, 27, 38, 43, 82]` | Final sorted array |
 
 **Production Version (Handles duplicates, stable):**
@@ -154,11 +154,12 @@ The array is divided into four regions: `[0..low-1]` (0s), `[low..mid-1]` (1s), 
 | Step | Array | low | mid | high | Action |
 |------|-------|-----|-----|------|--------|
 | 0 | `[2,0,2,1,1,0]` | 0 | 0 | 5 | Start |
-| 1 | `[0,0,2,1,1,2]` | 1 | 1 | 4 | Swap(0,5), 2 moved to end |
-| 2 | `[0,0,2,1,1,2]` | 1 | 2 | 4 | nums[2]=2, swap with high |
-| 3 | `[0,0,1,1,2,2]` | 1 | 2 | 3 | nums[2]=1, mid++ |
-| 4 | `[0,0,1,1,2,2]` | 1 | 3 | 3 | nums[3]=1, mid++ |
-| 5 | `[0,0,1,1,2,2]` | 1 | 4 | 3 | mid > high, done |
+| 1 | `[0,0,2,1,1,2]` | 0 | 0 | 4 | nums[0]=2, Swap(0,5), 2 moved to end |
+| 2 | `[0,0,2,1,1,2]` | 1 | 1 | 4 | nums[0]=0, swap(0,0), low++, mid++ |
+| 3 | `[0,0,2,1,1,2]` | 2 | 2 | 4 | nums[1]=0, swap(1,1), low++, mid++ |
+| 4 | `[0,0,1,1,2,2]` | 2 | 2 | 3 | nums[2]=2, swap with high |
+| 5 | `[0,0,1,1,2,2]` | 2 | 3 | 3 | nums[2]=1, mid++ |
+| 6 | `[0,0,1,1,2,2]` | 2 | 4 | 3 | nums[3]=1, mid++ → mid > high, done |
 
 **Edge Case Version (Handles any integers, 3-way partition):**
 ```cpp

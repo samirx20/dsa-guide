@@ -1,4 +1,4 @@
-# Part 3, Topic 1: LLM APIs & Message History
+# Part 8, Topic 1: LLM APIs & Message History
 ## Chapter 1: The Chat Completions API
 
 **Prerequisite Knowledge:** Basic understanding of Python lists, dictionaries, and API requests.
@@ -158,7 +158,7 @@ response = client.chat.completions.create(
     
     temperature=0.0,
     #           ^^^
-    #           0.0 = deterministic (same input → same output)
+    #           0.0 = near-deterministic (same input → almost always same output)
     #           1.0 = creative (varied outputs)
     
     max_tokens=50,
@@ -198,7 +198,7 @@ response = client.chat.completions.create(
 
 ### 3. Understanding Parameters
 
-`temperature` controls randomness (0.0 = deterministic, 1.0 = creative). `max_tokens` limits the response length.
+`temperature` controls randomness (0.0 = near-deterministic, 1.0 = creative; the API accepts up to 2.0). `max_tokens` limits the response length.
 
 ```python
 # Ask for a creative answer
@@ -247,10 +247,10 @@ print("Precise:", response_precise.choices[0].message.content)
 
 | Temperature | Behavior | Use Case | Consistency |
 |-------------|----------|----------|-------------|
-| 0.0 | Deterministic, predictable | Tool-calling, factual Q&A | Same input → same output |
+| 0.0 | Near-deterministic, predictable | Tool-calling, factual Q&A | Same input → almost always same output (not guaranteed) |
 | 0.3 | Mostly predictable, slight variation | Data analysis, summaries | Very consistent |
 | 0.7 | Balanced creativity | General chat, code generation | Moderate variation |
-| 1.0 | Maximum creativity | Creative writing, brainstorming | Highly varied |
+| 1.0 | High creativity (API max is 2.0) | Creative writing, brainstorming | Highly varied |
 
 ### Edge Case: Temperature with Same Prompt
 
@@ -435,7 +435,7 @@ choice.finish_reason
 #         Why the AI stopped:
 #         "stop"   = naturally finished (said everything it needed)
 #         "length" = hit max_tokens limit (response was cut off)
-#         "tool"   = wants to call a tool (agentic use case)
+#         "tool_calls" = wants to call a tool (agentic use case)
 
 response.usage
 #         ^^^^^
@@ -451,7 +451,7 @@ response.usage
 |-----------------|---------|------------|
 | `"stop"` | AI finished naturally | Process the response |
 | `"length"` | Hit `max_tokens` limit | Increase `max_tokens` or truncate |
-| `"tool"` | AI wants to call a tool | Execute the tool and send result |
+| `"tool_calls"` | AI wants to call a tool | Execute the tool and send result |
 | `"content_filter"` | Response blocked by safety filter | Review your prompt |
 
 ### Error Scenarios and Fixes
@@ -598,9 +598,9 @@ The Chat Completions API uses a messages list with `system`, `user`, and `assist
 | System role | `{"role": "system", "content": "..."}` | Set AI behavior |
 | User role | `{"role": "user", "content": "..."}` | Human input |
 | Assistant role | `{"role": "assistant", "content": "..."}` | AI previous response |
-| Temperature | `0.0` to `1.0` | Controls randomness |
+| Temperature | `0.0` to `2.0` | Controls randomness |
 | Max tokens | Integer (e.g., `500`) | Limits response length |
-| Finish reason | `"stop"`, `"length"`, `"tool"` | Why AI stopped |
+| Finish reason | `"stop"`, `"length"`, `"tool_calls"` | Why AI stopped |
 | Prompt tokens | `response.usage.prompt_tokens` | Input token count |
 | Completion tokens | `response.usage.completion_tokens` | Output token count |
 | Content | `response.choices[0].message.content` | AI's response text |

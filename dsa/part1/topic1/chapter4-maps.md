@@ -48,7 +48,7 @@ There are two types of maps in C++. **Always default to `unordered_map`.**
 | Insert | $O(1)$ average | $O(\log N)$ |
 | Erase | $O(1)$ average | $O(\log N)$ |
 | Key Order | Random | Sorted |
-| Memory | Higher (hash table overhead) | Lower |
+| Memory | Bucket array + 1 node per key (often less in practice) | 3 pointers + color per node (often more) |
 | Worst Case | $O(N)$ (hash collisions) | $O(\log N)$ always |
 
 ### 3. Core Operations
@@ -197,8 +197,8 @@ for (auto it = freq.begin(); it != freq.end(); ++it) {
 }
 
 // Iterating a map (sorted order)
-map<string, int> sorted Ages = {{"Charlie", 35}, {"Alice", 30}};
-for (const auto& [name, age] : sorted Ages) {
+map<string, int> sortedAges = {{"Charlie", 35}, {"Alice", 30}};
+for (const auto& [name, age] : sortedAges) {
     cout << name << ": " << age << "\n"; // Prints in alphabetical key order
 }
 ```

@@ -39,7 +39,7 @@ Mastering the Monotonic pattern is the key to passing Hard array problems.
 
 **Trigger:** Determine if `()[]{}` is valid.
 
-**Intuition:** Classic Stack. Iterate through characters. If it's an opening bracket, push the *closing* equivalent to the stack. If it's a closing bracket, check if the stack is empty or if the top doesn't match. If valid, pop. At the end, return `stack.empty()`.
+**Intuition:** Classic Stack. Iterate through characters. If it's an opening bracket, push the *closing* equivalent to the stack. If it's a closing bracket, check if the stack is empty or if the top doesn't match. If valid, pop. At the end, return `stack.empty()`. (The walkthrough below follows this push-the-closer idea; the code after it uses the equivalent variant that pushes the *opening* bracket and checks the pair when popping.)
 
 **Step-by-Step Walkthrough for `"{[()]}"`:**
 
@@ -249,15 +249,16 @@ The stack naturally handles nested expressions:
 | Step | i | Temp | Stack (indices) | Action | Result |
 |------|---|------|-----------------|--------|--------|
 | 1 | 0 | 73 | [0] | Push 0 | [0,0,0,0,0,0,0] |
-| 2 | 1 | 74 | [0] | 74>73? Pop 0, result[0]=1 | [1,0,0,0,0,0,0] |
-| 3 | 2 | 75 | [1] | 75>74? Pop 1, result[1]=1 | [1,1,0,0,0,0,0] |
-| 4 | 3 | 71 | [2] | 71>75? No, push 3 | [1,1,0,0,0,0,0] |
-| 5 | 4 | 69 | [2,3] | 69>71? No, push 4 | [1,1,0,0,0,0,0] |
+| 2 | 1 | 74 | [1] | 74>73? Pop 0, result[0]=1, push 1 | [1,0,0,0,0,0,0] |
+| 3 | 2 | 75 | [2] | 75>74? Pop 1, result[1]=1, push 2 | [1,1,0,0,0,0,0] |
+| 4 | 3 | 71 | [2,3] | 71>75? No, push 3 | [1,1,0,0,0,0,0] |
+| 5 | 4 | 69 | [2,3,4] | 69>71? No, push 4 | [1,1,0,0,0,0,0] |
 | 6 | 5 | 72 | [2,3] | 72>69? Pop 4, result[4]=1 | [1,1,0,0,1,0,0] |
 | 7 | 5 | 72 | [2] | 72>71? Pop 3, result[3]=2 | [1,1,0,2,1,0,0] |
-| 8 | 5 | 72 | [] | 72>75? No, push 5 | [1,1,0,2,1,0,0] |
-| 9 | 6 | 76 | [5] | 76>72? Pop 5, result[5]=1 | [1,1,0,2,1,1,0] |
-| 10 | 6 | 76 | [] | Push 6 | [1,1,0,2,1,1,0] |
+| 8 | 5 | 72 | [2,5] | 72>75? No, push 5 | [1,1,0,2,1,0,0] |
+| 9 | 6 | 76 | [2] | 76>72? Pop 5, result[5]=1 | [1,1,0,2,1,1,0] |
+| 10 | 6 | 76 | [] | 76>75? Pop 2, result[2]=4 | [1,1,4,2,1,1,0] |
+| 11 | 6 | 76 | [6] | Push 6 | [1,1,4,2,1,1,0] |
 
 **Final result:** `[1, 1, 4, 2, 1, 1, 0]`
 
@@ -305,7 +306,7 @@ The answer is `stack.size()`.
 | 2 | 8 | 8 | 4 | 1.0 | [1.0] | 1.0<=1.0, fleet! Don't push |
 | 3 | 5 | 5 | 1 | 7.0 | [1.0, 7.0] | Push |
 | 4 | 3 | 3 | 3 | 3.0 | [1.0, 7.0] | 3.0<=7.0, fleet! Don't push |
-| 5 | 0 | 0 | 1 | 12.0 | [1.0, 7.0] | 12.0>7.0, Push |
+| 5 | 0 | 0 | 1 | 12.0 | [1.0, 7.0, 12.0] | 12.0>7.0, Push |
 
 **Result:** stack.size() = 3 fleets
 
@@ -364,7 +365,7 @@ Pop it, calculate its area (`height * width`), and record the max. The width is 
 | Step | i | Height | Stack (indices) | Action | Max Area |
 |------|---|--------|-----------------|--------|----------|
 | 1 | 0 | 2 | [0] | Push 0 | 0 |
-| 2 | 1 | 1 | [0] | 1<2? Pop 0, area=2*(1-0-1)=2 | 2 |
+| 2 | 1 | 1 | [0] | 1<2? Pop 0, stack empty, area=2*1=2 | 2 |
 | 3 | 1 | 1 | [1] | Push 1 | 2 |
 | 4 | 2 | 5 | [1,2] | Push 2 | 2 |
 | 5 | 3 | 6 | [1,2,3] | Push 3 | 2 |
@@ -373,8 +374,8 @@ Pop it, calculate its area (`height * width`), and record the max. The width is 
 | 8 | 4 | 2 | [1] | 2>1, push 4 | 10 |
 | 9 | 5 | 3 | [1,4] | Push 5 | 10 |
 | 10 | end | - | [1,4,5] | Pop 5, area=3*(6-4-1)=3 | 10 |
-| 11 | end | - | [1,4] | Pop 4, area=2*(6-1-1)=10 | 10 |
-| 12 | end | - | [1] | Pop 1, area=1*(6-0-1)=5 | 10 |
+| 11 | end | - | [1,4] | Pop 4, area=2*(6-1-1)=8 | 10 |
+| 12 | end | - | [1] | Pop 1, stack empty, area=1*6=6 | 10 |
 
 **Result:** 10
 
@@ -432,10 +433,10 @@ Using h=0 at i=n ensures all bars get popped.
 |------|-----------|----|----|--------|--------|
 | 1 | push(1) | [1] | [] | Push to s1 | - |
 | 2 | push(2) | [1,2] | [] | Push to s1 | - |
-| 3 | peek() | [1,2] | [2,1] | Pour s1->s2 | 1 |
+| 3 | peek() | [] | [2,1] | Pour s1->s2 | 1 |
 | 4 | pop() | [] | [2] | Pop s2 | 1 |
 | 5 | push(3) | [3] | [2] | Push to s1 | - |
-| 6 | pop() | [3] | [] | Pour s1->s2, pop | 2 |
+| 6 | pop() | [3] | [] | s2 not empty, no pour; pop s2 | 2 |
 
 **Code:**
 ```cpp
@@ -504,11 +505,11 @@ Amortized O(1):
 | 1 | 0 | 1 | [0] | Push 0 | [] |
 | 2 | 1 | 3 | [0] | 3>1? Pop 0, Push 1 | [] |
 | 3 | 2 | -1 | [1,2] | Push 2 | [3] |
-| 4 | 3 | -3 | [1,2,3] | Push 3 | [3] |
-| 5 | 4 | 5 | [4] | Pop 3,2,1 (all<5), Push 4 | [3, 5] |
-| 6 | 5 | 3 | [4,5] | Push 5 | [3, 5] |
-| 7 | 6 | 6 | [6] | Pop 5,4 (both<6), Push 6 | [5, 6] |
-| 8 | 7 | 7 | [7] | Pop 6 (6<7), Push 7 | [6, 7] |
+| 4 | 3 | -3 | [1,2,3] | Push 3 | [3, 3] |
+| 5 | 4 | 5 | [4] | Pop 3,2,1 (all<5), Push 4 | [3, 3, 5] |
+| 6 | 5 | 3 | [4,5] | Push 5 | [3, 3, 5, 5] |
+| 7 | 6 | 6 | [6] | Pop 5,4 (both<6), Push 6 | [3, 3, 5, 5, 6] |
+| 8 | 7 | 7 | [7] | Pop 6 (6<7), Push 7 | [3, 3, 5, 5, 6, 7] |
 
 **Final result:** `[3, 3, 5, 5, 6, 7]`
 

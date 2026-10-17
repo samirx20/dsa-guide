@@ -92,9 +92,9 @@ Add 'b': Set: {c,a,b}, Window: [c,a,b], maxLen=3
 | 3 | 2 | c | {a,b} | insert | {a,b,c} | [a,b,c] | 3 |
 | 4 | 3 | a | {a,b,c} | erase 'a', insert 'a' | {b,c,a} | [b,c,a] | 3 |
 | 5 | 4 | b | {b,c,a} | erase 'b', insert 'b' | {c,a,b} | [c,a,b] | 3 |
-| 6 | 5 | b | {c,a,b} | erase 'c','a','b', insert 'b' | {b} | [b] | 3 |
-| 7 | 6 | b | {b} | erase 'b', insert 'b' | {b} | [b] | 3 |
-| 8 | 7 | b | {b} | erase 'b', insert 'b' | {b} | [b] | 3 |
+| 6 | 5 | c | {c,a,b} | erase 'c', insert 'c' | {a,b,c} | [a,b,c] | 3 |
+| 7 | 6 | b | {a,b,c} | erase 'a','b', insert 'b' | {c,b} | [c,b] | 3 |
+| 8 | 7 | b | {c,b} | erase 'c','b', insert 'b' | {b} | [b] | 3 |
 
 **Answer: 3** (substring "abc")
 
@@ -207,12 +207,9 @@ maxLen=4
 Step 5: right=4, 'B'
 Counts: [3,2,...], maxFreq=3
 Window: [A,A,B,A,B], len=5, replacements=2 > 1 ✗
-Shrink: remove s[0]='A', left=1
-Counts: [2,2,...], maxFreq=2 (but we keep old maxFreq=3)
-Window: [A,B,A,B], len=4, replacements=2 > 1 ✗
-Shrink: remove s[1]='A', left=2
-Counts: [1,2,...], maxFreq=2
-Window: [B,A,B], len=3, replacements=1 ≤ 1 ✓
+Shrink (once, `if`): remove s[0]='A', left=1
+Counts: [2,2,...], true max is 2 (but we keep old maxFreq=3)
+Window: [A,B,A,B], len=4, len - maxFreq = 4 - 3 = 1 → no further shrink
 maxLen stays 4
 ```
 
@@ -223,9 +220,9 @@ maxLen stays 4
 | 2 | 1 | A | 2 | 2 | 0 | Yes | 2 |
 | 3 | 2 | B | 2 | 3 | 1 | Yes | 3 |
 | 4 | 3 | A | 3 | 4 | 1 | Yes | 4 |
-| 5 | 4 | B | 3 | 5 | 2 | No | 4 |
-| 6 | 4 | B | 3 | 4 | 2 | No | 4 |
-| 7 | 4 | B | 2 | 3 | 1 | Yes | 4 |
+| 5 | 4 | B | 3 | 5 | 2 | No → shrink once (left=1) | 4 |
+| 6 | 5 | B | 3 | 5 | 2 | No → shrink once (left=2) | 4 |
+| 7 | 6 | A | 3 | 5 | 2 | No → shrink once (left=3) | 4 |
 
 #### Edge Case: k = 0
 ```cpp
@@ -321,11 +318,11 @@ Input: s1 = "ab", s2 = "eidbaooo"
 
 s1Count: [1,1,0,0,...] (a=1, b=1)
 
-Step 1: Window [e,i] → windowCount: [0,0,0,0,1,0,0,0,0,1,...]
+Step 1: Window [e,i] → windowCount: [0,0,0,0,1,0,0,0,1,0,...]
          Not equal to s1Count
 
 Step 2: Window [i,d] → add 'd', remove 'e'
-         windowCount: [0,0,0,1,0,1,0,0,0,0,...]
+         windowCount: [0,0,0,1,0,0,0,0,1,0,...]
          Not equal
 
 Step 3: Window [d,b] → add 'b', remove 'i'
@@ -468,12 +465,12 @@ Window: "ADOBEC" (contains A,B,C)
 matched = 3 == required = 3 → VALID
 
 Shrink while valid:
-  "ADOBEC" → "DOBEC" → "OBEC" → "BEC" → "EC" (loses A, matched=2, STOP)
+  "ADOBEC" → "DOBEC" (loses A, matched=2, STOP)
   Min window so far: "ADOBEC" (length 6)
 
 Continue expanding:
-  "CODEBANC" → has all required chars
-  Shrink: "CODEBANC" → "ODEBANC" → "DEBANC" → "EBANC" → "BANC" (length 4)
+  "ODEBANC" → has all required chars
+  Shrink: "ODEBANC" → "DEBANC" → "EBANC" → "BANC" (length 4)
   
 Final answer: "BANC"
 ```
@@ -483,7 +480,7 @@ Final answer: "BANC"
 |------|--------|---------|--------|--------|----------|
 | 1-5 | ADOBEC | 3 | shrink | 6 | 0 |
 | 6 | DOBEC | 2 | expand | 6 | 0 |
-| 7-12 | CODEBANC | 3 | shrink | 4 | 9 |
+| 7-12 | ODEBANC | 3 | shrink | 4 | 9 |
 
 #### Edge Case: t Has Duplicate Characters
 ```cpp
@@ -494,10 +491,10 @@ Final answer: "BANC"
 // Answer: "aa"
 ```
 
-#### Common Mistake: Using > Instead of >=
+#### Common Mistake: Using >= or > Instead of ==
 ```cpp
-// WRONG: Checking exact match
-if (windowCounts[c] == targetCounts[c]) matched++;
+// WRONG: Checking >= (increments matched again for every extra copy)
+if (windowCounts[c] >= targetCounts[c]) matched++;
 
 // WRONG: Checking greater than
 if (windowCounts[c] > targetCounts[c]) matched++;

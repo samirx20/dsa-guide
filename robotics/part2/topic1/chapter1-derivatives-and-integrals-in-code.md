@@ -277,7 +277,7 @@ Depending on whether you are integrating live sensor data or simulating a physic
    $$k_2 = f\!\left(\mathbf{s}_k + \tfrac{\Delta t}{2} k_1, u_k\right), \qquad k_3 = f\!\left(\mathbf{s}_k + \tfrac{\Delta t}{2} k_2, u_k\right)$$
    $$k_4 = f(\mathbf{s}_k + \Delta t\, k_3, u_k)$$
    $$\mathbf{s}_{k+1} = \mathbf{s}_k + \frac{\Delta t}{6}\left(k_1 + 2k_2 + 2k_3 + k_4\right)$$
-   * **Pros:** Fourth-order accuracy $\mathcal{O}(\Delta t^4)$—halving $\Delta t$ reduces single-step error by $16\times$.
+   * **Pros:** Fourth-order accuracy $\mathcal{O}(\Delta t^4)$—halving $\Delta t$ reduces accumulated (global) error by $16\times$.
 
 #### 4.3 Dry Run: Exact Calculus vs. Euler vs. Semi-Implicit vs. Trapezoidal
 
@@ -477,7 +477,7 @@ if __name__ == "__main__":
 
 **What's happening:**
 1. **`torque_gravity = -mass * g * length * math.sin(theta)`**: Computes the non-linear gravitational torque on the joint.
-2. **In the `False` (Forward Euler) branch**: After just $5\text{ seconds}$ ($250$ ticks at $\Delta t = 0.02\text{ s}$), the total mechanical energy balloons from **$9.81\text{ J}$ to over $26.4\text{ J}$**—the simulated arm starts spinning over the top like a propeller from phantom numerical energy!
+2. **In the `False` (Forward Euler) branch**: After just $5\text{ seconds}$ ($250$ ticks at $\Delta t = 0.02\text{ s}$), the total mechanical energy balloons from **$9.81\text{ J}$ to about $16.7\text{ J}$** (a $70\%$ gain)—the simulated arm swings far past $\pm 90^\circ$ (to roughly $134^\circ$) on phantom numerical energy!
 3. **In the `True` (Semi-Implicit Euler) branch**: Swapping the update order of `omega` and `theta` keeps the mechanical energy locked near **$9.81\text{ J}$** indefinitely.
 
 ---

@@ -1,4 +1,4 @@
-# Part 1, Topic 1: Asynchronous Python
+# Part 5, Topic 1: Asynchronous Python
 ## Chapter 1: The Event Loop
 
 **Prerequisite Knowledge:** Basic Python functions, understanding of the difference between executing code and waiting for external things (like downloading a file).
@@ -67,14 +67,14 @@ async def say_hello():
 asyncio.run(say_hello())     # Creates event loop → runs coroutine → closes loop
 #                             ^^^^^^^^^^^
 #                             Entry point for ALL async Python programs
-#                             Equivalent to: loop = asyncio.get_event_loop()
+#                             Equivalent to: loop = asyncio.new_event_loop()
 #                                           loop.run_until_complete(say_hello())
 #                                           loop.close()
 ```
 
 ### 2. Coroutines vs Threads
 
-Threads are OS-managed and run truly in parallel, but they share memory which causes race conditions. Coroutines are managed by Python and run concurrently on one thread — no race conditions, no locks needed. For I/O-bound workloads (APIs, databases), coroutines are simpler and faster.
+Threads are OS-managed and preempted at arbitrary points (in CPython the GIL still lets only one run Python bytecode at a time), and they share memory which causes race conditions. Coroutines are managed by Python and run concurrently on one thread — they can only switch at `await`, so races are much rarer and locks are rarely needed (state read before an `await` and written after it can still race). For I/O-bound workloads (APIs, databases), coroutines are simpler and faster.
 
 ```
 ┌──────────────────── THREADS ────────────────────┐
@@ -138,18 +138,18 @@ async def fetch_data_async():
 
 # Coroutines: Python decides when to switch (at 'await' points)
 #             Only ONE coroutine runs at any instant
-#             No race conditions because switching only happens at known points
+#             Far fewer races because switching only happens at known points (await)
 #             No locks needed for most I/O-bound work
 ```
 
 | Feature | Threads | Coroutines |
 |---------|---------|------------|
 | Managed by | Operating System | Python (asyncio) |
-| Parallelism | True parallelism (multiple cores) | Concurrent on one thread |
+| Parallelism | OS threads, but CPython's GIL runs Python bytecode on one core at a time | Concurrent on one thread |
 | Memory sharing | Shared (dangerous) | Shared (safe — cooperative) |
 | Switching cost | High (OS context switch) | Low (function resume) |
 | Locks needed | Yes (race conditions) | Rarely (only for shared mutable state) |
-| Best for | CPU-bound work | I/O-bound work (APIs, DB, files) |
+| Best for | Blocking I/O / sync libraries (CPU-bound Python needs processes due to the GIL) | I/O-bound work (APIs, DB, files) |
 
 ### 3. Blocking vs Non-Blocking
 
@@ -311,14 +311,15 @@ asyncio.run(main())
 # 3. Closes the event loop
 # 4. Returns the result
 #
-# You can ONLY call asyncio.run() once per program
-# Calling it again raises RuntimeError
+# You can NOT call asyncio.run() while an event loop is already running
+# (e.g. from inside a coroutine) — that raises RuntimeError
 ```
 
 ```python
-# WRONG: Can't call asyncio.run() twice
+# Calling asyncio.run() twice in sequence is allowed (each call creates a fresh loop)
 asyncio.run(main())   # Works
-asyncio.run(main())   # RuntimeError: This event loop is already running
+asyncio.run(main())   # Also works — but asyncio.run() INSIDE a running loop raises
+                      # RuntimeError: asyncio.run() cannot be called from a running event loop
 
 # RIGHT: For scripts, call it once at the bottom
 async def main():

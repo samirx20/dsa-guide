@@ -319,7 +319,7 @@ If you insert `[1, 2, 3, 4, 5]` into a fresh BST, every node goes to the right c
 
 ### 7. Balanced BSTs: AVL and Red-Black Trees
 
-**Balanced BSTs** (like AVL trees or Red-Black trees) automatically rotate themselves during insertion to ensure the height never exceeds $\log N$. You will rarely be asked to code an AVL rotation on a whiteboard, but you must know that `std::map` and `std::set` in C++ use Red-Black trees to guarantee $O(\log N)$ worst-case performance.
+**Balanced BSTs** (like AVL trees or Red-Black trees) automatically rotate themselves during insertion to ensure the height always stays $O(\log N)$ (at most about $1.44\log_2 N$ for AVL and $2\log_2(N+1)$ for Red-Black). You will rarely be asked to code an AVL rotation on a whiteboard, but you must know that `std::map` and `std::set` in C++ use Red-Black trees to guarantee $O(\log N)$ worst-case performance.
 
 ```cpp
 // AVL Tree rotations:

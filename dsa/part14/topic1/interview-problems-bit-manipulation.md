@@ -179,7 +179,7 @@ while (n) {
 
 **Step-by-Step Walkthrough:**
 
-**Intuition:** You could loop $N$ times and call the $O(1)$ function from Problem 2, resulting in an $O(N \log N)$ overall time.
+**Intuition:** You could loop $N$ times and call the $O(\log N)$ function from Problem 2, resulting in an $O(N \log N)$ overall time.
 *Better DP Solution:* The number of set bits in `x` is exactly the number of set bits in `x / 2` (which is `x >> 1`), plus 1 if `x` is odd!
 `dp[i] = dp[i >> 1] + (i & 1);`
 
@@ -314,16 +314,14 @@ Missing number: 2
 
 **Dry-Run Table:**
 
-| Step | num | res (before) | res ^ num | res (after) |
+| Step | num | res (before) | res ^ i ^ num | res (after) |
 |---|---|---|---|---|
-| 0 | — | 0 (init) | — | 0 |
-| 1 | 3 | 0 | 0 ^ 3 | 3 |
-| 2 | 0 | 3 | 3 ^ 0 | 3 |
-| 3 | 1 | 3 | 3 ^ 1 | 2 |
-| 4 | 2 | 2 | 2 ^ 2 | 0 |
-| 5 | 3 | 0 | 0 ^ 3 | 3 |
+| 0 | — | 3 (init = n) | — | 3 |
+| 1 | 3 (i=0) | 3 | 3 ^ 0 ^ 3 | 0 |
+| 2 | 0 (i=1) | 0 | 0 ^ 1 ^ 0 | 1 |
+| 3 | 1 (i=2) | 1 | 1 ^ 2 ^ 1 | 2 |
 
-Wait, let me redo this properly: XOR of i from 0..n AND nums array.
+Equivalently, split it into the XOR of i from 0..n and the XOR of the nums array:
 
 ```
 Expected XOR: 0 ^ 1 ^ 2 ^ 3 = 0
@@ -403,7 +401,8 @@ Carry = 0 → done! Result: 1000 = 8 ✓ (5+3=8)
 |---|---|---|---|---|
 | 1 | 0110 | 0010 | 0001 | 0010 |
 | 2 | 0100 | 0100 | 0010 | 0100 |
-| 3 | 0000 | 1000 | 0000 | 0000 |
+| 3 | 0000 | 1000 | 0100 | 1000 |
+| 4 | 1000 | 0000 | 0000 | 0000 |
 
 ```cpp
 int getSum(int a, int b) {

@@ -1,4 +1,4 @@
-# Part 5, Topic 3: Caching & Performance
+# Part 6, Topic 2: Caching & Performance
 ## Chapter 2: Redis Caching Patterns
 
 ### What You'll Learn
@@ -163,12 +163,12 @@ async function getProducts() {
     }
 
     // 2. Cache miss: query database
-    const products = await db.select().from(products)
+    const rows = await db.select().from(products)
 
     // 3. Store in cache (TTL: 5 minutes)
-    await redis.set(cacheKey, JSON.stringify(products), 'EX', 300)
+    await redis.set(cacheKey, JSON.stringify(rows), 'EX', 300)
 
-    return products
+    return rows
 }
 
 async function getProduct(id: number) {
@@ -213,8 +213,8 @@ function cacheMiddleware(ttlSeconds: number) {
 
 // Usage
 app.get('/products', cacheMiddleware(300), async (c) => {
-    const products = await db.select().from(products)
-    return c.json(products)
+    const rows = await db.select().from(products)
+    return c.json(rows)
 })
 ```
 
@@ -303,7 +303,7 @@ async function getWithLock(key: string, fetchFn: () => Promise<any>, ttl: number
 }
 
 // Usage
-const products = await getWithLock(
+const productList = await getWithLock(
     'products:all',
     () => db.select().from(products),
     300
@@ -314,7 +314,7 @@ const products = await getWithLock(
 
 ## 8. Redis as Session Store
 
-Ties back to Part 4 auth — store sessions in Redis for speed.
+Ties back to session-based authentication — store sessions in Redis for speed.
 
 ```typescript
 // lib/sessions.ts

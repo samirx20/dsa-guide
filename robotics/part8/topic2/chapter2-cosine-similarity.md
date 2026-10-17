@@ -1,4 +1,4 @@
-# Part 4, Topic 1: Vector Search & Embeddings
+# Part 8, Topic 2: Vector Search & Embeddings
 ## Chapter 2: Cosine Similarity
 
 **Prerequisite Knowledge:** Basic understanding of arrays/lists and the concept of a coordinate system.
@@ -52,7 +52,7 @@ v2 = [0.15, 0.25, 0.35, 0.45, 0.55]
 v3 = [0.5, 0.4, 0.3, 0.2, 0.1]
 
 print(cosine_similarity(v1, v2))  # ~0.99 (nearly parallel)
-print(cosine_similarity(v1, v3))  # ~0.85 (similar but different direction)
+print(cosine_similarity(v1, v3))  # ~0.64 (similar but different direction)
 ```
 
 **What's happening:**
@@ -66,11 +66,11 @@ v2 = [0.15, 0.25, 0.35, 0.45, 0.55]
 #      |    └── Dimension 1: both positive, close in ratio
 #      └── Dimension 0: both positive, close in ratio
 #
-# v2 is roughly 1.5x v1 across all dimensions
+# v2 is v1 + 0.05 in every dimension (1.1x-1.5x per dimension)
 # They point in nearly the SAME direction
 # Dot product = 0.1*0.15 + 0.2*0.25 + ... = large positive
-# Magnitudes: |v1| ≈ 0.74, |v2| ≈ 1.11
-# Result: dot / (0.74 * 1.11) ≈ 0.99 → nearly identical direction
+# Magnitudes: |v1| ≈ 0.74, |v2| ≈ 0.84
+# Result: dot / (0.74 * 0.84) ≈ 0.99 → nearly identical direction
 ```
 
 Dot product measures how much two vectors align. Magnitudes act as normalizers — a short vector pointing the same direction as a long vector will still score close to 1. This is why cosine similarity works for text: it ignores how "long" or intense a document is and focuses on its topic direction.
@@ -140,7 +140,7 @@ import numpy as np
 short_doc = np.array([0.3, 0.4, 0.5])        # Short maintenance note
 long_doc = np.array([3.0, 4.0, 5.0])          # Same topic, much longer manual
 
-euclidean = np.linalg.norm(short_doc - long_doc)  # ≈ 6.7
+euclidean = np.linalg.norm(short_doc - long_doc)  # ≈ 6.36
 # Euclidean thinks these are VERY different documents!
 
 # GOOD: Using cosine similarity
@@ -149,7 +149,7 @@ cosine = np.dot(short_doc, long_doc) / (
 )
 # Cosine ≈ 1.0 → correctly identifies same topic
 
-print(f"Euclidean: {euclidean:.2f}")  # 6.71 (misleading)
+print(f"Euclidean: {euclidean:.2f}")  # 6.36 (misleading)
 print(f"Cosine: {cosine:.4f}")        # 1.0000 (correct)
 ```
 
@@ -162,7 +162,7 @@ long_doc = np.array([3.0, 4.0, 5.0])
 #
 # Euclidean: sqrt((0.3-3)^2 + (0.4-4)^2 + (0.5-5)^2)
 #          = sqrt(7.29 + 12.96 + 20.25)
-#          = sqrt(40.5) ≈ 6.7
+#          = sqrt(40.5) ≈ 6.36
 # This is the RAW DISTANCE, not semantic similarity
 #
 # Cosine: dot / (|a| * |b|)
@@ -224,7 +224,7 @@ query = [0.9, 0.1, 0.0, 0.0, 0.0]
 # doc2: [0.1, 0.9, 0.0, 0.0, 0.0]
 #        ^   ^^^^
 #        Opposite emphasis (dim 1 strong, dim 0 weak)
-#        Score ≈ 0.19 → low match
+#        Score ≈ 0.22 → low match
 #
 # doc3: [0.88, 0.08, 0.02, 0.01, 0.01]
 #        ^^^^  ^^^
@@ -479,7 +479,7 @@ def visualize_scores():
 
 # Output:
 # Same topic, different magnitude     → +1.0000
-# Similar topic                        → +0.9877
+# Similar topic                        → +0.9788
 # Unrelated topic                      → +0.0000
 # Opposite topic                       → -1.0000
 ```

@@ -256,14 +256,13 @@ bool hasPathSum(TreeNode* root, int targetSum) {
 //
 // hasPathSum(5, 22)
 //   hasPathSum(4, 17)
-//     hasPathSum(11, 6)
-//       hasPathSum(7, -1) → false (leaf, -1≠0)
-//       hasPathSum(2, -5) → false (leaf, -5≠0)
-//     hasPathSum(13, 4) → false (leaf, 4≠0)
-//   hasPathSum(8, 14)
-//     hasPathSum(13, 1) → false (leaf, 1≠0)
-//     hasPathSum(4, 10)
-//       hasPathSum(1, 6) → false (leaf, 6≠0)
+//     hasPathSum(11, 13)
+//       hasPathSum(7, 2) → false (leaf, 2-7=-5≠0)
+//       hasPathSum(2, 2) → true (leaf, 2-2=0) ✓
+//     → true (|| short-circuits: 4's null right child is never checked)
+//   → true
+//   hasPathSum(8, 17) is NEVER called (|| short-circuits)
+//     (it would explore 13 → 9-13≠0, and 4 → 1 → 5-1≠0)
 ```
 
 ---
@@ -318,12 +317,12 @@ public:
 // Good nodes (no greater value on path from root):
 // 3: path=[3], max=3 → good ✓
 // 1: path=[3,1], max=3 → not good (1<3)
+// 3: path=[3,1,3], max=3 → good ✓ (3>=3, ties count)
 // 4: path=[3,4], max=4 → good ✓
-// 3: path=[3,4,3], max=4 → not good (3<4)
 // 1: path=[3,4,1], max=4 → not good (1<4)
 // 5: path=[3,4,5], max=5 → good ✓
 //
-// Count = 3 (nodes 3, 4, 5)
+// Count = 4 (root 3, bottom-left 3, 4, 5)
 ```
 
 **Dry Run Table:**
@@ -332,10 +331,10 @@ public:
 |------|----------------|----------|-------|-------|
 | 3 | [3] | -∞ | Yes | 1 |
 | 1 | [3,1] | 3 | No | 1 |
-| 4 | [3,4] | 3 | Yes | 2 |
-| 3 | [3,4,3] | 4 | No | 2 |
-| 1 | [3,4,1] | 4 | No | 2 |
-| 5 | [3,4,5] | 4 | Yes | 3 |
+| 3 | [3,1,3] | 3 | Yes | 2 |
+| 4 | [3,4] | 3 | Yes | 3 |
+| 1 | [3,4,1] | 4 | No | 3 |
+| 5 | [3,4,5] | 4 | Yes | 4 |
 
 ---
 
@@ -408,7 +407,7 @@ public:
         if (root == nullptr) return "N,";
         
         return to_string(root->val) + "," + 
-               serialize(root->left) + "," + 
+               serialize(root->left) + 
                serialize(root->right);
     }
     
@@ -452,7 +451,7 @@ private:
 //
 // Serialize (Preorder):
 // 1 → 2 → N → N → 3 → 4 → N → N → 5 → N → N
-// Result: "1,2,N,N,3,4,N,N,5,N,N"
+// Result: "1,2,N,N,3,4,N,N,5,N,N,"
 //
 // Deserialize:
 // Process "1": create node(1)
@@ -484,7 +483,7 @@ private:
 | 8 | null | "1,2,N,N,3,4,N,N," | "5,N,N" |
 | 9 | 5 | "1,2,N,N,3,4,N,N,5," | "N,N" |
 | 10 | null | "1,2,N,N,3,4,N,N,5,N," | "N" |
-| 11 | null | "1,2,N,N,3,4,N,N,5,N,N" | "" |
+| 11 | null | "1,2,N,N,3,4,N,N,5,N,N," | "" |
 
 ---
 
