@@ -393,6 +393,175 @@ Cycle starts at node(4). Correct!
 
 ---
 
+## Practice & Self-Check
+
+Write `slow` and `fast` as two columns and advance them one row per loop iteration — exactly like the chapter's dry-run tables. For cycles, write the cycle out explicitly (e.g. `5 → 3`) next to your table.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Middle of an even list, two loop conditions.** For `1 -> 2 -> 3 -> 4 -> 5 -> 6 -> nullptr`: (a) which node does the chapter's `middleNode` (loop `while (fast != nullptr && fast->next != nullptr)`) return? (b) Which node is returned if the loop condition is changed to `while (fast->next && fast->next->next)` (the version used inside Reorder List)? Give a dry-run table for (a).
+
+**Q2. Cycle detection on a new list.** The list is `1 -> 2 -> 3 -> 4 -> 5`, with `node(5)->next = node(3)`. Trace `hasCycle`. At which iteration, and on which node, do `slow` and `fast` meet?
+
+**Q3. Finding the cycle start.** Continue Q2 with `detectCycle`. Write the Phase 2 table. Which node is returned? Check your answer with the chapter's formula $a + b = nc$ by stating $a$, $b$, $c$ and $n$.
+
+**Q4. Cycle at the head.** The list is `1 -> 2 -> 3`, with `node(3)->next = node(1)`. Where do the pointers meet in Phase 1, and how many Phase 2 iterations run before `detectCycle` returns? Which row of the Edge Case table does this confirm?
+
+### Coding Exercises
+
+**E1 (Easy). Happy Number.** Repeatedly replace `n` by the sum of the squares of its digits. `n` is *happy* if this reaches 1. Otherwise the sequence loops forever — detect the loop with Floyd's algorithm (the "Happy Number" row of Common Applications) instead of a hash set.
+
+```cpp
+bool isHappy(int n);
+// isHappy(19) -> true    (19 → 82 → 68 → 100 → 1)
+// isHappy(2)  -> false   (… → 4 → 16 → 37 → 58 → 89 → 145 → 42 → 20 → 4 …)
+```
+
+**E2 (Easy–Medium). Palindrome linked list in O(1) space.** Find the end of the first half with fast/slow, reverse the second half (Chapter 1), compare, then restore the list.
+
+```cpp
+bool isPalindrome(ListNode* head);
+// [1, 2, 2, 1] -> true
+// [1, 2, 3]    -> false
+// [1, 2, 1]    -> true
+```
+
+**E3 (Medium). Length of the cycle.** Return the number of nodes in the cycle, or 0 if there is none. After Phase 1 finds a meeting point, you are standing *inside* the cycle.
+
+```cpp
+int cycleLength(ListNode* head);
+// 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> (back to 4) -> 3
+// 1 -> 2 -> nullptr                        -> 0
+```
+
+#### Dry-Run: Answers
+
+**Q1.** (a) **node(4)** (second middle). (b) **node(3)** (first middle).
+
+| Iteration | `slow` | `fast` | Loop check before next iteration |
+|-----------|--------|--------|----------------------------------|
+| Start | node(1) | node(1) | fast and fast->next exist → go |
+| 1 | node(2) | node(3) | go |
+| 2 | node(3) | node(5) | fast->next = node(6) exists → go |
+| 3 | node(4) | nullptr | fast == nullptr → **stop** |
+
+For (b), after iteration 2 (`slow` = 3, `fast` = 5), `fast->next->next` is `nullptr`, so the loop stops one step earlier and returns node(3). That "first middle" is what Reorder List needs so that the first half is never shorter than the second.
+
+**Q2.** They meet at **iteration 3, on node(4)**. The cycle is `3 → 4 → 5 → 3`.
+
+| Iteration | `slow` | `fast` (two hops) | Meet? |
+|-----------|--------|-------------------|-------|
+| Start | node(1) | node(1) | – |
+| 1 | node(2) | 1 → 2 → **3** | No |
+| 2 | node(3) | 3 → 4 → **5** | No |
+| 3 | node(4) | 5 → 3 → **4** | **Yes** |
+
+**Q3.** Returns **node(3)**.
+
+| Phase 2 step | `slow` | `fast` | Equal? |
+|--------------|--------|--------|--------|
+| Reset | node(1) | node(4) | No |
+| 1 | node(2) | node(5) | No |
+| 2 | node(3) | node(3) (5 → 3) | **Yes** |
+
+Here $a = 2$ (1 → 2 → 3), $b = 1$ (3 → 4), $c = 3$ (nodes 3, 4, 5). Then $a + b = 3 = 1 \cdot c$, so $n = 1$, and walking $a = 2$ steps from the meeting point (4 → 5 → 3) lands on the start, as the formula promises.
+
+**Q4.** Phase 1 meets at **node(1)**; Phase 2 runs **0** iterations.
+
+| Iteration | `slow` | `fast` | Meet? |
+|-----------|--------|--------|-------|
+| 1 | node(2) | node(3) | No |
+| 2 | node(3) | 3 → 1 → **2** | No |
+| 3 | node(1) | 2 → 3 → **1** | **Yes** |
+
+Phase 2 resets `slow = head = node(1)`, which already equals `fast`, so `while (slow != fast)` never runs and node(1) is returned. This confirms the "Cycle at head" row: *they meet at head immediately*. Formula check: $a = 0$, $b = 0$, $c = 3$.
+
+**E1 — reference solution**
+
+```cpp
+int digitSquareSum(int n) {
+    int sum = 0;
+    while (n > 0) {
+        int d = n % 10;
+        sum += d * d;
+        n /= 10;
+    }
+    return sum;
+}
+
+bool isHappy(int n) {
+    int slow = n, fast = n;
+    do {
+        slow = digitSquareSum(slow);                    // 1 step
+        fast = digitSquareSum(digitSquareSum(fast));    // 2 steps
+    } while (slow != fast);
+    return slow == 1;          // 1 maps to itself, so a "cycle" at 1 means happy
+}
+```
+
+$O(\log n)$ per step, $O(1)$ space. The `do … while` is needed because `slow == fast` at the start. Every sequence eventually cycles: happy numbers get stuck at `1 → 1`, unhappy ones in the 8-number loop through `4`.
+
+**E2 — reference solution**
+
+```cpp
+ListNode* reverseList(ListNode* head) {          // Chapter 1, iterative
+    ListNode* prev = nullptr;
+    while (head != nullptr) {
+        ListNode* next_node = head->next;
+        head->next = prev;
+        prev = head;
+        head = next_node;
+    }
+    return prev;
+}
+
+bool isPalindrome(ListNode* head) {
+    if (head == nullptr || head->next == nullptr) return true;
+    ListNode* slow = head;
+    ListNode* fast = head;
+    while (fast->next != nullptr && fast->next->next != nullptr) {   // First middle
+        slow = slow->next;
+        fast = fast->next->next;
+    }
+    ListNode* second = reverseList(slow->next);    // Reverse second half
+    bool ok = true;
+    for (ListNode *p1 = head, *p2 = second; p2 != nullptr; p1 = p1->next, p2 = p2->next) {
+        if (p1->val != p2->val) { ok = false; break; }
+    }
+    slow->next = reverseList(second);              // Restore the original list
+    return ok;
+}
+```
+
+$O(N)$ time, $O(1)$ space. For `[1,2,3]`: `slow` stops at node(2), the second half `[3]` is compared with `1` → mismatch → false. For odd lengths the middle node stays in the first half and is never compared, which is correct.
+
+**E3 — reference solution**
+
+```cpp
+int cycleLength(ListNode* head) {
+    ListNode* slow = head;
+    ListNode* fast = head;
+    while (fast != nullptr && fast->next != nullptr) {
+        slow = slow->next;
+        fast = fast->next->next;
+        if (slow == fast) {                    // Phase 1: inside the cycle
+            int len = 1;
+            ListNode* walker = slow->next;
+            while (walker != slow) {           // Walk once around the loop
+                walker = walker->next;
+                len++;
+            }
+            return len;
+        }
+    }
+    return 0;                                  // fast hit the end: no cycle
+}
+```
+
+$O(N)$ time, $O(1)$ space. For the chapter's `1 → … → 6 → (4)` list, the cycle is `4 → 5 → 6 → 4`, so the walk counts 3 nodes.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

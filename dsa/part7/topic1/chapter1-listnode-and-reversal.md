@@ -428,6 +428,180 @@ Result: 2 -> 1 -> nullptr
 
 ---
 
+## Practice & Self-Check
+
+Follow the chapter's Golden Rule: draw boxes and arrows for every question below before you answer it.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Reversal dry-run on four nodes.** Run the iterative `reverseList` on `10 -> 20 -> 30 -> 40 -> nullptr`. Fill in `prev`, `curr` and `next_node` after each iteration. How many loop iterations run, and which node is returned?
+
+**Q2. What does this print?** Using the chapter's `ListNode` constructors and `printList`:
+
+```cpp
+ListNode* c = new ListNode(3);
+ListNode* b = new ListNode(2, c);
+ListNode* a = new ListNode(1, b);
+
+a->next = a->next->next;      // (i)
+
+ListNode* x = new ListNode(9);
+x->next = c->next;            // (ii)
+c->next = x;                  // (iii)
+
+printList(a);
+```
+
+**Q3. The wrong insertion order.** Start from `1 -> 3 -> 4 -> nullptr` with `NodeA` = node(1) and `NewNode` = node(5). Run the two insertion lines in the **wrong** order (Step 2 first, then Step 1). What does `printList(head)` do afterwards? What happened to nodes 3 and 4?
+
+**Q4. Recursive reversal, mid-unwind.** Call `reverseListRecursive` on `1 -> 2 -> 3 -> 4 -> nullptr`. (a) How many frames are on the call stack at the deepest point? (b) Immediately after the frame with `head = node(3)` returns (and before the `node(2)` frame runs its two pointer lines), what are `node(4)->next`, `node(3)->next` and `node(2)->next`?
+
+**Q5. A tail-deletion crash.** The "Delete next node" one-liner is `NodeA->next = NodeA->next->next;`. What happens if `NodeA` is the **last** node of the list? What guard should be added?
+
+### Coding Exercises
+
+**E1 (Easy). Insert at a position.** Insert a new node with value `val` so that it ends up at 0-based index `pos` (`0 <= pos <= length`). Use the chapter's two-step insertion in the right order; `pos == 0` replaces the head.
+
+```cpp
+ListNode* insertAt(ListNode* head, int pos, int val);
+// [1, 3, 4], pos = 1, val = 5 -> [1, 5, 3, 4]
+// [1, 3, 4], pos = 0, val = 9 -> [9, 1, 3, 4]
+```
+
+**E2 (Easy–Medium). Reverse the first k nodes.** Reverse only the first `k` nodes and reconnect the rest unchanged. If `k` is at least the length, reverse the whole list.
+
+```cpp
+ListNode* reverseFirstK(ListNode* head, int k);
+// [1, 2, 3, 4, 5], k = 3 -> [3, 2, 1, 4, 5]
+// [1, 2],          k = 5 -> [2, 1]
+```
+
+**E3 (Medium). Reverse between positions (LC 92).** Reverse the nodes from 1-based position `left` to `right` (inclusive) in one pass, leaving the rest in place. Note that `left = 1` changes the head — a stack-allocated dummy node (Chapter 2) makes that case disappear.
+
+```cpp
+ListNode* reverseBetween(ListNode* head, int left, int right);
+// [1, 2, 3, 4, 5], left = 2, right = 4 -> [1, 4, 3, 2, 5]
+// [3, 5],          left = 1, right = 2 -> [5, 3]
+```
+
+#### Dry-Run: Answers
+
+**Q1.** **4** iterations; returns **node(40)**, giving `40 -> 30 -> 20 -> 10 -> nullptr`.
+
+| Iteration | `prev` | `curr` | `next_node` | Pointer reversed | List state after |
+|-----------|--------|--------|-------------|------------------|------------------|
+| Start | nullptr | node(10) | – | – | `10 -> 20 -> 30 -> 40` |
+| 1 | node(10) | node(20) | node(20) | 10->next = nullptr | `nullptr <- 10    20 -> 30 -> 40` |
+| 2 | node(20) | node(30) | node(30) | 20->next = node(10) | `nullptr <- 10 <- 20    30 -> 40` |
+| 3 | node(30) | node(40) | node(40) | 30->next = node(20) | `nullptr <- 10 <- 20 <- 30    40` |
+| 4 | node(40) | nullptr | nullptr | 40->next = node(30) | `nullptr <- 10 <- 20 <- 30 <- 40` |
+
+**Q2.** Prints **`1 -> 3 -> 9 -> NULL`**.
+
+| After | Chain from `a` |
+|-------|----------------|
+| construction | `1 -> 2 -> 3 -> NULL` |
+| (i) bypass node(2) | `1 -> 3 -> NULL` |
+| (ii) `x->next = c->next` (= nullptr) | `1 -> 3 -> NULL`, and `9 -> NULL` |
+| (iii) `c->next = x` | `1 -> 3 -> 9 -> NULL` |
+
+Lines (ii) and (iii) are exactly "insert after `c`" in the correct order. (Node 2 is now unreachable; in real C++ you would `delete` it.)
+
+**Q3.** It **prints forever**: `1 -> 5 -> 5 -> 5 -> …`.
+
+| Line run | `NodeA->next` | `NewNode->next` |
+|----------|---------------|-----------------|
+| `NodeA->next = NewNode` | node(5) | (uninitialized) |
+| `NewNode->next = NodeA->next` | node(5) | **node(5)** — itself |
+
+The only pointer to node(3) was `NodeA->next`, and it was overwritten before being saved, so nodes 3 and 4 are unreachable (leaked), and node(5) is a one-node cycle.
+
+**Q4.** (a) **4** frames: `head = 1, 2, 3, 4` (the `head = 4` frame hits the base case `head->next == nullptr`). (b) The `head = 3` frame ran `head->next->next = head` and `head->next = nullptr`, so:
+
+| Pointer | Value |
+|---------|-------|
+| `node(4)->next` | node(3) |
+| `node(3)->next` | nullptr |
+| `node(2)->next` | **still node(3)** (not yet touched) |
+
+The `node(2)` frame then uses exactly that stale pointer: `head->next->next = head` sets `node(3)->next = node(2)`.
+
+**Q5.** If `NodeA` is the tail, `NodeA->next` is `nullptr`, so `NodeA->next->next` dereferences a null pointer — undefined behaviour, typically a segmentation fault. Guard it:
+
+```cpp
+if (NodeA != nullptr && NodeA->next != nullptr) {
+    ListNode* victim = NodeA->next;
+    NodeA->next = victim->next;
+    delete victim;              // C++: free the bypassed node
+}
+```
+
+**E1 — reference solution**
+
+```cpp
+ListNode* insertAt(ListNode* head, int pos, int val) {
+    if (pos == 0) return new ListNode(val, head);   // New head points to old head
+    ListNode* curr = head;
+    for (int i = 0; i < pos - 1; i++) {             // Walk to the node BEFORE pos
+        curr = curr->next;
+    }
+    ListNode* node = new ListNode(val);
+    node->next = curr->next;                        // Step 1: grab the rest of the list
+    curr->next = node;                              // Step 2: link node in
+    return head;
+}
+```
+
+$O(pos)$ time, $O(1)$ extra space. For `pos = length` the walk ends on the tail and `node->next` becomes `nullptr` — an append.
+
+**E2 — reference solution**
+
+```cpp
+ListNode* reverseFirstK(ListNode* head, int k) {
+    ListNode* prev = nullptr;
+    ListNode* curr = head;
+    int count = 0;
+    while (curr != nullptr && count < k) {   // Standard 3-pointer loop, capped at k
+        ListNode* next_node = curr->next;
+        curr->next = prev;
+        prev = curr;
+        curr = next_node;
+        count++;
+    }
+    if (head != nullptr) head->next = curr;  // Old head is now the group's tail
+    return prev;                             // Last node reversed is the new head
+}
+```
+
+$O(k)$ time, $O(1)$ space. After the loop, `curr` is node(4) for the first example, and the old head node(1) must point to it: `3 -> 2 -> 1 -> 4 -> 5`.
+
+**E3 — reference solution**
+
+```cpp
+ListNode* reverseBetween(ListNode* head, int left, int right) {
+    ListNode dummy(0, head);
+    ListNode* before = &dummy;
+    for (int i = 1; i < left; i++) before = before->next;   // Node just before 'left'
+
+    ListNode* segTail = before->next;    // Will become the tail of the reversed part
+    ListNode* prev = nullptr;
+    ListNode* curr = segTail;
+    for (int i = left; i <= right; i++) {                    // Reverse exactly right-left+1 nodes
+        ListNode* next_node = curr->next;
+        curr->next = prev;
+        prev = curr;
+        curr = next_node;
+    }
+    before->next = prev;       // Connect front part to the new segment head
+    segTail->next = curr;      // Connect segment tail to the untouched rest
+    return dummy.next;
+}
+```
+
+$O(N)$ time, $O(1)$ space. For `[1,2,3,4,5]`, 2, 4: `before` = node(1), the loop reverses `2,3,4`, leaving `prev` = node(4) and `curr` = node(5); rewiring gives `1 -> 4 -> 3 -> 2 -> 5`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

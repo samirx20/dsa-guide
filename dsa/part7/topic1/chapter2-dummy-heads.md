@@ -358,6 +358,158 @@ In competitive programming / LeetCode, people often use `new ListNode(0)` and ac
 
 ---
 
+## Practice & Self-Check
+
+The test for every answer below: *could the head change?* If yes, the dummy node should be doing the work.
+
+### Predict the Output / Trace by Hand
+
+**Q1. The buggy version on a nastier input.** Run the very first `removeElements` in this chapter (no dummy, checks only `curr->next->val`) on `6 -> 6 -> 2 -> 6 -> nullptr` with `val = 6`. What list is returned? Which 6s were removed and which survived?
+
+**Q2. Dummy-node dry-run.** Run `removeElementsOptimal` on `7 -> 7 -> 7 -> 1 -> nullptr` with `val = 7`. Fill in the chapter-style dry-run table (`curr`, `curr->next->val`, match?, action). How many loop iterations run, and what is returned? What would be returned for `7 -> 7 -> nullptr`?
+
+**Q3. Ties in the merge.** Label the nodes `list1 = 1a -> 4 -> 5` and `list2 = 1b -> 2 -> 6`. Using this chapter's dummy-node `mergeTwoLists` (which compares with `<=`), which `1` ends up first? What is the final order? Would the answer change if the comparison were `<`?
+
+**Q4. Why `return dummy.next` and not `&dummy`?** A student "simplifies" the dummy-node pattern:
+
+```cpp
+ListNode* buildWithDummy(ListNode* head) {
+    ListNode dummy(0);
+    dummy.next = head;
+    return &dummy;      // caller will just skip the first node...
+}
+```
+
+What is wrong with returning `&dummy`, and which section of the chapter explains why?
+
+### Coding Exercises
+
+**E1 (Easy). Remove duplicates from a sorted list (keep one copy).** Every value should appear once. Here the head never needs deleting — explain in one sentence why no dummy is required.
+
+```cpp
+ListNode* deleteDuplicates(ListNode* head);
+// [1, 1, 2, 3, 3] -> [1, 2, 3]
+// [1, 1, 1]       -> [1]
+```
+
+**E2 (Easy–Medium). Partition list (LC 86).** Rearrange so that all nodes with value `< x` come before nodes with value `>= x`, preserving the original relative order inside each group. Build two lists with **two** stack-allocated dummy nodes, then join them.
+
+```cpp
+ListNode* partition(ListNode* head, int x);
+// [1, 4, 3, 2, 5, 2], x = 3 -> [1, 2, 2, 4, 3, 5]
+// [2, 1],             x = 2 -> [1, 2]
+```
+
+**E3 (Medium). Remove *all* duplicated values from a sorted list (LC 82).** If a value appears more than once, delete every node with that value. The head itself may be deleted, so use a dummy.
+
+```cpp
+ListNode* deleteAllDuplicates(ListNode* head);
+// [1, 2, 3, 3, 4, 4, 5] -> [1, 2, 5]
+// [1, 1, 1, 2, 3]       -> [2, 3]
+```
+
+#### Dry-Run: Answers
+
+**Q1.** Returns **`6 -> 2 -> nullptr`**. The second and fourth 6s are removed; the head 6 survives.
+
+| Iteration | `curr` | `curr->next->val` | Match? | Action | List after |
+|-----------|--------|-------------------|--------|--------|------------|
+| 1 | node(6) head | 6 (2nd node) | Yes | Bypass | `6 -> 2 -> 6` |
+| 2 | node(6) head | 2 | No | Advance | `6 -> 2 -> 6` |
+| 3 | node(2) | 6 | Yes | Bypass | `6 -> 2` |
+| 4 | node(2) | – (`next` is nullptr) | – | Stop | `6 -> 2` |
+
+Note the code *can* delete the second 6 because it is "a next node" — only the head is unreachable for deletion.
+
+**Q2.** **5** iterations (4 that do work + 1 failed check), returns **node(1)** → `1 -> nullptr`.
+
+| Iteration | `curr` | `curr->next->val` | Match? | Action | List after |
+|-----------|--------|-------------------|--------|--------|------------|
+| 1 | dummy | 7 | Yes | Bypass | `dummy -> 7 -> 7 -> 1` |
+| 2 | dummy | 7 | Yes | Bypass | `dummy -> 7 -> 1` |
+| 3 | dummy | 7 | Yes | Bypass | `dummy -> 1` |
+| 4 | dummy | 1 | No | Advance | `dummy -> 1` |
+| 5 | node(1) | nullptr | – | Stop | `dummy -> 1` |
+
+For `7 -> 7 -> nullptr`: two bypasses leave `dummy.next == nullptr`, the loop stops, and it returns **`nullptr`** (empty list) — no special case needed.
+
+**Q3.** With `<=`, **`1a`** (from `list1`) comes first. Final order: **`1a -> 1b -> 2 -> 4 -> 5 -> 6`**.
+
+| Step | Compare | Attach | `tail` |
+|------|---------|--------|--------|
+| 1 | 1a <= 1b ✓ | 1a | 1a |
+| 2 | 4 <= 1b ✗ | 1b | 1b |
+| 3 | 4 <= 2 ✗ | 2 | 2 |
+| 4 | 4 <= 6 ✓ | 4 | 4 |
+| 5 | 5 <= 6 ✓ | 5 | 5 |
+| end | list1 empty | attach 6 | – |
+
+With `<` (as in the Interview Problems version), step 1 is `1a < 1b` = false, so **`1b` comes first**. The values are identical, but `<=` keeps the merge *stable* (equal elements keep their list1-before-list2 order), which matters when nodes carry extra data.
+
+**Q4.** `dummy` lives on the **stack frame** of `buildWithDummy`. When the function returns, that frame is destroyed, so `&dummy` is a **dangling pointer** — dereferencing it is undefined behaviour. Section 4 ("Memory Management Note") explains this: the stack-allocated dummy is "automatically destroyed when function returns", which is exactly why the pattern returns `dummy.next` (a pointer to a real heap node) and never the dummy itself.
+
+**E1 — reference solution**
+
+```cpp
+ListNode* deleteDuplicates(ListNode* head) {
+    ListNode* curr = head;
+    while (curr != nullptr && curr->next != nullptr) {
+        if (curr->next->val == curr->val) {
+            curr->next = curr->next->next;     // Bypass the duplicate, stay put
+        } else {
+            curr = curr->next;                 // Next value is new: advance
+        }
+    }
+    return head;
+}
+```
+
+$O(N)$ time, $O(1)$ space. No dummy is needed because the *first* occurrence of each value is always kept, so the head node can never be removed.
+
+**E2 — reference solution**
+
+```cpp
+ListNode* partition(ListNode* head, int x) {
+    ListNode lessDummy(0), geDummy(0);             // Two stack dummies
+    ListNode* less = &lessDummy;
+    ListNode* ge = &geDummy;
+    for (ListNode* curr = head; curr != nullptr; curr = curr->next) {
+        if (curr->val < x) { less->next = curr; less = curr; }   // Attach to tail
+        else               { ge->next = curr;   ge = curr;   }
+    }
+    ge->next = nullptr;                // CRITICAL: cut the old link (avoids a cycle)
+    less->next = geDummy.next;         // Join: small list, then big list
+    return lessDummy.next;
+}
+```
+
+$O(N)$ time, $O(1)$ extra space. Without `ge->next = nullptr`, the last `>= x` node (here the `5` in the first example) would keep pointing at whatever followed it originally (the final `2`, which is now in the *less* list), creating a cycle.
+
+**E3 — reference solution**
+
+```cpp
+ListNode* deleteAllDuplicates(ListNode* head) {
+    ListNode dummy(0, head);
+    ListNode* prev = &dummy;                       // Last node known to be unique
+    while (prev->next != nullptr) {
+        ListNode* curr = prev->next;
+        if (curr->next != nullptr && curr->next->val == curr->val) {
+            int dup = curr->val;
+            while (prev->next != nullptr && prev->next->val == dup) {
+                prev->next = prev->next->next;     // Bypass EVERY node with this value
+            }
+        } else {
+            prev = prev->next;                     // curr is unique: keep it
+        }
+    }
+    return dummy.next;
+}
+```
+
+$O(N)$ time, $O(1)$ space. For `[1,1,1,2,3]`, `prev` stays on the dummy while all three 1s are bypassed, so `dummy.next` becomes node(2) — the head deletion happens with no special code.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.

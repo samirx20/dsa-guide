@@ -513,6 +513,168 @@ ListNode* reverseKGroup(ListNode* head, int k) {
 
 ---
 
+## Practice & Self-Check
+
+Each question re-runs one of the solutions above on a new input. Name the technique first (3-pointer reversal, dummy + tail, fast/slow, gap pointers, hash map + doubly linked list), then trace.
+
+### Predict the Output / Trace by Hand
+
+**Q1. Remove Nth From End — deleting the head.** Run Problem 4's `removeNthFromEnd` on `1 -> 2 -> 3 -> 4 -> 5` with `n = 5`. Where are `left` and `right` after the "move right n+1 steps" loop? How many times does the `while (right != nullptr)` loop run? What is returned, and why would the code crash or misbehave without the dummy node?
+
+**Q2. Find the Duplicate on a new array.** Trace Problem 3's `findDuplicate` on `nums = [3, 1, 3, 4, 2]`. Give the Phase 1 values of `slow` and `fast` after each `do` iteration, then Phase 2. What is returned?
+
+**Q3. Reorder List, even length.** Run Problem 5's `reorderList` on `1 -> 2 -> 3 -> 4 -> 5 -> 6`. Where does `slow` stop, what are the two halves after the split and reversal, and what is the final list?
+
+**Q4. LRU Cache trace.** With `LRUCache cache(2)`, run: `put(1,1)`, `put(2,2)`, `get(1)`, `put(3,3)`, `get(2)`, `put(4,4)`, `get(1)`, `get(3)`, `get(4)`. Give each `get`'s return value and the list order (most recent first) after every operation.
+
+**Q5. Reverse Nodes in k-Group, k = 3.** What does Problem 7's `reverseKGroup` return for `1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8` with `k = 3`? After the first group is processed, which node is `groupPrev`?
+
+### Coding Exercises
+
+**E1 (Easy). k-th node from the end.** Return the value of the k-th node from the end (1-based) in one pass, using the gap technique from Problem 4. Assume `1 <= k <= length`.
+
+```cpp
+int kthFromEnd(ListNode* head, int k);
+// [1, 2, 3, 4, 5], k = 2 -> 4
+// [1, 2, 3, 4, 5], k = 5 -> 1
+```
+
+**E2 (Easy–Medium). Add Two Numbers (LC 2).** Each list stores a non-negative integer with its digits in **reverse** order (ones digit first). Return their sum as a list in the same format. Use a dummy node + `tail` like Merge Two Sorted Lists, and carry like grade-school addition.
+
+```cpp
+ListNode* addTwoNumbers(ListNode* l1, ListNode* l2);
+// [2, 4, 3] + [5, 6, 4] -> [7, 0, 8]     (342 + 465 = 807)
+// [9, 9]    + [1]       -> [0, 0, 1]     (99 + 1 = 100)
+```
+
+**E3 (Medium). Rotate List (LC 61).** Rotate the list to the right by `k` places. `k` may exceed the length — reduce it with `k % length`. Hint: temporarily link the tail to the head, then cut at the right place.
+
+```cpp
+ListNode* rotateRight(ListNode* head, int k);
+// [1, 2, 3, 4, 5], k = 2 -> [4, 5, 1, 2, 3]
+// [0, 1, 2],       k = 4 -> [2, 0, 1]
+```
+
+#### Dry-Run: Answers
+
+**Q1.** After moving `right` $n + 1 = 6$ steps (`dummy → 1 → 2 → 3 → 4 → 5 → nullptr`), **`right = nullptr`** and **`left = dummy`**. The `while` loop runs **0** times. `left->next` is node(1), so node(1) is bypassed and deleted; `dummy.next` is node(2) → returns **`2 -> 3 -> 4 -> 5`**.
+
+| Step | `left` | `right` |
+|------|--------|---------|
+| Init | dummy | dummy |
+| after 6 moves | dummy | nullptr |
+| while loop | (skipped) | (skipped) |
+| delete `left->next` | dummy → node(2) | – |
+
+Without the dummy, `left` and `right` would have to start at `head`; there is no node *before* node(1) for `left` to stop on, and moving `right` $n + 1 = 6$ steps would step past `nullptr` (crash). The dummy supplies that "node before the head".
+
+**Q2.** Returns **3**.
+
+Phase 1 (`slow = nums[slow]`, `fast = nums[nums[fast]]`), starting with `slow = fast = nums[0] = 3`:
+
+| Iteration | `slow` | `fast` | Equal? |
+|-----------|--------|--------|--------|
+| Init | 3 | 3 | (do-while: move first) |
+| 1 | nums[3] = 4 | nums[nums[3]] = nums[4] = 2 | No |
+| 2 | nums[4] = 2 | nums[nums[2]] = nums[3] = 4 | No |
+| 3 | nums[2] = 3 | nums[nums[4]] = nums[2] = 3 | **Yes** |
+
+Phase 2: `slow = nums[0] = 3`, `fast = 3` → already equal, loop body never runs → return **3**. (Index-graph: 0 → 3 → 4 → 2 → 3, so value 3 is the entry of the cycle, i.e. the duplicate.)
+
+**Q3.** `slow` stops at **node(3)**. Halves: `1 -> 2 -> 3` and `4 -> 5 -> 6`, reversed to `6 -> 5 -> 4`. Final list: **`1 -> 6 -> 2 -> 5 -> 3 -> 4`**.
+
+| Merge step | `first` | `second` | Link made | Chain so far |
+|------------|---------|----------|-----------|--------------|
+| 1 | 1 | 6 | 1→6→2 | `1 6 2 …` |
+| 2 | 2 | 5 | 2→5→3 | `1 6 2 5 3 …` |
+| 3 | 3 | 4 | 3→4→nullptr | `1 6 2 5 3 4` |
+| end | nullptr | nullptr | – | done |
+
+(Middle-finding: `slow`/`fast` go (1,1) → (2,3) → (3,5); then `fast->next->next` is `nullptr`, so it stops.)
+
+**Q4.** `get` results: **1, −1, −1, 3, 4**.
+
+| Operation | Returns | List (MRU → LRU) | Note |
+|-----------|---------|------------------|------|
+| `put(1,1)` | – | [1] | |
+| `put(2,2)` | – | [2, 1] | |
+| `get(1)` | **1** | [1, 2] | 1 moved to front |
+| `put(3,3)` | – | [3, 1] | full → evict tail **2** |
+| `get(2)` | **−1** | [3, 1] | 2 was evicted |
+| `put(4,4)` | – | [4, 3] | full → evict tail **1** |
+| `get(1)` | **−1** | [4, 3] | |
+| `get(3)` | **3** | [3, 4] | |
+| `get(4)` | **4** | [4, 3] | |
+
+**Q5.** Returns **`3 -> 2 -> 1 -> 6 -> 5 -> 4 -> 7 -> 8`** (the last group `7, 8` has fewer than 3 nodes, so the `kth` check returns early and leaves it as-is). After the first group, `groupPrev` = **node(1)** — the old first node of the group, which is now its tail (`ListNode* tail = groupPrev->next; … groupPrev = tail;`).
+
+| Group | kth | groupNext | After rewiring |
+|-------|-----|-----------|----------------|
+| 1, 2, 3 | node(3) | node(4) | `3 2 1 4 5 6 7 8`, groupPrev = node(1) |
+| 4, 5, 6 | node(6) | node(7) | `3 2 1 6 5 4 7 8`, groupPrev = node(4) |
+| 7, 8, ? | – | – | `kth` hits nullptr → return |
+
+**E1 — reference solution**
+
+```cpp
+int kthFromEnd(ListNode* head, int k) {
+    ListNode* right = head;
+    for (int i = 0; i < k; i++) right = right->next;   // Gap of k nodes
+    ListNode* left = head;
+    while (right != nullptr) {                         // Move both until right falls off
+        left = left->next;
+        right = right->next;
+    }
+    return left->val;                                  // left is k nodes from the end
+}
+```
+
+$O(N)$ time, one pass, $O(1)$ space. No dummy is needed because we *read* the node instead of deleting it (we need the node itself, not the one before it).
+
+**E2 — reference solution**
+
+```cpp
+ListNode* addTwoNumbers(ListNode* l1, ListNode* l2) {
+    ListNode dummy(0);
+    ListNode* tail = &dummy;
+    int carry = 0;
+    while (l1 != nullptr || l2 != nullptr || carry != 0) {   // Keep going for a final carry
+        int sum = carry;
+        if (l1 != nullptr) { sum += l1->val; l1 = l1->next; }
+        if (l2 != nullptr) { sum += l2->val; l2 = l2->next; }
+        tail->next = new ListNode(sum % 10);                 // Digit for this place
+        tail = tail->next;
+        carry = sum / 10;
+    }
+    return dummy.next;
+}
+```
+
+$O(\max(m, n))$ time. For `[9,9] + [1]`: `9+1 = 10` → digit 0, carry 1; `9+0+1 = 10` → digit 0, carry 1; both lists empty but `carry = 1` → digit 1. Result `[0,0,1]`.
+
+**E3 — reference solution**
+
+```cpp
+ListNode* rotateRight(ListNode* head, int k) {
+    if (head == nullptr || head->next == nullptr || k == 0) return head;
+    int n = 1;
+    ListNode* tail = head;
+    while (tail->next != nullptr) { tail = tail->next; n++; }   // Length + tail
+    k %= n;
+    if (k == 0) return head;                                    // Full rotations: no change
+    ListNode* newTail = head;
+    for (int i = 0; i < n - k - 1; i++) newTail = newTail->next;  // (n-k)-th node
+    ListNode* newHead = newTail->next;
+    newTail->next = nullptr;       // Cut
+    tail->next = head;             // Old tail joins old head
+    return newHead;
+}
+```
+
+$O(N)$ time, $O(1)$ space. For `[0,1,2]`, `k = 4`: `n = 3`, `k = 1`, the new tail is node(1) (index 1), the new head node(2) → `[2, 0, 1]`.
+
+---
+
 ## Interactive Visualization & `shadcn/ui` Specification (For Claude)
 
 > **UI Constraint:** Use **`shadcn/ui` primitives exclusively** (`<Card>`, `<CardHeader>`, `<CardTitle>`, `<CardContent>`, `<Tabs>`, `<TabsList>`, `<TabsTrigger>`, `<TabsContent>`, `<Slider>`, `<Button>`, `<Badge>`, `<Select>`, `<Switch>`, `<Table>`, `<Tooltip>`, `<ScrollArea>`). Do **not** use raw browser `<input type="range">`, `<select>`, or default checkboxes.
