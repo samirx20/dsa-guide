@@ -1,4 +1,4 @@
-# Part 4, Topic 2: Metadata & Advanced Retrieval
+# Part 8, Topic 2: Metadata & Advanced Retrieval
 ## Chapter 1: Vector Databases
 
 **Prerequisite Knowledge:** Basic Python dictionaries, lists, and an understanding of embeddings.

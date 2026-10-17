@@ -1,4 +1,4 @@
-# Part 4, Topic 1: Vector Search & Embeddings
+# Part 8, Topic 1: Vector Search & Embeddings
 ## Chapter 1: Embeddings
 
 **Prerequisite Knowledge:** Basic understanding of API calls and lists in Python.

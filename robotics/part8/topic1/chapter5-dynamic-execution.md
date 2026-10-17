@@ -1,4 +1,4 @@
-# Part 3, Topic 2: Function Routing
+# Part 8, Topic 2: Function Routing
 ## Chapter 2: Dynamic Execution
 
 **Prerequisite Knowledge:** The Chat Completions API, Tool Calling, and basic Python error handling.

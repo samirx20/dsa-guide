@@ -1,4 +1,4 @@
-# Part 5, Topic 3: Caching & Performance
+# Part 6, Topic 3: Caching & Performance
 ## Chapter 2: Redis Caching Patterns
 
 ### What You'll Learn
@@ -314,7 +314,7 @@ const products = await getWithLock(
 
 ## 8. Redis as Session Store
 
-Ties back to Part 4 auth — store sessions in Redis for speed.
+Ties back to session-based authentication — store sessions in Redis for speed.
 
 ```typescript
 // lib/sessions.ts

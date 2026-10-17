@@ -1,4 +1,4 @@
-# Part 2, Topic 2: Physics-First Rule Engines
+# Part 7, Topic 2: Physics-First Rule Engines
 ## Project 1: Thermal Guardrail
 
 AI-generated commands must respect physical thermal limits. This project builds a rule engine that validates, rejects, or modifies API commands based on equipment-specific thermal constraints.

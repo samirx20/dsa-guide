@@ -1,4 +1,4 @@
-# Part 1, Topic 1: Asynchronous Python
+# Part 5, Topic 1: Asynchronous Python
 ## Chapter 3: Async HTTP
 
 **Prerequisite Knowledge:** Understanding of the event loop, `async`/`await` keywords, and basic HTTP requests (like GET and POST).

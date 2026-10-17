@@ -1,4 +1,4 @@
-# Part 6, Topic 1: System Integration
+# Part 8, Topic 1: System Integration
 ## Chapter 2: Observability
 
 **Prerequisite Knowledge:** Basic understanding of functions, logging, and performance timing.

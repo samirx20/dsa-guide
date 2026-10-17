@@ -1,4 +1,4 @@
-# Part 3, Topic 1: LLM APIs & Message History
+# Part 8, Topic 1: LLM APIs & Message History
 ## Chapter 1: The Chat Completions API
 
 **Prerequisite Knowledge:** Basic understanding of Python lists, dictionaries, and API requests.

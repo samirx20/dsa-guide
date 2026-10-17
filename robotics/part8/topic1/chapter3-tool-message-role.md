@@ -1,4 +1,4 @@
-# Part 3, Topic 1: LLM APIs & Message History
+# Part 8, Topic 1: LLM APIs & Message History
 ## Chapter 3: The Tool Message Role
 
 **Prerequisite Knowledge:** The Chat Completions API and JSON structure.

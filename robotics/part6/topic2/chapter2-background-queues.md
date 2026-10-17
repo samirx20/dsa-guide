@@ -1,4 +1,4 @@
-# Part 5, Topic 2: Docker & Background Workers
+# Part 6, Topic 2: Docker & Background Workers
 ## Chapter 2: Background Queues
 
 ### What You'll Learn

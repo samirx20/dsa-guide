@@ -1,4 +1,4 @@
-# Part 6, Topic 1: System Integration
+# Part 8, Topic 1: System Integration
 ## Chapter 1: Architecture Review
 
 **Prerequisite Knowledge:** Basic understanding of functions, Pydantic models, and the concept of an AI agent.

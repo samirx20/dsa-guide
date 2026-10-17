@@ -1,4 +1,4 @@
-# Part 1, Topic 2: FastAPI Development
+# Part 5, Topic 2: FastAPI Development
 ## Chapter 1: FastAPI Basics
 
 **Prerequisite Knowledge:** Basic understanding of Python functions, classes, and HTTP requests (GET/POST).

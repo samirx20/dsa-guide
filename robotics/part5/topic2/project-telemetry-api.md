@@ -1,4 +1,4 @@
-# Part 1, Topic 2: FastAPI Development
+# Part 5, Topic 2: FastAPI Development
 ## Project 1: Telemetry API
 
 Build a high-performance async API that exposes machine telemetry data. The API supports creating and querying sensor readings, uses dependency-injected mock storage, and provides full OpenAPI documentation.

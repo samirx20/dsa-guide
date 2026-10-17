@@ -1,4 +1,4 @@
-# Part 3, Topic 1: LLM APIs & Message History
+# Part 8, Topic 1: LLM APIs & Message History
 ## Chapter 2: Context Windows
 
 **Prerequisite Knowledge:** Basic understanding of strings and the Chat Completions API.

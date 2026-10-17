@@ -1,4 +1,4 @@
-# Part 1, Topic 1: Asynchronous Python
+# Part 5, Topic 1: Asynchronous Python
 ## Chapter 1: The Event Loop
 
 **Prerequisite Knowledge:** Basic Python functions, understanding of the difference between executing code and waiting for external things (like downloading a file).

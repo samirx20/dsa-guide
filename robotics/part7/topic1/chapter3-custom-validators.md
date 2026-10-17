@@ -1,4 +1,4 @@
-# Part 2, Topic 1: Data Validation with Pydantic
+# Part 7, Topic 1: Data Validation with Pydantic
 ## Chapter 3: Custom Validators
 
 **Prerequisite Knowledge:** Basic Pydantic `BaseModel`s and Field constraints.

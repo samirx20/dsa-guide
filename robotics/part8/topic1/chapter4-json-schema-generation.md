@@ -1,4 +1,4 @@
-# Part 3, Topic 2: Function Routing
+# Part 8, Topic 2: Function Routing
 ## Chapter 1: JSON Schema Generation
 
 **Prerequisite Knowledge:** Basic understanding of Python functions, type hints, and tool calling.

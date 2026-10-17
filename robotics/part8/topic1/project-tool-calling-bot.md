@@ -1,4 +1,4 @@
-# Part 3, Topic 2: Function Routing
+# Part 8, Topic 2: Function Routing
 ## Project 1: Tool-Calling Diagnostic Bot
 
 An LLM can only monitor your servers if it can call functions that read real data. This project builds a diagnostic bot that generates JSON schemas from Python functions, simulates LLM tool calls, routes and executes them, and returns structured results in a full conversation loop.

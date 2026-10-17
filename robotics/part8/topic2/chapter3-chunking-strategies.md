@@ -1,4 +1,4 @@
-# Part 4, Topic 1: Vector Search & Embeddings
+# Part 8, Topic 1: Vector Search & Embeddings
 ## Chapter 3: Chunking Strategies
 
 **Prerequisite Knowledge:** Basic understanding of strings, lists, and loops in Python.

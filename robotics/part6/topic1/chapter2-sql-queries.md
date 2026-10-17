@@ -1,4 +1,4 @@
-# Part 3, Topic 1: Relational Databases & SQL
+# Part 6, Topic 1: Relational Databases & SQL
 ## Chapter 2: SQL Queries (CRUD & JOINs)
 
 ### What You'll Learn

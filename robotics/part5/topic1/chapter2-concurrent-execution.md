@@ -1,4 +1,4 @@
-# Part 1, Topic 1: Asynchronous Python
+# Part 5, Topic 1: Asynchronous Python
 ## Chapter 2: Concurrent Execution
 
 **Prerequisite Knowledge:** Understanding of the event loop (Chapter 1), `async` and `await` keywords.

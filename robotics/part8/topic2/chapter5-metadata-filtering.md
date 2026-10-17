@@ -1,4 +1,4 @@
-# Part 4, Topic 2: Metadata & Advanced Retrieval
+# Part 8, Topic 2: Metadata & Advanced Retrieval
 ## Chapter 2: Metadata Filtering
 
 **Prerequisite Knowledge:** Basic understanding of Python dictionaries and lists.

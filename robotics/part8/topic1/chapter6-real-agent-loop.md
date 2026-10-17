@@ -1,4 +1,4 @@
-# Part 3, Topic 2: Function Routing
+# Part 8, Topic 2: Function Routing
 ## Chapter 3: The Real Agent Loop
 
 **Prerequisite Knowledge:** The Chat Completions API, Tool Calling, Tool Message Role, FunctionRouter, and JSON Schema Generation.

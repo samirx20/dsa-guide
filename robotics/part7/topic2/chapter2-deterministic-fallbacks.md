@@ -1,4 +1,4 @@
-# Part 2, Topic 2: Physics-First Rule Engines
+# Part 7, Topic 2: Physics-First Rule Engines
 ## Chapter 2: Deterministic Fallbacks
 
 **Prerequisite Knowledge:** Basic Python dictionary usage, understanding of functions and basic conditional logic (`if`/`else`).

@@ -1,4 +1,4 @@
-# Part 1, Topic 1: Asynchronous Python
+# Part 5, Topic 1: Asynchronous Python
 ## Project 1: Async Data Fetcher from Mock Sensor APIs
 
 Now that you understand event loops, concurrent execution, and async HTTP, it is time to build a script that fetches data from 3 different mock sensor APIs simultaneously and compares the performance against a sequential approach.

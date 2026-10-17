@@ -1,4 +1,4 @@
-# Part 2, Topic 1: Data Validation with Pydantic
+# Part 7, Topic 1: Data Validation with Pydantic
 ## Project 1: Sensor Schema Validator
 
 LLMs produce JSON that looks plausible but may contain physically impossible or dangerous values. This project builds a complete validation layer that rejects anomalous sensor readings before they can influence any downstream system.

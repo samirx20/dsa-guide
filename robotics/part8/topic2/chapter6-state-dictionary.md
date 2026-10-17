@@ -1,4 +1,4 @@
-# Part 5, Topic 1: State Machines & Memory
+# Part 8, Topic 1: State Machines & Memory
 ## Chapter 1: The State Dictionary
 
 **Prerequisite Knowledge:** Basic understanding of Python dictionaries and functions.

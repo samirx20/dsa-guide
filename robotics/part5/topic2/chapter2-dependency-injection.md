@@ -1,4 +1,4 @@
-# Part 1, Topic 2: FastAPI Development
+# Part 5, Topic 2: FastAPI Development
 ## Chapter 2: Dependency Injection
 
 **Prerequisite Knowledge:** Basic understanding of FastAPI endpoints and Python functions.

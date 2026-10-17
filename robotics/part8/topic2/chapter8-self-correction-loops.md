@@ -1,4 +1,4 @@
-# Part 5, Topic 1: State Machines & Memory
+# Part 8, Topic 1: State Machines & Memory
 ## Chapter 3: Self-Correction Loops
 
 **Prerequisite Knowledge:** Basic understanding of Try/Except blocks, Pydantic, and JSON.

@@ -1,4 +1,4 @@
-# Part 2, Topic 2: Physics-First Rule Engines
+# Part 7, Topic 2: Physics-First Rule Engines
 ## Chapter 1: Middleware Interceptors
 
 **Prerequisite Knowledge:** Python functions, basic Type Hinting (Part 0), and an understanding of what an AI "command" looks like (usually a dictionary).
